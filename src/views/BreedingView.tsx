@@ -1,18 +1,17 @@
 import { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { Slave } from '../types';
+import CustomSelect, { Option } from '../components/CustomSelect';
 
 export default function BreedingView() {
   const slaves = useGameStore((state) => state.slaves);
   const addSlave = useGameStore((state) => state.addSlave);
 
-  // 記錄使用者選擇的雙親 ID
   const [parent1Id, setParent1Id] = useState<string>('');
   const [parent2Id, setParent2Id] = useState<string>('');
   const [resultMessage, setResultMessage] = useState<string>('');
 
   const handleBreed = () => {
-    // 基礎防呆檢查
     if (!parent1Id || !parent2Id) {
       setResultMessage('請先選擇兩名對象！');
       return;
@@ -24,21 +23,17 @@ export default function BreedingView() {
 
     const p1 = slaves.find(s => s.id === parent1Id);
     const p2 = slaves.find(s => s.id === parent2Id);
-
     if (!p1 || !p2) return;
 
-    // 獨立數學運算：平均值 + 突變亂數 (-10 ~ 10)，並限制在 1~100 之間
     const calcStat = (s1: number, s2: number) => {
       const base = Math.floor((s1 + s2) / 2);
       const mutation = Math.floor(Math.random() * 21) - 10;
       return Math.max(1, Math.min(100, base + mutation));
     };
 
-    // 50% 機率隨機繼承種族
     const childRace = Math.random() > 0.5 ? p1.race : p2.race;
     const childId = 'child-' + Math.random().toString(36).substring(2, 9);
 
-    // 建立新生兒資料模型
     const newChild: Slave = {
       id: childId,
       name: `未知的 ${childRace} (新生兒)`,
@@ -49,24 +44,23 @@ export default function BreedingView() {
         intelligence: calcStat(p1.primaryStats.intelligence, p2.primaryStats.intelligence),
         obedience: calcStat(p1.primaryStats.obedience, p2.primaryStats.obedience),
       },
-      // 新生兒預設體力滿載且無壓力
       conditionStats: { stamina: 100, stress: 0, rebellion: 0 },
       traits: [],
       backgroundStory: '在基地中誕生的新生代，繼承了雙親的血脈。',
-      parents: {
-        fatherId: p1.id,
-        motherId: p2.id
-      }
+      parents: { fatherId: p1.id, motherId: p2.id }
     };
 
-    // 寫入狀態機並回報成功
     addSlave(newChild);
     setResultMessage(`繁衍成功！新生兒 [${newChild.name}] 已加入基地排程。`);
-    
-    // 清空選擇，方便下一次操作
     setParent1Id('');
     setParent2Id('');
   };
+
+  // 將奴隸名單轉換為 CustomSelect 需要的 Option 格式
+  const slaveOptions: Option[] = slaves.map(s => ({
+    value: s.id,
+    label: `${s.name} (${s.race})`
+  }));
 
   return (
     <div className="w-full flex flex-col gap-4 pb-10">
@@ -80,33 +74,16 @@ export default function BreedingView() {
           選擇兩名成員進行繁衍。後代的能力值將繼承雙親的平均值，並帶有 [-10, 10] 的隨機突變。
         </p>
 
-        {/* 下拉選擇器一 */}
         <div className="flex flex-col gap-2">
           <label className="text-sm text-gray-300 font-bold">血統來源一 (父系/母系皆可)：</label>
-          <select 
-            className="bg-gray-900 border border-gray-600 text-gray-200 p-3 rounded outline-none focus:border-purple-500"
-            value={parent1Id}
-            onChange={(e) => setParent1Id(e.target.value)}
-          >
-            <option value="">-- 請選擇 --</option>
-            {slaves.map(s => <option key={s.id} value={s.id}>{s.name} ({s.race})</option>)}
-          </select>
+          <CustomSelect options={slaveOptions} value={parent1Id} onChange={setParent1Id} focusColor="purple" />
         </div>
 
-        {/* 下拉選擇器二 */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 relative z-40">
           <label className="text-sm text-gray-300 font-bold">血統來源二：</label>
-          <select 
-            className="bg-gray-900 border border-gray-600 text-gray-200 p-3 rounded outline-none focus:border-purple-500"
-            value={parent2Id}
-            onChange={(e) => setParent2Id(e.target.value)}
-          >
-            <option value="">-- 請選擇 --</option>
-            {slaves.map(s => <option key={s.id} value={s.id}>{s.name} ({s.race})</option>)}
-          </select>
+          <CustomSelect options={slaveOptions} value={parent2Id} onChange={setParent2Id} focusColor="purple" />
         </div>
 
-        {/* 執行按鈕 */}
         <button 
           onClick={handleBreed}
           className="mt-2 bg-purple-900 hover:bg-purple-800 text-white font-bold py-3 rounded-lg border border-purple-700 transition-colors shadow-md"
@@ -114,7 +91,6 @@ export default function BreedingView() {
           開始繁衍
         </button>
 
-        {/* 系統訊息提示區 */}
         {resultMessage && (
           <div className="p-3 bg-gray-900 border border-green-800 text-green-400 rounded text-sm text-center animate-pulse">
             {resultMessage}
