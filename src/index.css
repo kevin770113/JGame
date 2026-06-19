@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
+html, body {
   width: 100%;
   height: 100%;
   margin: 0;
@@ -10,7 +10,16 @@ html, body, #root {
   background-color: #121212; 
   color: #e5e7eb; 
   
-  /* 絕對鎖定網頁底層，禁止手機瀏覽器的彈性拉扯與整頁滑動 */
+  /* 鎖定底層滑動 */
   overflow: hidden;
   overscroll-behavior-y: none;
+  /* 禁止一些特殊的手勢操作引發畫面偏移 */
+  touch-action: pan-x pan-y; 
+}
+
+/* 將 React 的根節點絕對釘死在視窗的四個角落 */
+#root {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
