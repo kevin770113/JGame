@@ -2,8 +2,9 @@ import { useState } from 'react';
 import Header from './components/Header';
 import Navigation from './components/Navigation';
 import BaseView from './views/BaseView';
-// 新增引入 MarketView
 import MarketView from './views/MarketView';
+// 新增引入 BreedingView
+import BreedingView from './views/BreedingView';
 
 function App() {
   const [currentView, setCurrentView] = useState('Base');
@@ -13,9 +14,9 @@ function App() {
       case 'Base':
         return <BaseView />;
       case 'Market':
-        return <MarketView />; // 替換為真實的市場組件
+        return <MarketView />;
       case 'Breeding':
-        return <div className="text-gray-500 text-center mt-10">繁衍實驗室建置中...</div>;
+        return <BreedingView />; // 替換為真實的繁衍組件
       case 'Dispatch':
         return <div className="text-gray-500 text-center mt-10">外部派遣建置中...</div>;
       case 'Map':
