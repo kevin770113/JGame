@@ -1,15 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Navigation from './components/Navigation';
 import BaseView from './views/BaseView';
 import MarketView from './views/MarketView';
 import BreedingView from './views/BreedingView';
 import DispatchView from './views/DispatchView';
-// 新增引入 MapView
 import MapView from './views/MapView';
+import { useGameStore } from './store/useGameStore';
 
 function App() {
   const [currentView, setCurrentView] = useState('Base');
+
+  // 從大腦讀取市場狀態與背景批貨函數
+  const marketSlaves = useGameStore((state) => state.marketSlaves);
+  const triggerBackgroundMarketRefresh = useGameStore((state) => state.triggerBackgroundMarketRefresh);
+
+  // 遊戲啟動監聽器 (Component Mount)
+  useEffect(() => {
+    // 只要遊戲一啟動，且發現大腦裡的市場是空的，就立刻在背景無聲無息地觸發 AI 批貨
+    if (marketSlaves.length === 0) {
+      triggerBackgroundMarketRefresh();
+    }
+  }, []); // 空的依賴陣列代表只在進入遊戲時檢查一次
 
   const renderView = () => {
     switch (currentView) {
@@ -22,7 +34,7 @@ function App() {
       case 'Dispatch':
         return <DispatchView />;
       case 'Map':
-        return <MapView />; // 替換為真實的地圖組件
+        return <MapView />;
       default:
         return <BaseView />;
     }
