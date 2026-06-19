@@ -1,23 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import SlaveCard from '../components/SlaveCard';
+import { generateSlaveIdentity } from '../services/aiService'; // 引入您剛剛建立的 AI 通訊層
 import { Slave, Race } from '../types';
 
-// 擴充一個帶有價格的型別，專供市場使用
 interface MarketSlave extends Slave {
   price: number;
 }
 
 const RACES: Race[] = ['Orc', 'Dwarf', 'Elf', 'Dragon', 'Undead', 'Human'];
 
-// 簡易亂數產生器：生成隨機待售奴隸
 const generateMarketSlave = (): MarketSlave => {
   const race = RACES[Math.floor(Math.random() * RACES.length)];
   const id = 'market-' + Math.random().toString(36).substring(2, 9);
   
   return {
     id,
-    name: `未知的 ${race}`, // 之後這部分會串接 AI 來生成專屬名字
+    name: `未知的 ${race}`, 
     race,
     primaryStats: { 
       combat: Math.floor(Math.random() * 60) + 20, 
@@ -27,33 +26,48 @@ const generateMarketSlave = (): MarketSlave => {
     },
     conditionStats: { stamina: 100, stress: 0, rebellion: Math.floor(Math.random() * 20) },
     traits: [],
-    backgroundStory: '在戰亂中流離失所的流民，正在等待買家。',
-    price: Math.floor(Math.random() * 800) + 200, // 價格介於 200~1000
+    backgroundStory: '正在等待買家...',
+    price: Math.floor(Math.random() * 800) + 200, 
   };
 };
 
 export default function MarketView() {
-  // 從狀態機讀取金錢與動作
   const gold = useGameStore((state) => state.player.gold);
   const deductGold = useGameStore((state) => state.deductGold);
   const addSlave = useGameStore((state) => state.addSlave);
   
   const [marketSlaves, setMarketSlaves] = useState<MarketSlave[]>([]);
 
-  // 畫面初次載入時，生成 3 名待售奴隸
   useEffect(() => {
-    setMarketSlaves([generateMarketSlave(), generateMarketSlave(), generateMarketSlave()]);
+    const initMarket = async () => {
+      // 1. 先快速生成 3 個基礎商品，保證玩家秒開畫面不卡頓
+      const baseSlaves = [generateMarketSlave(), generateMarketSlave(), generateMarketSlave()];
+      setMarketSlaves(baseSlaves);
+
+      // 2. 在背景非同步呼叫 AI，為這三個商品賦予有血有肉的靈魂
+      const aiEnrichedSlaves = await Promise.all(
+        baseSlaves.map(async (slave) => {
+          const aiData = await generateSlaveIdentity(slave.race);
+          return {
+            ...slave,
+            name: aiData.name,
+            backgroundStory: aiData.story
+          };
+        })
+      );
+
+      // 3. 靜悄悄地把假名稱替換成 AI 生成的精緻文本
+      setMarketSlaves(aiEnrichedSlaves);
+    };
+
+    initMarket();
   }, []);
 
-  // 處理購買邏輯
   const handleBuy = (slave: MarketSlave) => {
     if (gold >= slave.price) {
-      // 1. 扣錢
       deductGold(slave.price);
-      // 2. 拔除 price 屬性後，將純淨的 slave 資料加入玩家陣列
       const { price, ...slaveData } = slave;
       addSlave(slaveData);
-      // 3. 從市場的架上移除已購買的奴隸
       setMarketSlaves(marketSlaves.filter(s => s.id !== slave.id));
     } else {
       alert('資金不足！');
@@ -68,7 +82,7 @@ export default function MarketView() {
       </div>
       
       <p className="text-sm text-gray-400 mb-2">
-        這裡充斥著來自前線的戰俘與流民。每次進入市場，待售名單都會更新。
+        每次進入市場，AI 均會自動為待售名單注入全新的名字與身世背景。
       </p>
 
       <div className="flex flex-col gap-6">
@@ -79,10 +93,13 @@ export default function MarketView() {
         ) : (
           marketSlaves.map((slave) => (
             <div key={slave.id} className="relative group flex flex-col gap-2">
-              {/* 重複利用我們先前刻好的精美卡片 */}
               <SlaveCard slave={slave} />
               
-              {/* 購買按鈕面板 */}
+              {/* 新增身世背景簡介區塊，提升劇情感 */}
+              <div className="bg-gray-850 px-4 py-2 text-xs text-gray-400 italic border-l-2 border-gray-600 bg-gray-800/30">
+                背景: {slave.backgroundStory}
+              </div>
+
               <div className="flex justify-between items-center bg-gray-900 px-4 py-3 rounded-lg border border-gray-700 shadow-inner">
                 <span className="text-gray-300 text-sm">
                   售價: <strong className="text-yellow-500 text-lg ml-1">{slave.price}</strong> 
