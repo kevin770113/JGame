@@ -3,8 +3,9 @@ import Header from './components/Header';
 import Navigation from './components/Navigation';
 import BaseView from './views/BaseView';
 import MarketView from './views/MarketView';
-// 新增引入 BreedingView
 import BreedingView from './views/BreedingView';
+// 新增引入 DispatchView
+import DispatchView from './views/DispatchView';
 
 function App() {
   const [currentView, setCurrentView] = useState('Base');
@@ -16,9 +17,9 @@ function App() {
       case 'Market':
         return <MarketView />;
       case 'Breeding':
-        return <BreedingView />; // 替換為真實的繁衍組件
+        return <BreedingView />;
       case 'Dispatch':
-        return <div className="text-gray-500 text-center mt-10">外部派遣建置中...</div>;
+        return <DispatchView />; // 替換為真實的派遣組件
       case 'Map':
         return <div className="text-gray-500 text-center mt-10">據點遷移建置中...</div>;
       default:
