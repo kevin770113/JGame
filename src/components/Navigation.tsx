@@ -13,12 +13,13 @@ export default function Navigation({ currentView, setCurrentView }: NavigationPr
   ];
 
   return (
-    <nav className="bg-gray-900 border-t border-gray-700 flex justify-around p-2 z-10">
+    // 加入 overflow-x-auto 允許窄螢幕橫向滑動
+    <nav className="bg-gray-900 border-t border-gray-700 flex justify-start sm:justify-around p-2 z-10 overflow-x-auto gap-2">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => setCurrentView(tab.id)}
-          className={`py-2 px-2 sm:px-4 rounded transition-colors text-sm sm:text-base ${
+          className={`py-2 px-2 sm:px-4 shrink-0 rounded transition-colors text-xs sm:text-base ${
             currentView === tab.id
               ? 'bg-blood-red text-white font-bold'
               : 'text-gray-400 hover:bg-gray-800'
