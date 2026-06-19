@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
+import CustomSelect, { Option } from '../components/CustomSelect';
 
-// 定義任務的資料結構
 interface Mission {
   id: string;
   title: string;
@@ -23,42 +23,51 @@ export default function DispatchView() {
   const addGold = useGameStore((state) => state.addGold);
   const updateCondition = useGameStore((state) => state.updateCondition);
 
-  // 記錄使用者選擇的任務與奴隸
   const [selectedMissionId, setSelectedMissionId] = useState<string>(MISSIONS[0].id);
   const [selectedSlaveId, setSelectedSlaveId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const selectedMission = MISSIONS.find(m => m.id === selectedMissionId);
 
   const handleDispatch = () => {
     if (!selectedSlaveId) {
       setSysMessage({ text: '請先選擇要派遣的成員！', type: 'error' });
       return;
     }
-
-    const mission = MISSIONS.find(m => m.id === selectedMissionId);
     const slave = slaves.find(s => s.id === selectedSlaveId);
+    if (!selectedMission || !slave) return;
 
-    if (!mission || !slave) return;
-
-    // 邏輯防呆：檢查體力是否足夠
-    if (slave.conditionStats.stamina < mission.staminaCost) {
-      setSysMessage({ text: `派遣失敗！${slave.name} 的體力不足 (需 ${mission.staminaCost}，當前 ${slave.conditionStats.stamina})。`, type: 'error' });
+    if (slave.conditionStats.stamina < selectedMission.staminaCost) {
+      setSysMessage({ text: `派遣失敗！${slave.name} 的體力不足。`, type: 'error' });
       return;
     }
 
-    // 進行數學運算與狀態更新
-    const newStamina = Math.max(0, slave.conditionStats.stamina - mission.staminaCost);
-    const newStress = Math.min(100, slave.conditionStats.stress + mission.stressGain);
+    const newStamina = Math.max(0, slave.conditionStats.stamina - selectedMission.staminaCost);
+    const newStress = Math.min(100, slave.conditionStats.stress + selectedMission.stressGain);
 
     updateCondition(slave.id, { stamina: newStamina, stress: newStress });
-    addGold(mission.reward);
+    addGold(selectedMission.reward);
 
-    setSysMessage({ text: `派遣成功！${slave.name} 完成了【${mission.title}】，獲得資金 ${mission.reward}。`, type: 'success' });
-    
-    // 操作完畢後清空選擇
+    setSysMessage({ text: `派遣成功！${slave.name} 獲得資金 ${selectedMission.reward}。`, type: 'success' });
     setSelectedSlaveId('');
   };
 
-  const selectedMission = MISSIONS.find(m => m.id === selectedMissionId);
+  // 動態生成帶有體力檢查的選項格式
+  const slaveOptions: Option[] = slaves.map(s => {
+    const isExhausted = selectedMission ? s.conditionStats.stamina < selectedMission.staminaCost : false;
+    return {
+      value: s.id,
+      label: `${s.name} (體力: ${s.conditionStats.stamina}) ${isExhausted ? '- 體力不足' : ''}`,
+      disabled: isExhausted
+    };
+  });
+
+  // 切換任務時重置選取人員並清空訊息
+  const handleMissionChange = (mId: string) => {
+    setSelectedMissionId(mId);
+    setSelectedSlaveId('');
+    setSysMessage(null);
+  };
 
   return (
     <div className="w-full flex flex-col gap-4 pb-10">
@@ -67,12 +76,11 @@ export default function DispatchView() {
         <span className="text-sm text-gray-500">消耗體力換取資金</span>
       </div>
 
-      {/* 任務選擇面板 */}
       <div className="flex gap-2 overflow-x-auto pb-2">
         {MISSIONS.map(m => (
           <button
             key={m.id}
-            onClick={() => setSelectedMissionId(m.id)}
+            onClick={() => handleMissionChange(m.id)}
             className={`shrink-0 px-4 py-2 rounded-lg border transition-colors text-sm ${
               selectedMissionId === m.id 
                 ? 'bg-blue-900 border-blue-500 text-white' 
@@ -84,7 +92,6 @@ export default function DispatchView() {
         ))}
       </div>
 
-      {/* 任務詳情與執行面板 */}
       {selectedMission && (
         <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col gap-4 shadow-lg">
           <div>
@@ -101,19 +108,8 @@ export default function DispatchView() {
 
           <div className="flex flex-col gap-2 mt-2">
             <label className="text-sm text-gray-300 font-bold">選擇派遣成員：</label>
-            <select 
-              className="bg-gray-900 border border-gray-600 text-gray-200 p-3 rounded outline-none focus:border-blue-500"
-              value={selectedSlaveId}
-              onChange={(e) => setSelectedSlaveId(e.target.value)}
-            >
-              <option value="">-- 請選擇 --</option>
-              {slaves.map(s => (
-                <option key={s.id} value={s.id} disabled={s.conditionStats.stamina < selectedMission.staminaCost}>
-                  {s.name} (體力: {s.conditionStats.stamina} / 壓力: {s.conditionStats.stress}) 
-                  {s.conditionStats.stamina < selectedMission.staminaCost ? ' - 體力不足' : ''}
-                </option>
-              ))}
-            </select>
+            {/* 替換為我們的手刻組件，並加上藍色主題 */}
+            <CustomSelect options={slaveOptions} value={selectedSlaveId} onChange={setSelectedSlaveId} focusColor="blue" />
           </div>
 
           <button 
