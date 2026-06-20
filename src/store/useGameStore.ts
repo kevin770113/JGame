@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import localforage from 'localforage';
 // ［修正］在此處補上了 Skills 的匯入
-import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, Skills } from '../types';
+import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
 import { generateSlaveIdentity } from '../services/aiService';
 
