@@ -1,7 +1,8 @@
 import { useGameStore } from '../store/useGameStore';
 
 export default function Header() {
-  const { day, timePhase, gold, food, location, roomDirtiness } = useGameStore((state) => state.player);
+  const { day, timePhase, gold, food, location, roomDirtiness, maxSlaveCapacity, prestige } = useGameStore((state) => state.player);
+  const slaves = useGameStore((state) => state.slaves);
   const processTurn = useGameStore((state) => state.processTurn);
 
   const timePhaseColor = () => {
@@ -31,31 +32,27 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-gray-900 border-b border-gray-700 p-3 flex flex-wrap justify-between items-center text-xs sm:text-sm shadow-md z-10 gap-2 select-none">
-      <div className="flex gap-3 sm:gap-6 items-center">
+    <header className="bg-gray-900 border-b border-gray-700 p-3 flex flex-col md:flex-row justify-between items-center text-xs shadow-md z-10 gap-2 select-none">
+      <div className="flex flex-wrap gap-3 sm:gap-4 items-center">
         <span className="text-gray-300 font-bold tracking-widest">
           第 <strong className="text-white">{day}</strong> 天 <span className="text-gray-600">|</span> <strong className={timePhaseColor()}>{timePhase}</strong>
         </span>
         <span className="text-gray-500">資金: <strong className="text-yellow-500 font-mono">{gold}</strong></span>
-        <span className={`font-bold ${food === 0 ? 'text-blood-red animate-pulse' : 'text-gray-500'}`}>
-          糧食: <strong className={food === 0 ? 'text-blood-red font-mono' : 'text-green-500 font-mono'}>{food}</strong>
-        </span>
+        <span className="text-gray-500">糧食: <strong className={food === 0 ? 'text-blood-red font-mono animate-pulse' : 'text-green-500 font-mono'}>{food}</strong></span>
+        <span className="text-gray-500">威望: <strong className="text-blue-400 font-mono">{prestige}</strong></span>
       </div>
       
-      <div className="flex gap-4 items-center">
-        <div className="hidden md:flex items-center gap-3">
-          <span className="text-gray-500">
-            據點: <span className="text-gray-300 font-bold">{getLocationName()}</span>
-          </span>
-          <span className="text-gray-500 border-l border-gray-700 pl-3 flex gap-1">
-            狀態: {getDirtinessDisplay()}
-          </span>
-        </div>
+      <div className="flex flex-wrap gap-3 items-center">
+        <span className="text-gray-500">據點: <span className="text-gray-300 font-bold">{getLocationName()}</span></span>
+        <span className="text-gray-500 border-l border-gray-700 pl-3">環境: {getDirtinessDisplay()}</span>
+        <span className="text-gray-500 border-l border-gray-700 pl-3">
+          人口: <strong className="text-gray-300 font-mono">{slaves.length} / {maxSlaveCapacity}</strong>
+        </span>
         <button 
           onClick={processTurn}
-          className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-1.5 rounded font-bold transition-all shadow-sm border border-gray-600 active:scale-95 tracking-widest"
+          className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1 rounded font-bold transition-all shadow-sm border border-gray-600 active:scale-95 tracking-widest"
         >
-          推進時段 &gt;&gt;
+          推進時段
         </button>
       </div>
     </header>
