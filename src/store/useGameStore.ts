@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import localforage from 'localforage';
-import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, ActivityStatus } from '../types';
+import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
 import { generateSlaveIdentity } from '../services/aiService';
 
