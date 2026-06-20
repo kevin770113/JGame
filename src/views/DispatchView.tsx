@@ -2,137 +2,156 @@ import { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import CustomSelect, { Option } from '../components/CustomSelect';
 
-interface Mission {
-  id: string;
-  title: string;
-  risk: string;
-  staminaCost: number;
-  stressGain: number;
-  reward: number;
-  description: string;
-}
-
-const MISSIONS: Mission[] = [
-  { id: 'm1', title: '黑市私掠物資護送', risk: '低', staminaCost: 20, stressGain: 10, reward: 300, description: '為地下商會提供暗夜物資押運，道路沉悶，但基本沒有生命危险。' },
-  { id: 'm2', title: '深淵晶石礦脈採掘', risk: '中', staminaCost: 50, stressGain: 30, reward: 800, description: '前往充斥致命瓦斯的高壓密閉深淵勞役，極度折損精神與骨血。' },
-  { id: 'm3', title: '帝國突擊敢死隊奇襲', risk: '高', staminaCost: 80, stressGain: 60, reward: 2000, description: '加入九死一生的死地伏擊敢死作戰，高致殘風險伴隨極其瘋狂的暴利。' },
-];
-
 export default function DispatchView() {
   const slaves = useGameStore((state) => state.slaves);
-  const addGold = useGameStore((state) => state.addGold);
-  const updateCondition = useGameStore((state) => state.updateCondition);
+  const dailyMissions = useGameStore((state) => state.dailyMissions);
+  const dispatchSlave = useGameStore((state) => state.dispatchSlave);
   const navigate = useGameStore((state) => state.navigate);
 
-  const [selectedMissionId, setSelectedMissionId] = useState<string>(MISSIONS[0].id);
+  const [selectedMissionId, setSelectedMissionId] = useState<string>('');
   const [selectedSlaveId, setSelectedSlaveId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const selectedMission = MISSIONS.find(m => m.id === selectedMissionId);
+  const selectedMission = dailyMissions.find(m => m.id === selectedMissionId);
 
   const handleDispatch = () => {
-    if (!selectedSlaveId) {
-      setSysMessage({ text: '請先選擇要派遣的代理人！', type: 'error' });
+    if (!selectedMission) {
+      setSysMessage({ text: '［錯誤］請先在佈告欄上選擇一張懸賞委託。', type: 'error' });
       return;
     }
+    if (!selectedSlaveId) {
+      setSysMessage({ text: '［錯誤］請選擇要簽署生死契約的代理人。', type: 'error' });
+      return;
+    }
+
     const slave = slaves.find(s => s.id === selectedSlaveId);
-    if (!selectedMission || !slave) return;
+    if (!slave) return;
+
+    if (slave.activityStatus !== '閒置') {
+      setSysMessage({ text: `［拒絕］${slave.name} 目前狀態為「${slave.activityStatus}」，無法接取新委託。`, type: 'error' });
+      return;
+    }
 
     if (slave.conditionStats.stamina < selectedMission.staminaCost) {
-      setSysMessage({ text: `派遣失敗！${slave.name} 體力過低，會死在半路上。`, type: 'error' });
+      setSysMessage({ text: `［警告］${slave.name} 體力嚴重透支，強行指派將導致在任務中暴斃。`, type: 'error' });
       return;
     }
 
-    const newStamina = Math.max(0, slave.conditionStats.stamina - selectedMission.staminaCost);
-    const newStress = Math.min(100, slave.conditionStats.stress + selectedMission.stressGain);
-
-    updateCondition(slave.id, { stamina: newStamina, stress: newStress });
-    addGold(selectedMission.reward);
-
-    setSysMessage({ text: `派遣契約簽署！${slave.name} 已順利交貨，賺回賞金 🪙 ${selectedMission.reward}。`, type: 'success' });
+    // 執行外派，將任務寫入佇列
+    dispatchSlave(slave.id, selectedMission.id);
+    setSysMessage({ 
+      text: `［系統］契約成立。${slave.name} 已啟程執行【${selectedMission.title}】，預計將於 ${selectedMission.requiredPhases} 個時段後歸來並結算賞金。`, 
+      type: 'success' 
+    });
+    setSelectedMissionId('');
     setSelectedSlaveId('');
   };
 
-  const slaveOptions: Option[] = slaves.map(s => {
+  // 只篩選出「閒置」狀態的奴隸供玩家指派
+  const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
+  const slaveOptions: Option[] = idleSlaves.map(s => {
     const isExhausted = selectedMission ? s.conditionStats.stamina < selectedMission.staminaCost : false;
     return {
       value: s.id,
-      label: `${s.name} (體力: ${s.conditionStats.stamina}) ${isExhausted ? '- 體力透支' : ''}`,
+      label: `${s.name} (體力: ${s.conditionStats.stamina}) ${isExhausted ? '［體力透支］' : ''}`,
       disabled: isExhausted
     };
   });
 
-  const handleMissionChange = (mId: string) => {
-    setSelectedMissionId(mId);
-    setSelectedSlaveId('');
-    setSysMessage(null);
+  const getRankStyle = (rank: string) => {
+    if (rank === '黃金') return 'text-yellow-500 border-yellow-700 bg-yellow-950/30';
+    if (rank === '蔚藍') return 'text-blue-400 border-blue-700 bg-blue-950/30';
+    return 'text-green-500 border-green-700 bg-green-950/30';
   };
 
   return (
     <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
-          <h2 className="text-xl font-bold text-gray-300">喧鬧酒館</h2>
-          <p className="text-2xs text-gray-500 mt-0.5">城鎮邊陲的灰色酒館，公佈欄上掛滿了刀口舔血的懸賞委託。</p>
+          <h2 className="text-xl font-bold text-gray-300">深淵酒館</h2>
+          <p className="text-xs text-gray-500 mt-1">充斥著劣質麥酒與血腥味的地下酒館。佈告欄上釘滿了以生命為籌碼的委託。</p>
         </div>
         <button 
           onClick={() => navigate('Town', 'Main')}
-          className="px-3 py-1 bg-gray-900 border border-gray-700 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm"
+          className="px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
         >
-          🔙 返回城鎮
+          ［返回城鎮］
         </button>
       </div>
 
-      {/* 橫向懸賞板切換 */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {MISSIONS.map(m => (
-          <button
-            key={m.id}
-            onClick={() => handleMissionChange(m.id)}
-            className={`shrink-0 px-4 py-2 rounded-lg border transition-colors text-xs font-bold ${
-              selectedMissionId === m.id 
-                ? 'bg-blue-900 border-blue-500 text-white' 
-                : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            {m.title}
-          </button>
-        ))}
-      </div>
+      {dailyMissions.length === 0 ? (
+        <div className="bg-gray-900/50 border border-gray-800 p-8 rounded-lg text-center my-4 text-gray-500 text-sm tracking-wide">
+          ［告示］今日的懸賞委託已被清空。請等待明日破曉時的商會更新。
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="text-xs text-gray-500 font-bold border-b border-gray-800 pb-1">［懸賞佈告欄］</div>
+          <div className="flex flex-col gap-2">
+            {dailyMissions.map(m => (
+              <button
+                key={m.id}
+                onClick={() => { setSelectedMissionId(m.id); setSysMessage(null); }}
+                className={`text-left p-3 rounded border transition-all ${
+                  selectedMissionId === m.id 
+                    ? 'border-gray-400 bg-gray-800 shadow-md' 
+                    : 'border-gray-800 bg-gray-900 hover:bg-gray-800/80 opacity-80 hover:opacity-100'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-1.5">
+                  <span className={`text-2xs font-bold px-1.5 py-0.5 rounded border ${getRankStyle(m.rank)} tracking-widest`}>
+                    {m.rank}級委託
+                  </span>
+                  <span className="text-gray-400 text-xs font-mono">耗時: {m.requiredPhases} 時段</span>
+                </div>
+                <h4 className="text-sm font-bold text-gray-200">{m.title}</h4>
+                <div className="flex gap-4 mt-2 text-xs font-mono bg-gray-950 p-1.5 rounded border border-gray-800">
+                  <span className="text-yellow-600">賞金: {m.reward}</span>
+                  <span className="text-green-600">體力: -{m.staminaCost}</span>
+                  <span className="text-red-600">壓力: +{m.stressGain}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {selectedMission && (
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col gap-4 shadow-md">
+        <div className="bg-gray-900/80 p-4 rounded-lg border border-gray-700 flex flex-col gap-4 shadow-lg animate-slide-up mt-2">
           <div>
-            <h3 className="text-base font-bold text-white mb-1">{selectedMission.title}</h3>
-            <p className="text-xs text-gray-400 leading-relaxed">{selectedMission.description}</p>
+            <h3 className="text-sm font-bold text-white mb-1 border-l-2 border-blood-red pl-2">{selectedMission.title}</h3>
+            <p className="text-xs text-gray-400 leading-relaxed italic mt-2">「{selectedMission.description}」</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs bg-gray-950 p-3 rounded border border-gray-800 font-mono">
-            <div className="text-gray-400">委託風險: <span className={selectedMission.risk === '高' ? 'text-red-400 font-bold animate-pulse' : 'text-yellow-500'}>{selectedMission.risk}</span></div>
-            <div className="text-gray-400">預期賞金: <span className="text-yellow-500 font-bold">🪙 {selectedMission.reward}</span></div>
-            <div className="text-gray-400">扣除體力: <span className="text-green-500">-{selectedMission.staminaCost}</span></div>
-            <div className="text-gray-400">累積壓力: <span className="text-red-400">+{selectedMission.stressGain}</span></div>
-          </div>
-
-          <div className="flex flex-col gap-1.5 mt-1">
-            <label className="text-2xs text-gray-400 font-bold">撕下懸賞並指派代理人：</label>
-            <CustomSelect options={slaveOptions} value={selectedSlaveId} onChange={setSelectedSlaveId} focusColor="blue" />
+          <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-gray-800">
+            <label className="text-xs text-gray-400 font-bold tracking-widest">［指派執行者］</label>
+            {idleSlaves.length > 0 ? (
+              <CustomSelect options={slaveOptions} value={selectedSlaveId} onChange={setSelectedSlaveId} focusColor="blue" />
+            ) : (
+              <div className="text-xs text-red-500 bg-red-950/20 p-2 border border-red-900/30 rounded">
+                目前據點內沒有處於「閒置」狀態的成員可供差遣。
+              </div>
+            )}
           </div>
 
           <button 
             onClick={handleDispatch}
-            className="mt-1 bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded border border-blue-700 transition-colors shadow text-xs sm:text-sm"
+            disabled={idleSlaves.length === 0}
+            className={`mt-2 font-bold py-2.5 rounded border transition-colors shadow text-xs tracking-widest ${
+              idleSlaves.length === 0 
+                ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                : 'bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-500 hover:border-gray-400'
+            }`}
           >
-            派遣成員執行悬赏
+            ［簽署生死契約並啟程］
           </button>
+        </div>
+      )}
 
-          {sysMessage && (
-            <div className={`p-2 border rounded text-xs text-center ${
-              sysMessage.type === 'success' ? 'bg-gray-900 border-green-800 text-green-400' : 'bg-gray-900 border-red-800 text-blood-red'
-            }`}>
-              {sysMessage.text}
-            </div>
-          )}
+      {sysMessage && (
+        <div className={`p-3 border rounded text-xs leading-relaxed tracking-wide ${
+          sysMessage.type === 'success' ? 'bg-gray-900 border-green-800 text-green-500' : 'bg-gray-900 border-red-900 text-red-500'
+        }`}>
+          {sysMessage.text}
         </div>
       )}
     </div>
