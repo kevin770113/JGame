@@ -7,6 +7,7 @@ interface LocationInfo {
   id: Location;
   name: string;
   cost: number;
+  reqPrestige: number; // ［新增］威望門檻
   description: string;
   perks: string;
 }
@@ -16,27 +17,30 @@ const LOCATIONS: LocationInfo[] = [
     id: 'Frontlines', 
     name: '混亂前線邊境', 
     cost: GAME_CONSTANTS.RELOCATION_COST.Frontlines, 
+    reqPrestige: 0,
     description: '狼煙四起的邊防交戰區，法外之徒的流放地。',
-    perks: '搬遷成本低廉。初始容納上限 5 人。'
+    perks: '無威望門檻。初始容納上限 5 人。'
   },
   { 
     id: 'NeutralHub', 
     name: '中立貿易核心城', 
     cost: GAME_CONSTANTS.RELOCATION_COST.NeutralHub, 
+    reqPrestige: 100,
     description: '三大帝國簽署互不侵犯協議的灰色交易核心。',
-    perks: '解鎖商會人口上限至 10 人，環境髒亂汙染累積速度減緩 30%。'
+    perks: '需要 100 點商會威望。解鎖上限至 10 人，髒亂累積減緩 30%。'
   },
   { 
     id: 'Capital', 
     name: '安逸極樂皇城', 
     cost: GAME_CONSTANTS.RELOCATION_COST.Capital, 
+    reqPrestige: 500,
     description: '戒備森嚴的絕對權力王都，極度排外的奢華牢籠。',
-    perks: '解鎖極限人口上限至 20 人，基礎設施完美，每日髒亂度累積減緩 60%。'
+    perks: '需要 500 點商會威望。解鎖上限至 20 人，髒亂累積減緩 60%。'
   },
 ];
 
 export default function MapView() {
-  const { gold, location: currentLocation } = useGameStore((state) => state.player);
+  const { gold, prestige, location: currentLocation } = useGameStore((state) => state.player);
   const deductGold = useGameStore((state) => state.deductGold);
   const changeLocation = useGameStore((state) => state.changeLocation);
   const navigate = useGameStore((state) => state.navigate);
@@ -49,8 +53,14 @@ export default function MapView() {
       return;
     }
 
+    // ★ 新增：威望檢查 ★
+    if (prestige < targetLocation.reqPrestige) {
+      setSysMessage({ text: `［拒絕］商會階級不符。進入【${targetLocation.name}】需要至少 ${targetLocation.reqPrestige} 點威望。`, type: 'error' });
+      return;
+    }
+
     if (gold < targetLocation.cost) {
-      setSysMessage({ text: `［拒絕］護送與疏通資金不足。遷移至【${targetLocation.name}】需要 ${targetLocation.cost} 資金。`, type: 'error' });
+      setSysMessage({ text: `［拒絕］疏通資金不足。遷移至【${targetLocation.name}】需要 ${targetLocation.cost} 資金。`, type: 'error' });
       return;
     }
 
@@ -64,7 +74,10 @@ export default function MapView() {
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
           <h2 className="text-xl font-bold text-gray-300">商會拔營遷移</h2>
-          <p className="text-2xs text-gray-500 mt-0.5">可用資產: <span className="text-yellow-500 font-mono font-bold">{gold}</span></p>
+          <div className="flex gap-4 mt-0.5">
+            <p className="text-2xs text-gray-500">可用資產: <span className="text-yellow-500 font-mono font-bold">{gold}</span></p>
+            <p className="text-2xs text-gray-500">當前威望: <span className="text-blue-400 font-mono font-bold">{prestige}</span></p>
+          </div>
         </div>
         <button 
           onClick={() => navigate('Home', 'Main')}
@@ -75,7 +88,7 @@ export default function MapView() {
       </div>
 
       <p className="text-xs text-gray-400">
-        更換商會駐紮地將直接改變內政基礎設施，擴展最大居住限額並改寫環境抗汙能力。
+        高階據點不僅需要打點資金，更需要商會擁有足夠的［威望］才能取得入城許可。
       </p>
 
       {sysMessage && (
@@ -89,7 +102,9 @@ export default function MapView() {
       <div className="flex flex-col gap-4 mt-2">
         {LOCATIONS.map((loc) => {
           const isCurrent = currentLocation === loc.id;
+          const meetsPrestige = prestige >= loc.reqPrestige;
           const canAfford = gold >= loc.cost;
+          const canRelocate = meetsPrestige && canAfford;
 
           return (
             <div 
@@ -114,19 +129,24 @@ export default function MapView() {
 
               {!isCurrent && (
                 <div className="flex justify-between items-center mt-1 z-10 border-t border-gray-800 pt-3">
-                  <span className="text-xs text-gray-400 font-bold tracking-widest">
-                    疏通開銷: <strong className={canAfford ? 'text-yellow-500 font-mono' : 'text-red-500 font-mono'}>{loc.cost}</strong>
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-gray-400 font-bold tracking-widest">
+                      疏通開銷: <strong className={canAfford ? 'text-yellow-500 font-mono' : 'text-red-500 font-mono'}>{loc.cost}</strong>
+                    </span>
+                    <span className="text-xs text-gray-400 font-bold tracking-widest">
+                      威望需求: <strong className={meetsPrestige ? 'text-blue-400 font-mono' : 'text-red-500 font-mono'}>{loc.reqPrestige}</strong>
+                    </span>
+                  </div>
                   <button
                     onClick={() => handleRelocate(loc)}
-                    disabled={!canAfford}
+                    disabled={!canRelocate}
                     className={`px-4 py-2 rounded font-bold text-xs transition-colors tracking-widest ${
-                      canAfford 
+                      canRelocate 
                         ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-500 hover:border-gray-400' 
                         : 'bg-gray-900 text-gray-700 border border-gray-800 cursor-not-allowed'
                     }`}
                   >
-                    {canAfford ? '［下令拔營］' : '［資產不足］'}
+                    {canRelocate ? '［下令拔營］' : '［條件不足］'}
                   </button>
                 </div>
               )}
