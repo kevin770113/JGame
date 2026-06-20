@@ -6,12 +6,11 @@ export default function MarketView() {
   const { gold } = useGameStore((state) => state.player);
   const deductGold = useGameStore((state) => state.deductGold);
   const addSlave = useGameStore((state) => state.addSlave);
+  const navigate = useGameStore((state) => state.navigate);
   
-  // 直接從大腦讀取市場名單與載入狀態
   const marketSlaves = useGameStore((state) => state.marketSlaves);
   const isMarketGenerating = useGameStore((state) => state.isMarketGenerating);
 
-  // 動態計算奴隸售價 (依據能力值總和)
   const calculatePrice = (slave: Slave) => {
     const sum = slave.primaryStats.combat + slave.primaryStats.endurance + slave.primaryStats.intelligence + slave.primaryStats.obedience;
     return Math.floor(sum * 3.5) + 150; 
@@ -21,7 +20,6 @@ export default function MarketView() {
     if (gold >= price) {
       deductGold(price);
       addSlave(slave);
-      // 從大腦的市場陣列中移除該商品
       useGameStore.setState((state) => ({
         marketSlaves: state.marketSlaves.filter(s => s.id !== slave.id)
       }));
@@ -31,53 +29,59 @@ export default function MarketView() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-4 pb-10">
-      <div className="flex justify-between items-end border-b border-gray-700 pb-2">
-        <h2 className="text-xl font-bold text-gray-300">奴隸市場</h2>
-        <span className="text-sm text-yellow-500">持有資金: {gold}</span>
+    <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in">
+      <div className="flex justify-between items-center border-b border-gray-700 pb-2">
+        <div>
+          <h2 className="text-xl font-bold text-gray-300">地下奴隸市場</h2>
+          <p className="text-2xs text-gray-500 mt-0.5">持有資金: <span className="text-yellow-500 font-mono font-bold">{gold}</span></p>
+        </div>
+        <button 
+          onClick={() => navigate('Town', 'Main')}
+          className="px-3 py-1 bg-gray-900 border border-gray-700 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm"
+        >
+          🔙 返回城鎮
+        </button>
       </div>
       
-      <p className="text-sm text-gray-400 mb-2">
-        商隊會在每天早上帶來新的貨源。購買的成員會立刻加入您的基地排程。
+      <p className="text-xs text-gray-400">
+        異域奴隸商隊會在每天早上抵達交易所。購買的血統會即刻送往據點大廳。
       </p>
 
-      <div className="flex flex-col gap-6">
-        {/* 過場等待畫面 */}
+      <div className="flex flex-col gap-5">
         {isMarketGenerating ? (
           <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center flex flex-col items-center justify-center gap-4 shadow-lg animate-pulse">
-            <div className="w-12 h-12 border-4 border-blood-red border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-gray-300 font-bold">奴隸商隊正在前往據點的路上...</p>
-            <p className="text-sm text-gray-500">AI 正在為商品進行血統認證與建檔</p>
+            <div className="w-10 h-10 border-4 border-blood-red border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-gray-300 text-xs font-bold">商隊正在進行血統建檔與安全檢疫...</p>
           </div>
         ) : marketSlaves.length === 0 ? (
           <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 text-center">
-            <p className="text-gray-400">市場上的奴隸已被搶購一空，請等待明天早市開張。</p>
+            <p className="text-xs text-gray-500">今日商品已全數被本地豪強搶購一空，請等待明天早市。</p>
           </div>
         ) : (
           marketSlaves.map((slave) => {
             const price = calculatePrice(slave);
             return (
-              <div key={slave.id} className="relative group flex flex-col gap-2">
+              <div key={slave.id} className="relative group flex flex-col gap-1.5">
                 <SlaveCard slave={slave} />
                 
-                <div className="bg-gray-850 px-4 py-2 text-xs text-gray-400 italic border-l-2 border-gray-600 bg-gray-800/30">
-                  背景: {slave.backgroundStory}
+                <div className="bg-gray-950 px-3 py-2 text-3xs sm:text-2xs text-gray-500 italic border-l border-gray-700 bg-gray-950/30">
+                  身世描述: {slave.backgroundStory}
                 </div>
 
-                <div className="flex justify-between items-center bg-gray-900 px-4 py-3 rounded-lg border border-gray-700 shadow-inner">
-                  <span className="text-gray-300 text-sm">
-                    售價: <strong className="text-yellow-500 text-lg ml-1">{price}</strong> 
+                <div className="flex justify-between items-center bg-gray-900 px-4 py-2 rounded border border-gray-700 shadow-inner">
+                  <span className="text-gray-400 text-xs">
+                    商隊報價: <strong className="text-yellow-500 font-mono text-base ml-1">{price}</strong> 
                   </span>
                   <button 
                     onClick={() => handleBuy(slave, price)}
-                    className={`px-4 py-2 rounded font-bold transition-colors text-sm sm:text-base ${
+                    className={`px-3 py-1.5 rounded font-bold transition-colors text-xs ${
                       gold >= price 
                         ? 'bg-blood-red hover:bg-red-700 text-white' 
                         : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                     }`}
                     disabled={gold < price}
                   >
-                    {gold >= price ? '確認購買' : '資金不足'}
+                    {gold >= price ? '簽約買下' : '資金不足'}
                   </button>
                 </div>
               </div>
