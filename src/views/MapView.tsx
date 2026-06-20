@@ -16,8 +16,8 @@ const LOCATIONS: LocationInfo[] = [
     id: 'Frontlines', 
     name: '混亂前線邊境', 
     cost: GAME_CONSTANTS.RELOCATION_COST.Frontlines, 
-    description: '狼煙四起的邊防交戰區，法律的法外之地。',
-    perks: '搬遷成本最低。日常開銷低，初始容納上限 5 人。'
+    description: '狼煙四起的邊防交戰區，法外之徒的流放地。',
+    perks: '搬遷成本低廉。初始容納上限 5 人。'
   },
   { 
     id: 'NeutralHub', 
@@ -30,7 +30,7 @@ const LOCATIONS: LocationInfo[] = [
     id: 'Capital', 
     name: '安逸極樂皇城', 
     cost: GAME_CONSTANTS.RELOCATION_COST.Capital, 
-    description: '戒備森嚴的絕對權力王都，奢華但嚴重排外。',
+    description: '戒備森嚴的絕對權力王都，極度排外的奢華牢籠。',
     perks: '解鎖極限人口上限至 20 人，基礎設施完美，每日髒亂度累積減緩 60%。'
   },
 ];
@@ -45,18 +45,18 @@ export default function MapView() {
 
   const handleRelocate = (targetLocation: LocationInfo) => {
     if (currentLocation === targetLocation.id) {
-      setSysMessage({ text: '您的商隊目前已經駐紮在此據點！', type: 'error' });
+      setSysMessage({ text: '［提示］您的商會目前已經駐紮在此據點。', type: 'error' });
       return;
     }
 
     if (gold < targetLocation.cost) {
-      setSysMessage({ text: `護送打點資金不足！遷移至【${targetLocation.name}】需要 ${targetLocation.cost}。`, type: 'error' });
+      setSysMessage({ text: `［拒絕］護送與疏通資金不足。遷移至【${targetLocation.name}】需要 ${targetLocation.cost} 資金。`, type: 'error' });
       return;
     }
 
     deductGold(targetLocation.cost);
     changeLocation(targetLocation.id);
-    setSysMessage({ text: `拔營成功！整個據點已正式搬遷進駐【${targetLocation.name}】。`, type: 'success' });
+    setSysMessage({ text: `［系統］遷移協議已生效。整個據點已正式搬遷進駐【${targetLocation.name}】。`, type: 'success' });
   };
 
   return (
@@ -68,25 +68,25 @@ export default function MapView() {
         </div>
         <button 
           onClick={() => navigate('Home', 'Main')}
-          className="px-3 py-1 bg-gray-900 border border-gray-700 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm"
+          className="px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
         >
-          🔙 返回大廳
+          ［返回大廳］
         </button>
       </div>
 
       <p className="text-xs text-gray-400">
-        更換商會駐紮地會直接改變內政基礎設施、擴展最大居住限額並改寫環境抗汙能力。
+        更換商會駐紮地將直接改變內政基礎設施，擴展最大居住限額並改寫環境抗汙能力。
       </p>
 
       {sysMessage && (
-        <div className={`p-2.5 border rounded text-xs text-center animate-pulse ${
-          sysMessage.type === 'success' ? 'bg-gray-900 border-green-800 text-green-400' : 'bg-gray-900 border-red-800 text-blood-red'
+        <div className={`p-3 border rounded text-xs leading-relaxed tracking-wide ${
+          sysMessage.type === 'success' ? 'bg-gray-900 border-green-800 text-green-500' : 'bg-gray-900 border-red-900 text-red-500'
         }`}>
           {sysMessage.text}
         </div>
       )}
 
-      <div className="flex flex-col gap-4 mt-1">
+      <div className="flex flex-col gap-4 mt-2">
         {LOCATIONS.map((loc) => {
           const isCurrent = currentLocation === loc.id;
           const canAfford = gold >= loc.cost;
@@ -94,39 +94,39 @@ export default function MapView() {
           return (
             <div 
               key={loc.id} 
-              className={`p-4 rounded-lg border flex flex-col gap-2.5 shadow-md relative overflow-hidden ${
+              className={`p-4 rounded-lg border flex flex-col gap-3 shadow-md relative overflow-hidden ${
                 isCurrent ? 'bg-gray-800 border-blood-red' : 'bg-gray-900 border-gray-700'
               }`}
             >
               <div className="flex justify-between items-start z-10">
                 <div>
-                  <h3 className={`text-base font-bold flex items-center gap-2 ${isCurrent ? 'text-blood-red' : 'text-white'}`}>
-                    {loc.name}
-                    {isCurrent && <span className="text-3xs bg-blood-red text-white px-1.5 py-0.5 rounded">目前駐紮</span>}
+                  <h3 className={`text-base font-bold flex items-center gap-2 tracking-widest ${isCurrent ? 'text-blood-red' : 'text-gray-200'}`}>
+                    【{loc.name}】
+                    {isCurrent && <span className="text-3xs bg-blood-red text-white px-1.5 py-0.5 rounded tracking-normal">目前駐紮</span>}
                   </h3>
-                  <p className="text-xs text-gray-400 mt-1">{loc.description}</p>
+                  <p className="text-xs text-gray-400 mt-1.5">{loc.description}</p>
                 </div>
               </div>
 
-              <div className="text-2xs text-gray-300 bg-gray-950 p-2 rounded border border-gray-800 font-sans">
-                <span className="text-gray-500 font-bold">解鎖基建特性：</span>{loc.perks}
+              <div className="text-2xs text-gray-300 bg-gray-950 p-2.5 rounded border border-gray-800 font-sans leading-relaxed">
+                <span className="text-gray-500 font-bold">［解鎖基建特性］</span><br/>{loc.perks}
               </div>
 
               {!isCurrent && (
-                <div className="flex justify-between items-center mt-1 z-10 border-t border-gray-800 pt-2.5">
-                  <span className="text-xs text-gray-400">
-                    打點開銷: <strong className={canAfford ? 'text-yellow-500 font-mono' : 'text-red-500 font-mono'}>{loc.cost}</strong>
+                <div className="flex justify-between items-center mt-1 z-10 border-t border-gray-800 pt-3">
+                  <span className="text-xs text-gray-400 font-bold tracking-widest">
+                    疏通開銷: <strong className={canAfford ? 'text-yellow-500 font-mono' : 'text-red-500 font-mono'}>{loc.cost}</strong>
                   </span>
                   <button
                     onClick={() => handleRelocate(loc)}
                     disabled={!canAfford}
-                    className={`px-3 py-1.5 rounded font-bold text-xs transition-colors ${
+                    className={`px-4 py-2 rounded font-bold text-xs transition-colors tracking-widest ${
                       canAfford 
-                        ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-500' 
-                        : 'bg-gray-800 text-gray-600 border border-gray-700 cursor-not-allowed'
+                        ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-500 hover:border-gray-400' 
+                        : 'bg-gray-900 text-gray-700 border border-gray-800 cursor-not-allowed'
                     }`}
                   >
-                    {canAfford ? '下令拔營' : '資產不足'}
+                    {canAfford ? '［下令拔營］' : '［資產不足］'}
                   </button>
                 </div>
               )}
