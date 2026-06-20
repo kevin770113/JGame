@@ -9,22 +9,22 @@ export default function BreedingView() {
   const addSlave = useGameStore((state) => state.addSlave);
   const navigate = useGameStore((state) => state.navigate);
 
-  const [parent1Id, setParent1Id] = useState<string>('');
-  const [parent2Id, setParent2Id] = useState<string>('');
+  const [alphaId, setAlphaId] = useState<string>('');
+  const [betaId, setBetaId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' | 'loading' } | null>(null);
 
   const handleBreed = async () => {
-    if (!parent1Id || !parent2Id) {
+    if (!alphaId || !betaId) {
       setSysMessage({ text: '［錯誤］必須提供兩具試驗體。', type: 'error' });
       return;
     }
-    if (parent1Id === parent2Id) {
+    if (alphaId === betaId) {
       setSysMessage({ text: '［錯誤］無法進行自我複製實驗。', type: 'error' });
       return;
     }
 
-    const p1 = slaves.find(s => s.id === parent1Id);
-    const p2 = slaves.find(s => s.id === parent2Id);
+    const p1 = slaves.find(s => s.id === alphaId);
+    const p2 = slaves.find(s => s.id === betaId);
     if (!p1 || !p2) return;
 
     if (p1.activityStatus !== '閒置' || p2.activityStatus !== '閒置') {
@@ -32,13 +32,14 @@ export default function BreedingView() {
       return;
     }
 
+    // ★ 盲選防呆：在此處才進行基因與性別驗證 ★
     if (p1.race !== p2.race) {
-      setSysMessage({ text: `［排斥］基因序列衝突：必須為同種族才可繁衍。`, type: 'error' });
+      setSysMessage({ text: `［排斥反應］基因序列衝突（${p1.race} 與 ${p2.race}），融合失敗。`, type: 'error' });
       return;
     }
 
     if (p1.gender === p2.gender) {
-      setSysMessage({ text: `［失敗］缺乏生殖條件：請選擇一男一女。`, type: 'error' });
+      setSysMessage({ text: `［排斥反應］缺乏足夠的異性生殖條件，融合失敗。`, type: 'error' });
       return;
     }
 
@@ -77,14 +78,16 @@ export default function BreedingView() {
 
     addSlave(newChild);
     setSysMessage({ text: `［系統］血脈融合成功！代號［${newChild.name}］已順利降生並建檔。`, type: 'success' });
-    setParent1Id('');
-    setParent2Id('');
+    setAlphaId('');
+    setBetaId('');
   };
 
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
+  
+  // 選單不再提示性別，增加盲選難度與神祕感
   const slaveOptions: Option[] = idleSlaves.map(s => ({
     value: s.id,
-    label: `${s.name} [${s.gender === 'Male' ? '男' : '女'}]`
+    label: `${s.name} (種族: ${s.race})`
   }));
 
   const isLoading = sysMessage?.type === 'loading';
@@ -106,17 +109,17 @@ export default function BreedingView() {
 
       <div className="bg-gray-900/80 p-5 rounded-lg border border-gray-700 flex flex-col gap-4 shadow-md mt-2">
         <p className="text-xs text-gray-400 leading-relaxed italic border-l-2 border-blood-red pl-2">
-          「雙親必須為一男一女且種族一致。後代將繼承雙親的平均屬性，並帶有不可預測的深淵突變。」
+          「放入不相容的基因序列將導致陣列啟動失敗。後代將繼承雙親的平均屬性，並帶有不可預測的深淵突變。」
         </p>
 
         <div className="flex flex-col gap-1.5 mt-2">
-          <label className="text-xs text-gray-400 font-bold tracking-widest">［注入試驗體：生父］</label>
-          <CustomSelect options={slaveOptions} value={parent1Id} onChange={setParent1Id} focusColor="gray" />
+          <label className="text-xs text-gray-400 font-bold tracking-widest">［注入試驗體 Alpha］</label>
+          <CustomSelect options={slaveOptions} value={alphaId} onChange={setAlphaId} focusColor="gray" />
         </div>
 
         <div className="flex flex-col gap-1.5 relative z-40">
-          <label className="text-xs text-gray-400 font-bold tracking-widest">［注入試驗體：生母］</label>
-          <CustomSelect options={slaveOptions} value={parent2Id} onChange={setParent2Id} focusColor="gray" />
+          <label className="text-xs text-gray-400 font-bold tracking-widest">［注入試驗體 Beta］</label>
+          <CustomSelect options={slaveOptions} value={betaId} onChange={setBetaId} focusColor="gray" />
         </div>
 
         <button 
