@@ -5,6 +5,7 @@ import MarketView from './views/MarketView';
 import BreedingView from './views/BreedingView'; 
 import DispatchView from './views/DispatchView'; 
 import MapView from './views/MapView';
+import InteractionView from './views/InteractionView'; // 新增匯入
 import { useGameStore } from './store/useGameStore';
 import { Slave } from './types';
 
@@ -28,8 +29,8 @@ function App() {
       switch (currentSubView) {
         case 'Main': return <BaseView />;
         case 'Room': return <BreedingView />; 
+        case 'Interaction': return <InteractionView />; // 新增路由
         case 'Map': return <MapView />;
-        // 未來將在此處加入 case 'Interaction': return <InteractionView />;
         default: return <BaseView />;
       }
     } else {
@@ -51,19 +52,19 @@ function App() {
                   onClick={() => navigate('Town', 'Market')}
                   className="py-4 bg-gray-900/80 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"
                 >
-                  <span className="flex items-center gap-2 text-gray-300 group-hover:text-white">【訪問奴隸商隊】</span>
+                  <span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［訪問奴隸商隊］</span>
                   <span className="text-xs text-gray-500 font-normal">引進全新的種族與血統</span>
                 </button>
                 <button 
                   onClick={() => navigate('Town', 'Tavern')}
                   className="py-4 bg-gray-900/80 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"
                 >
-                  <span className="flex items-center gap-2 text-gray-300 group-hover:text-white">【前往喧鬧酒館】</span>
+                  <span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［前往喧鬧酒館］</span>
                   <span className="text-xs text-gray-500 font-normal">查閱深淵委託與懸賞</span>
                 </button>
                 <button 
                   onClick={() => navigate('Home', 'Main')}
-                  className="py-3 bg-blood-red/20 hover:bg-blood-red/30 border border-blood-red/50 text-red-400 font-bold rounded-lg text-center transition-colors shadow mt-2"
+                  className="py-3 bg-blood-red/20 hover:bg-blood-red/30 border border-blood-red/50 text-red-400 font-bold rounded-lg text-center transition-colors shadow mt-2 tracking-widest"
                 >
                   ［返回安全據點］
                 </button>
@@ -86,20 +87,15 @@ function App() {
 
   return (
     <div className="absolute inset-0 flex flex-col bg-dark-bg text-gray-200 overflow-hidden select-none">
-      
-      <div className="shrink-0 z-20 shadow-md bg-gray-900 relative">
-        <Header />
-      </div>
+      <div className="shrink-0 z-20 shadow-md bg-gray-900 relative"><Header /></div>
 
       <div className="flex-1 flex overflow-hidden relative">
         <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center z-10 overscroll-contain">
-          {/* 城鎮場景不再限制寬度，全螢幕滿版展開 */}
           <div className={`w-full transition-all duration-300 ${currentScene === 'Town' ? 'max-w-3xl' : 'max-w-lg'}`}>
             {renderMainStage()}
           </div>
         </main>
 
-        {/* 基地內部才顯示右側名單，城鎮時徹底卸載釋放空間 */}
         {currentScene === 'Home' && (
           <aside className="w-24 border-l border-gray-800 flex flex-col bg-gray-950/40 overflow-y-auto shrink-0 animate-fade-in">
             <div className="p-2 border-b border-gray-800 text-center bg-gray-900/30">
@@ -125,7 +121,6 @@ function App() {
                       {slave.gender === 'Male' ? '男' : '女'}
                     </span>
                   </div>
-                  {/* 若非閒置，顯示微小狀態標籤 */}
                   {slave.activityStatus !== '閒置' && (
                      <div className="text-3xs text-yellow-500 font-bold bg-yellow-900/30 text-center rounded">{slave.activityStatus}</div>
                   )}
@@ -138,18 +133,9 @@ function App() {
       </div>
 
       {activeSlave && (
-        <div 
-          className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all"
-          onClick={() => setActiveSlave(null)}
-        >
-          <div 
-            className="w-full max-w-sm bg-gray-900 border border-gray-700 rounded-lg p-5 shadow-2xl flex flex-col gap-4 relative border-t-2 border-t-blood-red"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button 
-              onClick={() => setActiveSlave(null)}
-              className="absolute top-2 right-3 text-gray-500 hover:text-white text-sm font-bold transition-colors"
-            >
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all" onClick={() => setActiveSlave(null)}>
+          <div className="w-full max-w-sm bg-gray-900 border border-gray-700 rounded-lg p-5 shadow-2xl flex flex-col gap-4 relative border-t-2 border-t-blood-red" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setActiveSlave(null)} className="absolute top-2 right-3 text-gray-500 hover:text-white text-sm font-bold transition-colors">
               ［關閉］
             </button>
             
@@ -161,9 +147,7 @@ function App() {
                 </span>
               </h3>
               <div className="flex gap-2 mt-1">
-                <span className="text-xs text-gray-400 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-700">
-                  種族：{activeSlave.race}
-                </span>
+                <span className="text-xs text-gray-400 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-700">種族：{activeSlave.race}</span>
                 <span className={`text-xs px-2.5 py-0.5 rounded border ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-700 text-gray-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-500 font-bold'}`}>
                   狀態：{activeSlave.activityStatus}
                 </span>
