@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 
 export default function BaseView() {
-  const { location, roomDirtiness, maxSlaveCapacity } = useGameStore((state) => state.player);
-  const slaves = useGameStore((state) => state.slaves);
+  const { location, roomDirtiness } = useGameStore((state) => state.player);
   const navigate = useGameStore((state) => state.navigate);
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -17,12 +16,6 @@ export default function BaseView() {
     }
   };
 
-  const getDirtinessStatus = () => {
-    if (roomDirtiness > 80) return 'text-red-500 font-bold animate-pulse';
-    if (roomDirtiness > 50) return 'text-yellow-500 font-bold';
-    return 'text-green-500';
-  };
-
   return (
     <div className="w-full flex flex-col gap-4 pb-24 relative min-h-[70vh] animate-fade-in">
       <div className="border-b border-gray-700 pb-2">
@@ -31,37 +24,13 @@ export default function BaseView() {
       </div>
 
       <div className="bg-gray-900/40 border border-gray-800 rounded-lg p-5 flex flex-col gap-4 shadow-lg backdrop-blur-xs">
-        <div className="h-32 bg-gray-950/80 rounded border border-gray-800 flex items-center justify-center italic text-gray-600 text-xs text-center px-4 leading-relaxed">
+        <div className="h-48 bg-gray-950/80 rounded border border-gray-800 flex items-center justify-center italic text-gray-600 text-xs text-center px-4 leading-relaxed">
           ［當前據點室內大廳場景插圖預留區］
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-sm border-t border-gray-800 pt-3">
-          <div className="bg-gray-950 p-3 rounded border border-gray-800 flex flex-col gap-1">
-            <span className="text-gray-500 text-xs">成員容納上限</span>
-            <div className="flex justify-between items-baseline mt-1">
-              <strong className="text-lg text-gray-200 font-mono">{slaves.length} / {maxSlaveCapacity}</strong>
-              <span className="text-3xs text-gray-500">人</span>
-            </div>
-            <div className="w-full h-1 bg-gray-900 rounded overflow-hidden mt-1">
-              <div className="bg-blue-900 h-full" style={{ width: `${Math.min(100, (slaves.length / maxSlaveCapacity) * 100)}%` }}></div>
-            </div>
-          </div>
-
-          <div className="bg-gray-950 p-3 rounded border border-gray-800 flex flex-col gap-1">
-            <span className="text-gray-500 text-xs">環境髒亂度</span>
-            <div className="flex justify-between items-baseline mt-1">
-              <strong className={`text-lg font-mono ${getDirtinessStatus()}`}>{roomDirtiness}%</strong>
-              <span className="text-3xs text-gray-500">汙染</span>
-            </div>
-            <div className="w-full h-1 bg-gray-900 rounded overflow-hidden mt-1">
-              <div className="bg-blood-red h-full" style={{ width: `${roomDirtiness}%` }}></div>
-            </div>
-          </div>
         </div>
 
         {roomDirtiness > 50 && (
           <div className="p-3 bg-red-950/20 border border-red-900/40 rounded text-xs text-red-400 leading-relaxed animate-pulse tracking-wide">
-            ［系統警告］環境過於髒亂！成員睡眠恢復效率已大幅衰退。請儘速前往［互動與管理］指派成員進行打掃。
+            ［系統警告］環境過於髒亂！成員睡眠恢復效率已大打折扣。請儘速傳喚成員前往進行整頓打掃。
           </div>
         )}
       </div>
