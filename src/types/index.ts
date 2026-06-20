@@ -1,42 +1,46 @@
-// 1. 空間場景與路由型別 (新增)
-// 大場景：決定背景與主選單
+// 1. 空間場景與路由型別
 export type Scene = 'Home' | 'Town';
-// 子視圖：決定中央畫面的具體功能面板
-export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map';
+export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map' | 'Interaction'; // 新增 Interaction 路由
 
-// 2. 種族全面中文化
+// 2. 種族與生物特徵
 export type Race = '人類' | '精靈' | '半獸人' | '矮人' | '不死族' | '龍族';
-
-// 3. 生物特徵型別
 export type Gender = 'Male' | 'Female';
 
-// 4. 時間軸時段型別
+// 3. 時間與地緣
 export type TimePhase = '早上' | '中午' | '下午' | '晚上' | '深夜';
-
-// 5. 據點地緣型別
 export type Location = 'Frontlines' | 'NeutralHub' | 'Capital';
 
-// 核心能力值結構
+// 4. ▼ 新增：成員動態狀態與技能系統 ▼
+export type ActivityStatus = '閒置' | '外派中' | '特訓中';
+
+export interface Skills {
+  combat: number;    // 戰鬥專精 (影響高階任務)
+  housework: number; // 內政管家 (影響打掃效率)
+  survival: number;  // 生存本能 (影響日常消耗與隨機事件)
+}
+
+// 核心能力與動態狀態值結構
 export interface PrimaryStats {
-  combat: number;       // 武力
-  endurance: number;    // 體質
-  intelligence: number; // 智力
-  obedience: number;    // 服從
+  combat: number;
+  endurance: number;
+  intelligence: number;
+  obedience: number;
 }
 
-// 動態狀態值結構
 export interface ConditionStats {
-  stamina: number;   // 體力 (0 ~ 100)
-  stress: number;    // 壓力 (0 ~ 100)
-  rebellion: number; // 反抗 (0 ~ 100)
+  stamina: number;
+  stress: number;
+  rebellion: number;
 }
 
-// 奴隸資料模型
+// 5. 奴隸資料模型 (注入狀態與技能)
 export interface Slave {
   id: string;
   name: string;
   race: Race;
   gender: Gender;
+  activityStatus: ActivityStatus; // 新增：狀態鎖定機制
+  skills: Skills;                 // 新增：三維技能樹
   primaryStats: PrimaryStats;
   conditionStats: ConditionStats;
   traits: string[];
@@ -47,15 +51,13 @@ export interface Slave {
   };
 }
 
-// 玩家資料模型 (擴充內政變數)
+// 6. 玩家資料模型
 export interface Player {
-  day: number;             // 天數 (從第 1 天開始)
-  timePhase: TimePhase;    // 當前時段
-  gold: number;            // 資金
-  food: number;            // 糧食
-  location: Location;      // 當前據點
-  
-  // ▼ 本次重構新增的內政與基建變數 ▼
-  roomDirtiness: number;    // 房間髒亂度 (0 ~ 100)，過高會引發反噬
-  maxSlaveCapacity: number; // 奴隸容納上限 (依據點與設施而異)
+  day: number;
+  timePhase: TimePhase;
+  gold: number;
+  food: number;
+  location: Location;
+  roomDirtiness: number;
+  maxSlaveCapacity: number;
 }
