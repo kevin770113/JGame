@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import localforage from 'localforage';
-import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView } from '../types';
+// ［修正］在此處補上了 Skills 的匯入
+import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, Skills } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
 import { generateSlaveIdentity } from '../services/aiService';
 
@@ -45,7 +46,7 @@ export interface GameStore {
 
   addSlave: (slave: Slave) => void;
   updateSlave: (id: string, updates: Partial<Slave>) => void;
-  sellSlave: (slaveId: string) => void; // ［新增］黑市變現
+  sellSlave: (slaveId: string) => void; 
   dispatchSlave: (slaveId: string, missionId: string) => void;
 
   triggerBackgroundMarketRefresh: () => Promise<void>;
@@ -74,14 +75,12 @@ const generateDailyMissions = (): Mission[] => {
     });
   }
 
-  // 紫階：地區限定，機率 30%
   if (Math.random() > 0.7) {
     missions.push({
       id: `m-pur-${baseId}`, title: `［特化］${getName()}`, rank: '紫色', requiredPhases: 2, staminaCost: 50, stressGain: 30, reward: 1200 + Math.floor(Math.random() * 300), description: '地區限定委託。結算時有極高機率獲得【商會威望】，或強制突破執行者的技能極限。'
     });
   }
 
-  // 黃金階：傳說委託，機率 20%
   if (Math.random() > 0.8) {
     missions.push({
       id: `m-gld-${baseId}`, title: `［傳說］${getName()}`, rank: '黃金', requiredPhases: 5, staminaCost: 90, stressGain: 60, reward: 3500 + Math.floor(Math.random() * 1500), description: '九死一生的死亡委託。極易造成精神崩潰或致殘。'
@@ -152,7 +151,6 @@ export const useGameStore = create<GameStore>()(
         const slave = state.slaves.find(s => s.id === slaveId);
         if (!slave || slave.activityStatus !== '閒置') return state;
 
-        // 嚴格黑市折舊公式 (屬性血虧、技能暴利)
         const statsSum = slave.primaryStats.combat + slave.primaryStats.endurance + slave.primaryStats.intelligence + slave.primaryStats.obedience;
         const skillsSum = slave.skills.combat + slave.skills.housework + slave.skills.survival;
         const sellPrice = 50 + Math.floor(statsSum * 1.5) + (skillsSum * 200);
@@ -219,13 +217,16 @@ export const useGameStore = create<GameStore>()(
                
                let updatedSkills = { ...slave.skills };
                
-               // 紫階任務特殊結算
                if (dispatch.mission.rank === '紫色') {
-                 if (Math.random() > 0.5) earnedPrestige += Math.floor(Math.random() * 20) + 10;
-                 else {
-                   const skillKeys: (keyof Skills)[] = ['combat', 'housework', 'survival'];
+                 if (Math.random() > 0.5) {
+                   earnedPrestige += Math.floor(Math.random() * 20) + 10;
+                 } else {
+                   // ［修正］強制綁定為 Skills 鍵值，防止 TypeScript 報錯
+                   const skillKeys = ['combat', 'housework', 'survival'] as const;
                    const targetSkill = skillKeys[Math.floor(Math.random() * skillKeys.length)];
-                   if (updatedSkills[targetSkill] < 10) updatedSkills[targetSkill] += 1;
+                   if (updatedSkills[targetSkill] < 10) {
+                     updatedSkills[targetSkill] += 1;
+                   }
                  }
                }
 
@@ -271,6 +272,6 @@ export const useGameStore = create<GameStore>()(
         }
       }
     }),
-    { name: 'dark-fantasy-save-v5', storage: createJSONStorage(() => storage) }
+    { name: 'dark-fantasy-save-v5.1', storage: createJSONStorage(() => storage) }
   )
 );
