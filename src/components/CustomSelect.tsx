@@ -11,14 +11,13 @@ interface CustomSelectProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  focusColor?: 'purple' | 'blue'; // 讓不同場景可以有不同主題色
+  focusColor?: 'purple' | 'blue' | 'gray'; // ✅ 加上 'gray' 允許值
 }
 
-export default function CustomSelect({ options, value, onChange, placeholder = '-- 請選擇 --', focusColor = 'purple' }: CustomSelectProps) {
+export default function CustomSelect({ options, value, onChange, placeholder = '［請選擇］', focusColor = 'purple' }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 點擊外部關閉下拉選單
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -30,12 +29,21 @@ export default function CustomSelect({ options, value, onChange, placeholder = '
   }, []);
 
   const selectedOption = options.find(opt => opt.value === value);
-  const borderColorClass = focusColor === 'purple' ? 'border-purple-500' : 'border-blue-500';
-  const highlightColorClass = focusColor === 'purple' ? 'text-purple-400' : 'text-blue-400';
+  
+  // ✅ 根據傳入的 focusColor 給予對應的邊框與高光顏色
+  let borderColorClass = 'border-purple-500';
+  let highlightColorClass = 'text-purple-400';
+  
+  if (focusColor === 'blue') {
+    borderColorClass = 'border-blue-500';
+    highlightColorClass = 'text-blue-400';
+  } else if (focusColor === 'gray') {
+    borderColorClass = 'border-gray-500';
+    highlightColorClass = 'text-gray-300';
+  }
 
   return (
     <div className="relative w-full text-sm sm:text-base" ref={dropdownRef}>
-      {/* 按鈕本體 */}
       <button
         type="button"
         className={`w-full bg-gray-900 border ${isOpen ? borderColorClass : 'border-gray-600'} text-gray-200 p-3 rounded text-left flex justify-between items-center outline-none transition-colors shadow-inner`}
@@ -49,7 +57,6 @@ export default function CustomSelect({ options, value, onChange, placeholder = '
         </span>
       </button>
 
-      {/* 下拉選單列表 */}
       {isOpen && (
         <ul className="absolute z-50 w-full mt-1 bg-gray-900 border border-gray-600 rounded shadow-2xl max-h-60 overflow-y-auto overscroll-contain">
           {options.map((option) => (
