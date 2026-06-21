@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import localforage from 'localforage';
-// ［修正］在此處補上了 Skills 的匯入
 import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
 import { generateSlaveIdentity } from '../services/aiService';
@@ -115,7 +114,8 @@ const TIME_PHASES: TimePhase[] = ['早上', '中午', '下午', '晚上', '深�
 export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
-      player: { day: 1, timePhase: '早上', gold: 5000, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 0 },
+      // ★ 修正：給予無限測試資源 99999 金幣與 9999 威望
+      player: { day: 1, timePhase: '早上', gold: 99999, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 9999 },
       currentScene: 'Home',
       currentSubView: 'Main',
       dailyMissions: generateDailyMissions(),
@@ -221,7 +221,6 @@ export const useGameStore = create<GameStore>()(
                  if (Math.random() > 0.5) {
                    earnedPrestige += Math.floor(Math.random() * 20) + 10;
                  } else {
-                   // ［修正］強制綁定為 Skills 鍵值，防止 TypeScript 報錯
                    const skillKeys = ['combat', 'housework', 'survival'] as const;
                    const targetSkill = skillKeys[Math.floor(Math.random() * skillKeys.length)];
                    if (updatedSkills[targetSkill] < 10) {
@@ -272,6 +271,7 @@ export const useGameStore = create<GameStore>()(
         }
       }
     }),
-    { name: 'dark-fantasy-save-v5.1', storage: createJSONStorage(() => storage) }
+    // ★ 變更：將儲存名稱改為 v6，確保新玩家（您）一進來就有滿級初始資金覆蓋掉舊存檔
+    { name: 'dark-fantasy-save-v6', storage: createJSONStorage(() => storage) }
   )
 );
