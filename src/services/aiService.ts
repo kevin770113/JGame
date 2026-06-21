@@ -6,16 +6,17 @@ export const generateSlaveIdentity = async (race: Race, gender: Gender): Promise
   try {
     const genderText = gender === 'Male' ? '男性' : '女性';
     
-    // ★ 修正 1：在前端組合出完美的 Prompt，明確告訴 AI 要做什麼
+    // 組合出完美的 Prompt，明確告訴 AI 要做什麼
     const prompt = `請為黑暗奇幻遊戲生成一名【${race}】【${genderText}】的背景檔案。
 必須包含：
 1. name: 符合其種族與黑暗奇幻風格的名字（不要太長）。
 2. story: 一段約 50 字的悲慘、黑暗或帶有懸疑感的背景故事，說明他為何淪落至地下市場。`;
 
-    const response = await fetch(`${API_URL}/api/generate-identity`, { 
+    // ★ 修正：將網址改為您正確的後端路徑 /ai/run
+    const response = await fetch(`${API_URL}/ai/run`, { 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }), // ★ 修正 2：正確傳送 prompt 給後端
+      body: JSON.stringify({ prompt }), 
     });
 
     if (!response.ok) {
@@ -24,7 +25,7 @@ export const generateSlaveIdentity = async (race: Race, gender: Gender): Promise
 
     const data = await response.json();
     
-    // ★ 修正 3：精準擷取後端傳來的 response 字串
+    // 精準擷取後端傳來的 response 字串
     let rawText = data.response || data.text || JSON.stringify(data);
 
     // 防呆防護 1：強制清除 AI 容易亂加的 Markdown 語法
