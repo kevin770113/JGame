@@ -37,7 +37,6 @@ export default function DispatchView() {
       return;
     }
 
-    // 執行外派，將任務寫入佇列
     dispatchSlave(slave.id, selectedMission.id);
     setSysMessage({ 
       text: `［系統］契約成立。${slave.name} 已啟程執行【${selectedMission.title}】，預計將於 ${selectedMission.requiredPhases} 個時段後歸來並結算賞金。`, 
@@ -47,7 +46,6 @@ export default function DispatchView() {
     setSelectedSlaveId('');
   };
 
-  // 只篩選出「閒置」狀態的奴隸供玩家指派
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
   const slaveOptions: Option[] = idleSlaves.map(s => {
     const isExhausted = selectedMission ? s.conditionStats.stamina < selectedMission.staminaCost : false;
@@ -60,12 +58,14 @@ export default function DispatchView() {
 
   const getRankStyle = (rank: string) => {
     if (rank === '黃金') return 'text-yellow-500 border-yellow-700 bg-yellow-950/30';
+    if (rank === '紫色') return 'text-purple-400 border-purple-700 bg-purple-950/30'; // ★ 補上紫階專屬顏色
     if (rank === '蔚藍') return 'text-blue-400 border-blue-700 bg-blue-950/30';
     return 'text-green-500 border-green-700 bg-green-950/30';
   };
 
   return (
-    <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in">
+    // ★ 將底部的 pb-10 改為 pb-48，預留極大的空間給下拉選單，防止遭到截斷
+    <div className="w-full flex flex-col gap-4 pb-48 animate-fade-in">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
           <h2 className="text-xl font-bold text-gray-300">深淵酒館</h2>
