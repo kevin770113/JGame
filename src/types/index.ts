@@ -53,5 +53,7 @@ export interface Player {
   location: Location;
   roomDirtiness: number;
   maxSlaveCapacity: number;
-  prestige: number; // ［新增］商會威望
+  prestige: number;
+  actionPoints: number;      // ［新增］行動力
+  lastApUpdateTime: number;  // ［新增］上次行動力更新的真實時間戳記
 }
