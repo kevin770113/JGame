@@ -24,17 +24,24 @@ export const fetchIdentityBatch = async (): Promise<IdentityRecord[]> => {
     }
 
     const data = await response.json();
-    
-    // 取出後端傳來的原始字串
     let rawText = data.response || data.text || JSON.stringify(data);
 
-    // 強制清除 AI 容易亂加的 Markdown 語法
-    const cleanText = String(rawText).replace(/```json/gi, '').replace(/```/gi, '').trim();
+    // 初步清理 Markdown 標籤
+    let cleanText = String(rawText).replace(/```json/gi, '').replace(/```/gi, '').trim();
 
-    // 嘗試安全解析 JSON
+    // 終極暴力防呆：精準挖出 JSON 陣列，過濾掉 AI 的聊天廢話
+    const startIndex = cleanText.indexOf('[');
+    const endIndex = cleanText.lastIndexOf(']');
+    
+    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+      cleanText = cleanText.substring(startIndex, endIndex + 1);
+    } else {
+      throw new Error("無法從 AI 回應中定位 JSON 陣列的邊界");
+    }
+
+    // 安全解析被挖出來的純淨陣列
     const parsed = JSON.parse(cleanText);
     
-    // 確認 AI 確實回傳了陣列，且裡面有合法的物件
     if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name && parsed[0].story) {
       return parsed.slice(0, 10); 
     }
