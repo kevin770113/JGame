@@ -17,24 +17,23 @@ export default function BaseView() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-4 pb-24 relative min-h-[70vh] animate-fade-in">
-      <div className="border-b border-gray-700 pb-2">
+    <div className="w-full flex flex-col justify-between pb-24 relative min-h-[75vh] animate-fade-in">
+      {/* 頂部文字控制台標題 */}
+      <div className="border-b border-gray-700 pb-2 bg-gray-950/70 p-3 rounded backdrop-blur-xs">
         <h2 className="text-xl font-bold text-gray-300">{getLocationName()}</h2>
         <p className="text-xs text-gray-500 mt-1">商會的核心調度中樞，掌控所有內部設施與據點動態。</p>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-lg p-5 flex flex-col gap-4 shadow-lg backdrop-blur-xs">
-        <div className="h-48 bg-gray-950/80 rounded border border-gray-800 flex items-center justify-center italic text-gray-600 text-xs text-center px-4 leading-relaxed">
-          ［當前據點室內大廳場景插圖預留區］
+      {/* 中間完全放空，完美展示 R2 伺服器傳輸過來的全螢幕大圖 */}
+      <div className="flex-1 min-h-[200px]"></div>
+
+      {roomDirtiness > 50 && (
+        <div className="p-3 bg-red-950/40 border border-red-900/60 rounded text-xs text-red-400 leading-relaxed animate-pulse tracking-wide backdrop-blur-xs my-2">
+          ［系統警告］環境過於髒亂！成員睡眠恢復效率已大打折扣。請儘速傳喚成員前往進行整頓打掃。
         </div>
+      )}
 
-        {roomDirtiness > 50 && (
-          <div className="p-3 bg-red-950/20 border border-red-900/40 rounded text-xs text-red-400 leading-relaxed animate-pulse tracking-wide">
-            ［系統警告］環境過於髒亂！成員睡眠恢復效率已大打折扣。請儘速傳喚成員前往進行整頓打掃。
-          </div>
-        )}
-      </div>
-
+      {/* 行動按鈕選單常駐靠底 */}
       <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 w-full max-w-xs px-4">
         {isMenuOpen && (
           <div className="w-full bg-gray-950/95 border border-gray-700 rounded-lg p-2 flex flex-col gap-1 shadow-2xl animate-slide-up backdrop-blur-md">
