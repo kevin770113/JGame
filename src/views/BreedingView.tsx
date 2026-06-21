@@ -2,23 +2,23 @@ import { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { Slave, Gender } from '../types';
 import CustomSelect, { Option } from '../components/CustomSelect';
-import { generateSlaveIdentity } from '../services/aiService';
 
 export default function BreedingView() {
   const slaves = useGameStore((state) => state.slaves);
-  const maxSlaveCapacity = useGameStore((state) => state.player.maxSlaveCapacity); // ★ 取出最大人口數
+  const maxSlaveCapacity = useGameStore((state) => state.player.maxSlaveCapacity);
   const addSlave = useGameStore((state) => state.addSlave);
   const navigate = useGameStore((state) => state.navigate);
+  
+  // ★ 取出池子裡的抽卡方法
+  const consumeIdentity = useGameStore((state) => state.consumeIdentity);
 
   const [alphaId, setAlphaId] = useState<string>('');
   const [betaId, setBetaId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' | 'loading' } | null>(null);
 
-  // ★ 判斷目前人口是否已滿
   const isFull = slaves.length >= maxSlaveCapacity;
 
   const handleBreed = async () => {
-    // 防呆阻擋
     if (isFull) {
       setSysMessage({ text: '［警告］空間不足，據點已達人口上限，無法容納新的試驗體降生。', type: 'error' });
       return;
@@ -64,7 +64,13 @@ export default function BreedingView() {
     const childGender: Gender = Math.random() > 0.5 ? 'Male' : 'Female';
     const childId = 'child-' + Math.random().toString(36).substring(2, 9);
 
-    const aiData = await generateSlaveIdentity(childRace, childGender);
+    // ★ 從資源池秒抽一張卡
+    const aiData = await consumeIdentity();
+    
+    // ★ 動態判定性別與背景覆寫
+    const genderSuffix = childGender === 'Male' ? '之子' : '之女';
+    const fatherName = p1.gender === 'Male' ? p1.name : p2.name;
+    const motherName = p1.gender === 'Female' ? p1.name : p2.name;
 
     const newChild: Slave = {
       id: childId,
@@ -81,7 +87,8 @@ export default function BreedingView() {
       },
       conditionStats: { stamina: 100, stress: 0, rebellion: 0 },
       traits: [],
-      backgroundStory: `［密室誕生］${aiData.story}`,
+      // ★ 強制將背景故事改寫為：［密室誕生］XXX 與 XXX 之子 / 之女。加上 AI 提供的靈魂氣息
+      backgroundStory: `［密室誕生］${fatherName} 與 ${motherName} ${genderSuffix}。${aiData.story}`,
       parents: { fatherId: p1.gender === 'Male' ? p1.id : p2.id, motherId: p1.gender === 'Female' ? p1.id : p2.id }
     };
 
