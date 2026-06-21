@@ -1,4 +1,3 @@
-// 批次資料結構
 export interface IdentityRecord {
   name: string;
   story: string;
@@ -6,7 +5,6 @@ export interface IdentityRecord {
 
 const API_URL = import.meta.env.VITE_API_URL || ''; 
 
-// ★ 修正：將單次生成改為批次生成，一次索取 10 筆萬用資料
 export const fetchIdentityBatch = async (): Promise<IdentityRecord[]> => {
   try {
     const prompt = `請隨機生成 10 名黑暗奇幻風格的奴隸檔案。
@@ -26,17 +24,19 @@ export const fetchIdentityBatch = async (): Promise<IdentityRecord[]> => {
     }
 
     const data = await response.json();
+    
+    // 取出後端傳來的原始字串
     let rawText = data.response || data.text || JSON.stringify(data);
 
-    // 防呆防護 1：強制清除 AI 容易亂加的 Markdown 語法
+    // 強制清除 AI 容易亂加的 Markdown 語法
     const cleanText = String(rawText).replace(/```json/gi, '').replace(/```/gi, '').trim();
 
-    // 防呆防護 2：嘗試安全解析 JSON
+    // 嘗試安全解析 JSON
     const parsed = JSON.parse(cleanText);
     
     // 確認 AI 確實回傳了陣列，且裡面有合法的物件
     if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name && parsed[0].story) {
-      return parsed.slice(0, 10); // 確保最多只取 10 筆
+      return parsed.slice(0, 10); 
     }
     
     throw new Error("JSON 格式不符預期或缺少屬性");
@@ -44,7 +44,6 @@ export const fetchIdentityBatch = async (): Promise<IdentityRecord[]> => {
   } catch (error) {
     console.warn("［系統警告］AI 批次生成失敗，已啟動沉浸式備用方案:", error);
     
-    // 沉浸式備用方案 (Fallback)：當 AI 抽風時，直接批發 10 個深淵棄子
     const fallbackNames = ['深淵棄子', '無名死囚', '失落的黯影', '零號殘次品', '破碎的幽影', '無名盲者', '深淵殘渣', '被遺忘者', '罪業之軀', '無魂者'];
     
     return Array.from({ length: 10 }).map(() => ({
