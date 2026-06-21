@@ -6,6 +6,7 @@ import { generateSlaveIdentity } from '../services/aiService';
 
 export default function BreedingView() {
   const slaves = useGameStore((state) => state.slaves);
+  const maxSlaveCapacity = useGameStore((state) => state.player.maxSlaveCapacity); // ★ 取出最大人口數
   const addSlave = useGameStore((state) => state.addSlave);
   const navigate = useGameStore((state) => state.navigate);
 
@@ -13,7 +14,16 @@ export default function BreedingView() {
   const [betaId, setBetaId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' | 'loading' } | null>(null);
 
+  // ★ 判斷目前人口是否已滿
+  const isFull = slaves.length >= maxSlaveCapacity;
+
   const handleBreed = async () => {
+    // 防呆阻擋
+    if (isFull) {
+      setSysMessage({ text: '［警告］空間不足，據點已達人口上限，無法容納新的試驗體降生。', type: 'error' });
+      return;
+    }
+
     if (!alphaId || !betaId) {
       setSysMessage({ text: '［錯誤］必須提供兩具試驗體。', type: 'error' });
       return;
@@ -32,7 +42,6 @@ export default function BreedingView() {
       return;
     }
 
-    // ★ 盲選防呆：在此處才進行基因與性別驗證 ★
     if (p1.race !== p2.race) {
       setSysMessage({ text: `［排斥反應］基因序列衝突（${p1.race} 與 ${p2.race}），融合失敗。`, type: 'error' });
       return;
@@ -84,7 +93,6 @@ export default function BreedingView() {
 
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
   
-  // 選單不再提示性別，增加盲選難度與神祕感
   const slaveOptions: Option[] = idleSlaves.map(s => ({
     value: s.id,
     label: `${s.name} (種族: ${s.race})`
@@ -124,14 +132,16 @@ export default function BreedingView() {
 
         <button 
           onClick={handleBreed}
-          disabled={isLoading}
+          disabled={isLoading || isFull}
           className={`mt-4 font-bold py-3 rounded text-xs tracking-widest border transition-colors shadow ${
-            isLoading 
-              ? 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed animate-pulse'
-              : 'bg-blood-red/20 hover:bg-blood-red/40 text-red-400 border-red-900/50'
+            isFull
+              ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+              : isLoading 
+                ? 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed animate-pulse'
+                : 'bg-blood-red/20 hover:bg-blood-red/40 text-red-400 border-red-900/50'
           }`}
         >
-          {isLoading ? '［血統融合運算中...］' : '［啟動融合陣列］'}
+          {isFull ? '［據點人口已滿］' : isLoading ? '［血統融合運算中...］' : '［啟動融合陣列］'}
         </button>
 
         {sysMessage && (
