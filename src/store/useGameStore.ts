@@ -49,6 +49,7 @@ export interface GameStore {
   dispatchSlave: (slaveId: string, missionId: string) => void;
 
   triggerBackgroundMarketRefresh: () => Promise<void>;
+  checkApRecovery: () => void; // ［新增］檢查並回復行動力
   processTurn: () => void;
 }
 
@@ -114,8 +115,7 @@ const TIME_PHASES: TimePhase[] = ['早上', '中午', '下午', '晚上', '深�
 export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
-      // ★ 修正：給予無限測試資源 99999 金幣與 9999 威望
-      player: { day: 1, timePhase: '早上', gold: 99999, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 9999 },
+      player: { day: 1, timePhase: '早上', gold: 99999, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 9999, actionPoints: 50, lastApUpdateTime: Date.now() },
       currentScene: 'Home',
       currentSubView: 'Main',
       dailyMissions: generateDailyMissions(),
@@ -182,10 +182,39 @@ export const useGameStore = create<GameStore>()(
         } catch (e) { console.error(e); } finally { set({ isMarketGenerating: false }); }
       },
 
+      // ［實作］行動力檢查與回復（每分鐘回復 1 點）
+      checkApRecovery: () => set((state) => {
+        const { actionPoints, lastApUpdateTime } = state.player;
+        if (actionPoints >= 50) return state;
+
+        const now = Date.now();
+        const elapsed = now - lastApUpdateTime;
+        const recoverAmount = Math.floor(elapsed / 60000); 
+
+        if (recoverAmount > 0) {
+          const newAp = Math.min(50, actionPoints + recoverAmount);
+          const newUpdateTime = lastApUpdateTime + (recoverAmount * 60000); // 保留剩餘未滿一分鐘的毫秒數
+          return { player: { ...state.player, actionPoints: newAp, lastApUpdateTime: newAp === 50 ? now : newUpdateTime } };
+        }
+        return state;
+      }),
+
       processTurn: () => {
+        // 推進時優先核算一次行動力是否需要回復
+        get().checkApRecovery();
+        
         const state = get();
         const { player, slaves, activeDispatches, triggerBackgroundMarketRefresh } = state;
         
+        // ［實作］行動力防禦判斷
+        if (player.actionPoints < 1) {
+            console.warn('［系統］行動力不足，無法執行推進。');
+            return;
+        }
+
+        const newAp = player.actionPoints - 1;
+        const newApUpdateTime = player.actionPoints === 50 ? Date.now() : player.lastApUpdateTime;
+
         const currentPhaseIndex = TIME_PHASES.indexOf(player.timePhase);
         let nextPhase: TimePhase;
         let nextDay = player.day;
@@ -194,11 +223,16 @@ export const useGameStore = create<GameStore>()(
         if (currentPhaseIndex === TIME_PHASES.length - 1) { nextPhase = '早上'; nextDay += 1; triggerDailySettlement = true; } 
         else { nextPhase = TIME_PHASES[currentPhaseIndex + 1]; }
 
-        const dirtMultiplier = player.location === 'Capital' ? 1 : player.location === 'NeutralHub' ? 1.5 : 2;
-        const addedDirtiness = Math.ceil(slaves.length * dirtMultiplier);
-        let newDirtiness = Math.min(100, player.roomDirtiness + addedDirtiness);
+        // ［實作］計算人口溢出狀態
+        const overpopulation = Math.max(0, slaves.length - player.maxSlaveCapacity);
 
-        set({ player: { ...player, day: nextDay, timePhase: nextPhase, roomDirtiness: newDirtiness } });
+        // ［實作］環境髒亂度指數型爆發
+        const dirtMultiplier = player.location === 'Capital' ? 1 : player.location === 'NeutralHub' ? 1.5 : 2;
+        const baseAddedDirtiness = Math.ceil(slaves.length * dirtMultiplier);
+        const penaltyDirtiness = Math.pow(overpopulation, 2) * 5;
+        const newDirtiness = Math.min(100, player.roomDirtiness + baseAddedDirtiness + penaltyDirtiness);
+
+        set({ player: { ...player, day: nextDay, timePhase: nextPhase, roomDirtiness: newDirtiness, actionPoints: newAp, lastApUpdateTime: newApUpdateTime } });
 
         const newDispatches: ActiveDispatch[] = [];
         let earnedGold = 0;
@@ -260,8 +294,25 @@ export const useGameStore = create<GameStore>()(
             else {
               let staminaRecover = 30;
               if (newDirtiness > 50) staminaRecover = 10;
-              if (slave.activityStatus === '閒置') { newStamina = Math.min(100, newStamina + staminaRecover); newStress = Math.max(0, newStress - 5); }
-              if (newDirtiness > 80) { newStress = Math.min(100, newStress + 20); newRebellion = Math.min(100, newRebellion + 15); }
+              
+              if (slave.activityStatus === '閒置') { 
+                newStamina = Math.min(100, newStamina + staminaRecover); 
+                // ［實作］人口溢出時剝奪閒置恢復壓力的福利
+                if (overpopulation === 0) {
+                    newStress = Math.max(0, newStress - 5); 
+                }
+              }
+              
+              if (newDirtiness > 80) { 
+                newStress = Math.min(100, newStress + 20); 
+                newRebellion = Math.min(100, newRebellion + 15); 
+              }
+
+              // ［實作］壓力鍋效應：強制給所有人疊加高額壓力與反抗
+              if (overpopulation > 0) {
+                  newStress = Math.min(100, newStress + (overpopulation * 5));
+                  newRebellion = Math.min(100, newRebellion + (overpopulation * 3));
+              }
             }
             get().updateSlave(slave.id, { conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
           });
@@ -271,7 +322,6 @@ export const useGameStore = create<GameStore>()(
         }
       }
     }),
-    // ★ 變更：將儲存名稱改為 v6，確保新玩家（您）一進來就有滿級初始資金覆蓋掉舊存檔
-    { name: 'dark-fantasy-save-v6', storage: createJSONStorage(() => storage) }
+    { name: 'dark-fantasy-save-v7', storage: createJSONStorage(() => storage) }
   )
 );
