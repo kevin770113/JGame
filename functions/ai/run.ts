@@ -13,7 +13,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       });
     }
 
-    // 換上您親自從官方目錄驗證並複製的正確 FP8 模型 ID
     const aiResponse = await context.env.AI.run("@cf/meta/llama-3.1-8b-instruct-fp8", {
       messages: [
         { 
@@ -27,13 +26,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       ]
     });
 
-    // 容錯處理：過濾掉 AI 偶爾會發神經加上的 markdown 外框
-    let cleanText = aiResponse.response || "";
-    cleanText = cleanText.replace(/```json/g, "").replace(/```/g, "").trim();
+    // ★ 修正：後端不再解析 JSON，直接把 AI 生成的原始文字傳回給前端
+    let rawText = aiResponse.response || "";
 
-    const parsedData = JSON.parse(cleanText);
-
-    return new Response(JSON.stringify({ response: parsedData }), {
+    return new Response(JSON.stringify({ response: rawText }), {
       headers: { "Content-Type": "application/json;charset=UTF-8" },
     });
 
