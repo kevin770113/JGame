@@ -1,16 +1,19 @@
-import { Race, Gender } from '../types';
+// 批次資料結構
+export interface IdentityRecord {
+  name: string;
+  story: string;
+}
 
 const API_URL = import.meta.env.VITE_API_URL || ''; 
 
-export const generateSlaveIdentity = async (race: Race, gender: Gender): Promise<{ name: string; story: string }> => {
+// ★ 修正：將單次生成改為批次生成，一次索取 10 筆萬用資料
+export const fetchIdentityBatch = async (): Promise<IdentityRecord[]> => {
   try {
-    const genderText = gender === 'Male' ? '男性' : '女性';
-    
-    // ★ 修正：加入極度嚴格的「繁體中文」與「禁止英文/表情符號」限制
-    const prompt = `請為黑暗奇幻遊戲生成一名【${race}】【${genderText}】的背景檔案。
+    const prompt = `請隨機生成 10 名黑暗奇幻風格的奴隸檔案。
 必須嚴格遵守以下條件：
-1. name: 符合其種族與黑暗奇幻風格的名字（不要太長）。【絕對禁止】使用英文與表情符號(Emoji)，必須且只能使用「繁體中文」進行命名。
-2. story: 一段約 50 字的悲慘、黑暗或帶有懸疑感的背景故事，說明他為何淪落至地下市場。【絕對禁止】使用表情符號(Emoji)。`;
+1. 回傳格式必須為 JSON 陣列 (Array)，包含 10 個物件。格式精準如：[{"name": "名字", "story": "故事"}, ...]
+2. name: 【絕對禁止】使用英文與表情符號，必須且只能使用「繁體中文」。
+3. story: 一段約 50 字的靈魂氣息或軀體特徵描述。【絕對禁止】使用表情符號。【絕對禁止】使用第三人稱代名詞(如他、她、它)，請一律使用「此人」、「這具軀殼」、「其」或「這個靈魂」代稱。`;
 
     const response = await fetch(`${API_URL}/ai/run`, { 
       method: 'POST',
@@ -25,31 +28,28 @@ export const generateSlaveIdentity = async (race: Race, gender: Gender): Promise
     const data = await response.json();
     let rawText = data.response || data.text || JSON.stringify(data);
 
-    const cleanText = rawText.replace(/```json/gi, '').replace(/```/gi, '').trim();
+    // 防呆防護 1：強制清除 AI 容易亂加的 Markdown 語法
+    const cleanText = String(rawText).replace(/```json/gi, '').replace(/```/gi, '').trim();
+
+    // 防呆防護 2：嘗試安全解析 JSON
     const parsed = JSON.parse(cleanText);
     
-    if (parsed.name && parsed.story) {
-      return {
-        name: parsed.name,
-        story: parsed.story
-      };
+    // 確認 AI 確實回傳了陣列，且裡面有合法的物件
+    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name && parsed[0].story) {
+      return parsed.slice(0, 10); // 確保最多只取 10 筆
     }
     
-    throw new Error("JSON 中缺少 name 或 story 屬性");
+    throw new Error("JSON 格式不符預期或缺少屬性");
 
   } catch (error) {
-    console.warn("［系統警告］AI 身份生成失敗，已啟動沉浸式備用方案:", error);
+    console.warn("［系統警告］AI 批次生成失敗，已啟動沉浸式備用方案:", error);
     
-    const isMale = gender === 'Male';
-    const fallbackNames = isMale 
-      ? ['深淵棄子', '無名死囚', '失落的黯影', '零號殘次品'] 
-      : ['深淵棄女', '無名盲女', '破碎的幽影', '零號殘次品'];
+    // 沉浸式備用方案 (Fallback)：當 AI 抽風時，直接批發 10 個深淵棄子
+    const fallbackNames = ['深淵棄子', '無名死囚', '失落的黯影', '零號殘次品', '破碎的幽影', '無名盲者', '深淵殘渣', '被遺忘者', '罪業之軀', '無魂者'];
     
-    const randomName = fallbackNames[Math.floor(Math.random() * fallbackNames.length)];
-    
-    return {
-      name: `${randomName}`,
-      story: `［檔案毀損］在建檔過程中，深淵能量引發了異常波動。這名${race}的過去已被徹底抹除，大腦僅剩下純粹的服從與生存本能。`
-    };
+    return Array.from({ length: 10 }).map(() => ({
+      name: fallbackNames[Math.floor(Math.random() * fallbackNames.length)],
+      story: `［檔案毀損］在建檔過程中，深淵能量引發了異常波動。這具軀殼的過去已被徹底抹除，大腦僅剩下純粹的服從與生存本能。`
+    }));
   }
 };
