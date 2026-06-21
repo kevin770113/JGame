@@ -7,11 +7,11 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const fetchIdentityBatch = async (): Promise<IdentityRecord[]> => {
   try {
-    const prompt = `請隨機生成 10 名黑暗奇幻風格的奴隸檔案。
+    const prompt = `請扮演台灣在地化的黑暗奇幻遊戲腳本家，隨機生成 10 名「西方架空背景」的奴隸檔案。
 必須嚴格遵守以下條件：
 1. 回傳格式必須為 JSON 陣列 (Array)，包含 10 個物件。格式精準如：[{"name": "名字", "story": "故事"}, ...]
-2. name: 【絕對禁止】使用英文與表情符號，必須且只能使用「繁體中文」。
-3. story: 一段約 50 字的靈魂氣息或軀體特徵描述。【絕對禁止】使用表情符號。【絕對禁止】使用第三人稱代名詞(如他、她、它)，請一律使用「此人」、「這具軀殼」、「其」或「這個靈魂」代稱。`;
+2. name: 必須是西方奇幻風格的音譯名字或稱號（例如：亞歷山大、伊蓮娜、碎骨者）。【絕對限制】必須全程使用「繁體中文（台灣）」，嚴禁出現任何簡體字（絕對禁止使用如：亚、尔、龙、战、奥 等簡體字）。禁止使用英文與表情符號。
+3. story: 一段約 50 字的靈魂氣息或軀體特徵描述。【絕對限制】禁止使用表情符號。禁止使用第三人稱代名詞(如他、她、它)，請一律使用「此人」、「這具軀殼」、「其」或「這個靈魂」代稱。全篇必須為標準繁體中文。`;
 
     const response = await fetch(`${API_URL}/ai/run`, { 
       method: 'POST',
@@ -26,10 +26,8 @@ export const fetchIdentityBatch = async (): Promise<IdentityRecord[]> => {
     const data = await response.json();
     let rawText = data.response || data.text || JSON.stringify(data);
 
-    // 初步清理 Markdown 標籤
     let cleanText = String(rawText).replace(/```json/gi, '').replace(/```/gi, '').trim();
 
-    // 終極暴力防呆：精準挖出 JSON 陣列，過濾掉 AI 的聊天廢話
     const startIndex = cleanText.indexOf('[');
     const endIndex = cleanText.lastIndexOf(']');
     
@@ -39,7 +37,6 @@ export const fetchIdentityBatch = async (): Promise<IdentityRecord[]> => {
       throw new Error("無法從 AI 回應中定位 JSON 陣列的邊界");
     }
 
-    // 安全解析被挖出來的純淨陣列
     const parsed = JSON.parse(cleanText);
     
     if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name && parsed[0].story) {
