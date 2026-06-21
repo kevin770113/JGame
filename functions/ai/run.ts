@@ -17,16 +17,17 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       messages: [
         { 
           role: "system", 
-          content: "你是一個黑暗奇幻遊戲的文字引擎。請嚴格根據玩家的要求生成資料。請「僅」回傳一個合法的 JSON 物件，絕對不要包含任何額外的問候語、Markdown 標籤（如 ```json）或解釋性文字。" 
+          // 移除強制要求單一物件的指令，讓前端完全掌控資料格式
+          content: "你是一個黑暗奇幻遊戲的文字引擎。請嚴格根據玩家的要求生成資料。請「僅」回傳玩家要求的 JSON 格式，絕對不要包含任何額外的問候語、Markdown 標籤（如 ```json）或解釋性文字。" 
         },
         { 
           role: "user", 
-          content: `${prompt}\n\n回傳格式必須精準為：{"name": "名字", "story": "故事"}` 
+          content: prompt 
         }
       ]
     });
 
-    // ★ 修正：後端不再解析 JSON，直接把 AI 生成的原始文字傳回給前端
+    // 將解析工作交給前端，這裡直接回傳 AI 最原始的文字
     let rawText = aiResponse.response || "";
 
     return new Response(JSON.stringify({ response: rawText }), {
