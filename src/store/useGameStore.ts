@@ -365,7 +365,7 @@ export const useGameStore = create<GameStore>()(
         }
       }
     }),
-    // ★ 變更：由於資料結構大幅翻新，升級儲存至 v8，自動幫您初始化 10 筆名單的陣列
-    { name: 'dark-fantasy-save-v8', storage: createJSONStorage(() => storage) }
+    // ★ 變更：由於資料結構大幅翻新，升級儲存至 v9，自動幫您初始化 10 筆名單的陣列
+    { name: 'dark-fantasy-save-v9', storage: createJSONStorage(() => storage) }
   )
 );
