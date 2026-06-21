@@ -9,9 +9,13 @@ import InteractionView from './views/InteractionView';
 import { useGameStore } from './store/useGameStore';
 import { Slave } from './types';
 
+// 宣告 R2 圖片伺服器根網址
+const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
+
 function App() {
   const currentScene = useGameStore((state) => state.currentScene);
   const currentSubView = useGameStore((state) => state.currentSubView);
+  const location = useGameStore((state) => state.player.location);
   const navigate = useGameStore((state) => state.navigate);
   
   const slaves = useGameStore((state) => state.slaves);
@@ -23,6 +27,13 @@ function App() {
   useEffect(() => {
     if (marketSlaves.length === 0) triggerBackgroundMarketRefresh();
   }, []);
+
+  // 動態計算當前時空背景圖 URL
+  const getDynamicBackground = () => {
+    const sceneKey = currentScene.toLowerCase();
+    const locationKey = location.toLowerCase();
+    return `${R2_BASE_URL}/bg-${sceneKey}-${locationKey}.webp`;
+  };
 
   const renderMainStage = () => {
     if (currentScene === 'Home') {
@@ -37,27 +48,28 @@ function App() {
       switch (currentSubView) {
         case 'Main':
           return (
-            <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in">
-              <div className="border-b border-gray-700 pb-2">
+            <div className="w-full min-h-[75vh] flex flex-col justify-between pb-10 animate-fade-in">
+              {/* 頂部文字面板加上暗色半透明與毛玻璃特效，確保可讀性 */}
+              <div className="border-b border-gray-700 pb-2 bg-gray-950/70 p-3 rounded backdrop-blur-xs">
                 <h2 className="text-xl font-bold text-gray-300">城鎮市集</h2>
                 <p className="text-xs text-gray-500 mt-1">喧鬧的灰色地帶，充斥著酒精、金錢與血統的地下交易。</p>
               </div>
               
-              <div className="bg-gray-900/40 border border-gray-800 p-6 rounded-lg text-center my-2 h-44 flex items-center justify-center italic text-gray-600 text-sm">
-                ［城鎮外景街頭插圖預留區］
-              </div>
+              {/* 中間區域完全淨空，完美展現背景插圖 */}
+              <div className="flex-1"></div>
 
-              <div className="flex flex-col gap-3">
+              {/* 行動按鈕全面向底部靠攏，消除留白 */}
+              <div className="flex flex-col gap-3 bg-gray-950/50 p-3 rounded backdrop-blur-xs">
                 <button 
                   onClick={() => navigate('Town', 'Market')}
-                  className="py-4 bg-gray-900/80 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"
+                  className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"
                 >
                   <span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［訪問地下商隊］</span>
                   <span className="text-xs text-gray-500 font-normal">引進與變現血統資產</span>
                 </button>
                 <button 
                   onClick={() => navigate('Town', 'Tavern')}
-                  className="py-4 bg-gray-900/80 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"
+                  className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"
                 >
                   <span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［前往深淵酒館］</span>
                   <span className="text-xs text-gray-500 font-normal">查閱地區懸賞與傳說委託</span>
@@ -86,10 +98,21 @@ function App() {
   };
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-dark-bg text-gray-200 overflow-hidden select-none">
+    <div 
+      className="absolute inset-0 flex flex-col bg-dark-bg text-gray-200 overflow-hidden select-none transition-all duration-700"
+      style={{
+        backgroundImage: `url(${getDynamicBackground()})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      {/* 遮罩暗化層：確保全螢幕大圖不會干擾 UI 文字線條 */}
+      <div className="absolute inset-0 bg-black/40 z-0 pointer-events-none"></div>
+      
       <div className="shrink-0 z-20 shadow-md bg-gray-900 relative"><Header /></div>
 
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative z-10">
         <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center z-10 overscroll-contain">
           <div className={`w-full transition-all duration-300 ${currentScene === 'Town' ? 'max-w-3xl' : 'max-w-lg'}`}>
             {renderMainStage()}
@@ -97,8 +120,8 @@ function App() {
         </main>
 
         {currentScene === 'Home' && (
-          <aside className="w-24 border-l border-gray-800 flex flex-col bg-gray-950/40 overflow-y-auto shrink-0 animate-fade-in">
-            <div className="p-2 border-b border-gray-800 text-center bg-gray-900/30">
+          <aside className="w-24 border-l border-gray-800 flex flex-col bg-gray-950/60 backdrop-blur-xs overflow-y-auto shrink-0 animate-fade-in">
+            <div className="p-2 border-b border-gray-800 text-center bg-gray-900/40">
               <span className="text-2xs font-bold text-gray-500 tracking-wider">基地成員</span>
             </div>
             
@@ -107,7 +130,7 @@ function App() {
                 <button
                   key={slave.id}
                   onClick={() => setActiveSlave(slave)}
-                  className="w-full bg-gray-800/60 hover:bg-gray-700/80 border border-gray-700/50 rounded p-1.5 text-left flex flex-col gap-1 relative active:scale-95 transition-all shadow-sm group"
+                  className="w-full bg-gray-800/50 hover:bg-gray-700/80 border border-gray-700/50 rounded p-1.5 text-left flex flex-col gap-1 relative active:scale-95 transition-all shadow-sm group"
                 >
                   <span className={`absolute top-1 right-1 w-2 h-2 rounded-full ${getHealthStatusColor(slave)} shadow-sm`} />
                   
@@ -132,21 +155,18 @@ function App() {
         )}
       </div>
 
-      {/* ［雙欄佈局］全局成員詳細資訊彈窗 */}
       {activeSlave && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
-          <div className="w-full max-w-2xl bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-2xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setActiveSlave(null)} className="absolute top-2 right-3 text-gray-500 hover:text-white text-sm font-bold transition-colors z-20">
               ［關閉］
             </button>
             
-            {/* 左側：立繪頭像預留區 (佔 35%+) */}
             <div className="w-full sm:w-1/3 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[200px] sm:min-h-[400px] relative overflow-hidden group">
-               <div className="absolute inset-0 bg-gray-800/20 group-hover:bg-gray-800/40 transition-colors"></div>
+               <div className="absolute inset-0 bg-gray-800/10 group-hover:bg-gray-800/30 transition-colors"></div>
                <span className="text-gray-600 text-xs italic tracking-widest z-10">［立繪預留區］</span>
             </div>
 
-            {/* 右側：詳細數值與檔案 (佔 65%) */}
             <div className="w-full sm:w-2/3 flex flex-col gap-4">
               <div>
                 <h3 className="text-xl font-bold text-gray-200 flex items-center gap-2">
