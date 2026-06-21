@@ -2,27 +2,26 @@ import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import CustomSelect, { Option } from '../components/CustomSelect';
 
-const DIALOGUES = [
-  '深淵的凝視未曾移開，主人。',
-  '我會將那些敵人的骨頭磨成粉末。',
-  '這裡的氣息……令人感到窒息卻又沉迷。',
-  '只要您下令，我隨時準備赴死。',
-  '生存或是毀滅，都不過是您一句話的恩賜。',
-  '鮮血的味道能讓我保持清醒。',
-  '請盡情使用我，直到這具軀殼破碎為止。'
-];
+interface ConfirmModalData {
+  title: string;
+  action: () => void;
+}
 
 export default function InteractionView() {
   const slaves = useGameStore((state) => state.slaves);
-  const { gold, roomDirtiness } = useGameStore((state) => state.player);
+  const { gold, roomDirtiness, actionPoints } = useGameStore((state) => state.player);
   const updateSlave = useGameStore((state) => state.updateSlave);
   const deductGold = useGameStore((state) => state.deductGold);
   const navigate = useGameStore((state) => state.navigate);
+  const processTurn = useGameStore((state) => state.processTurn);
 
   const [selectedSlaveId, setSelectedSlaveId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'dialogue' | 'clean' | 'train'>('dialogue');
   const [currentQuote, setCurrentQuote] = useState<string>('［等待傳喚中...］');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  
+  // 警告彈窗狀態
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalData | null>(null);
 
   const selectedSlave = slaves.find(s => s.id === selectedSlaveId);
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
@@ -39,11 +38,38 @@ export default function InteractionView() {
 
   const handleTalk = () => {
     if (!selectedSlave) return;
+    const DIALOGUES = [
+      '深淵的凝視未曾移開，主人。',
+      '我會將那些敵人的骨頭磨成粉末。',
+      '這裡的氣息……令人感到窒息卻又沉迷。',
+      '只要您下令，我隨時準備赴死。',
+      '生存或是毀滅，都不過是您一句話的恩賜。',
+      '鮮血的味道能讓我保持清醒。',
+      '請盡情使用我，直到這具軀殼破碎為止。'
+    ];
     const randomQuote = DIALOGUES[Math.floor(Math.random() * DIALOGUES.length)];
     setCurrentQuote(`「${randomQuote}」`);
   };
 
-  const handleClean = () => {
+  // 攔截動作並呼叫警告視窗
+  const requestTimeSkipAction = (title: string, actionFn: () => void) => {
+    if (actionPoints < 1) {
+      setSysMessage({ text: '［警告］行動力不足，無法執行耗時指令。', type: 'error' });
+      return;
+    }
+    setConfirmModal({ title, action: actionFn });
+  };
+
+  // 實際執行：先做動作，再推進時間
+  const confirmAndExecute = () => {
+    if (confirmModal) {
+      confirmModal.action();
+      processTurn(); 
+      setConfirmModal(null);
+    }
+  };
+
+  const executeClean = () => {
     if (!selectedSlave) return;
     if (roomDirtiness === 0) {
       setSysMessage({ text: '［提示］目前環境已十分整潔，無需過度打掃。', type: 'error' });
@@ -54,7 +80,6 @@ export default function InteractionView() {
       return;
     }
 
-    // 根據內政管家技能計算清潔力：基礎 10 + (技能等級 * 8)
     const cleanPower = 10 + (selectedSlave.skills.housework * 8);
     const newDirtiness = Math.max(0, roomDirtiness - cleanPower);
     const newStamina = Math.max(0, selectedSlave.conditionStats.stamina - 15);
@@ -62,10 +87,10 @@ export default function InteractionView() {
     useGameStore.setState((state) => ({ player: { ...state.player, roomDirtiness: newDirtiness } }));
     updateSlave(selectedSlave.id, { conditionStats: { ...selectedSlave.conditionStats, stamina: newStamina } });
 
-    setSysMessage({ text: `［結算］${selectedSlave.name} 執行了環境整理。髒亂度下降 ${cleanPower}%。`, type: 'success' });
+    setSysMessage({ text: `［結算］${selectedSlave.name} 執行了環境整理。髒亂度大幅下降。`, type: 'success' });
   };
 
-  const handleTrain = (skillType: 'combat' | 'housework' | 'survival') => {
+  const executeTrain = (skillType: 'combat' | 'housework' | 'survival') => {
     if (!selectedSlave) return;
     const costGold = 500;
     const costStamina = 40;
@@ -92,11 +117,11 @@ export default function InteractionView() {
     });
 
     const skillName = skillType === 'combat' ? '戰鬥專精' : skillType === 'housework' ? '內政管家' : '生存本能';
-    setSysMessage({ text: `［突破］殘酷的特訓結束。${selectedSlave.name} 的【${skillName}】提升至 Lv.${currentLevel + 1}。`, type: 'success' });
+    setSysMessage({ text: `［突破］殘酷特訓結束。${selectedSlave.name} 的【${skillName}】已提升至 Lv.${currentLevel + 1}。`, type: 'success' });
   };
 
   return (
-    <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in">
+    <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in relative">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
           <h2 className="text-xl font-bold text-gray-300">互動與管理</h2>
@@ -123,7 +148,6 @@ export default function InteractionView() {
 
       {selectedSlave && (
         <div className="flex flex-col gap-4 mt-2">
-          {/* 橫向功能分頁切換 */}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none border-b border-gray-800">
             {[
               { id: 'dialogue', label: '［深淵對話］' },
@@ -133,7 +157,7 @@ export default function InteractionView() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-4 py-2 text-xs font-bold transition-colors ${
+                className={`px-4 py-2 text-xs font-bold transition-colors tracking-widest ${
                   activeTab === tab.id 
                     ? 'text-white border-b-2 border-blood-red' 
                     : 'text-gray-500 hover:text-gray-300'
@@ -144,7 +168,6 @@ export default function InteractionView() {
             ))}
           </div>
 
-          {/* 動態渲染面板 */}
           <div className="bg-gray-900/80 p-4 rounded-lg border border-gray-700 shadow-lg animate-fade-in min-h-[160px]">
             
             {activeTab === 'dialogue' && (
@@ -152,6 +175,7 @@ export default function InteractionView() {
                 <div className="text-sm text-gray-300 italic leading-relaxed bg-gray-950 p-4 rounded border border-gray-800 min-h-[80px] flex items-center justify-center text-center">
                   {currentQuote}
                 </div>
+                {/* 對話不消耗時間，直接呼叫 */}
                 <button onClick={handleTalk} className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-600 rounded font-bold text-xs tracking-widest transition-colors">
                   ［要求發言］
                 </button>
@@ -163,9 +187,12 @@ export default function InteractionView() {
                 <div className="text-xs text-gray-400 bg-gray-950 p-3 rounded border border-gray-800">
                   <div className="flex justify-between mb-1"><span>當前據點髒亂度：</span> <span className={roomDirtiness > 50 ? 'text-yellow-500' : 'text-green-500'}>{roomDirtiness}%</span></div>
                   <div className="flex justify-between"><span>成員內政管家等級：</span> <span className="text-blue-400">Lv.{selectedSlave.skills.housework}</span></div>
-                  <div className="text-gray-600 mt-2 border-t border-gray-800 pt-2">消耗體力: 15 / 依據技能等級決定打掃成效。</div>
+                  <div className="text-yellow-600 font-bold mt-2 border-t border-gray-800 pt-2 tracking-widest">⚠️ 執行此命令將消耗 1 點行動力並推進 1 個時段。</div>
                 </div>
-                <button onClick={handleClean} className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-600 rounded font-bold text-xs tracking-widest transition-colors">
+                <button 
+                  onClick={() => requestTimeSkipAction('下令整頓環境', executeClean)} 
+                  className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-600 rounded font-bold text-xs tracking-widest transition-colors"
+                >
                   ［下令整頓環境］
                 </button>
               </div>
@@ -173,17 +200,20 @@ export default function InteractionView() {
 
             {activeTab === 'train' && (
               <div className="flex flex-col gap-3">
-                <div className="text-xs text-gray-500 mb-1">每次特訓固定消耗資金: 500、體力: 40、壓力增加: 10</div>
+                <div className="text-xs text-yellow-600 font-bold mb-1 tracking-widest bg-gray-950 p-2 rounded border border-gray-800">
+                  ⚠️ 每次特訓將消耗 1 點行動力並推進 1 個時段。<br/>
+                  <span className="text-gray-500 font-normal">固定消耗資金: 500、體力: 40、壓力增加: 10</span>
+                </div>
                 <div className="grid grid-cols-1 gap-2">
-                  <button onClick={() => handleTrain('combat')} className="flex justify-between items-center p-3 bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded transition-colors group">
+                  <button onClick={() => requestTimeSkipAction('戰鬥專精特訓', () => executeTrain('combat'))} className="flex justify-between items-center p-3 bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded transition-colors group">
                     <span className="text-sm font-bold text-gray-300 group-hover:text-white tracking-widest">［戰鬥專精特訓］</span>
                     <span className="text-xs text-blue-400 font-mono">目前: Lv.{selectedSlave.skills.combat}</span>
                   </button>
-                  <button onClick={() => handleTrain('housework')} className="flex justify-between items-center p-3 bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded transition-colors group">
+                  <button onClick={() => requestTimeSkipAction('內政管家特訓', () => executeTrain('housework'))} className="flex justify-between items-center p-3 bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded transition-colors group">
                     <span className="text-sm font-bold text-gray-300 group-hover:text-white tracking-widest">［內政管家特訓］</span>
                     <span className="text-xs text-blue-400 font-mono">目前: Lv.{selectedSlave.skills.housework}</span>
                   </button>
-                  <button onClick={() => handleTrain('survival')} className="flex justify-between items-center p-3 bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded transition-colors group">
+                  <button onClick={() => requestTimeSkipAction('生存本能特訓', () => executeTrain('survival'))} className="flex justify-between items-center p-3 bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded transition-colors group">
                     <span className="text-sm font-bold text-gray-300 group-hover:text-white tracking-widest">［生存本能特訓］</span>
                     <span className="text-xs text-blue-400 font-mono">目前: Lv.{selectedSlave.skills.survival}</span>
                   </button>
@@ -199,6 +229,37 @@ export default function InteractionView() {
           sysMessage.type === 'success' ? 'bg-gray-900 border-green-800 text-green-500' : 'bg-gray-900 border-red-900 text-red-500'
         }`}>
           {sysMessage.text}
+        </div>
+      )}
+
+      {/* 沉浸式時間流逝防呆警告彈窗 */}
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-gray-900 border-t-2 border-blood-red rounded-lg p-5 max-w-sm w-full shadow-2xl border-x border-b border-gray-700">
+            <h3 className="text-lg font-bold text-red-500 mb-2 tracking-widest flex items-center gap-2">
+              ［時光流逝警告］
+            </h3>
+            <div className="text-sm text-gray-300 leading-relaxed mb-6 bg-gray-950 p-3 rounded border border-gray-800">
+              即將執行：<strong className="text-white">{confirmModal.title}</strong>
+              <div className="h-px bg-gray-800 my-2"></div>
+              此行動將消耗 <strong className="text-yellow-500">1 點行動力</strong>，並推進 <strong className="text-blue-400">1 個時段</strong>。<br/><br/>
+              <span className="text-xs text-gray-500 italic">隨著時間推進，據點的環境髒亂度與外派任務的進度都會隨之變化。是否確認執行？</span>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setConfirmModal(null)}
+                className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-400 font-bold rounded border border-gray-600 transition-colors text-sm tracking-widest"
+              >
+                ［重新考慮］
+              </button>
+              <button 
+                onClick={confirmAndExecute}
+                className="flex-1 py-2.5 bg-blood-red/80 hover:bg-blood-red text-white font-bold rounded border border-red-900 transition-all text-sm tracking-widest shadow-lg"
+              >
+                ［確認下達］
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
