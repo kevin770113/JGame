@@ -14,11 +14,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
 
     const aiResponse = await context.env.AI.run("@cf/meta/llama-3.1-8b-instruct-fp8", {
-      max_tokens: 2500, // 強制解鎖輸出上限，防止 10 筆資料生成到一半被腰斬
+      max_tokens: 2500,
       messages: [
         { 
           role: "system", 
-          content: "你是一個黑暗奇幻遊戲的文字引擎。請嚴格根據玩家的要求生成資料。請「僅」回傳玩家要求的 JSON 格式，絕對不要包含任何額外的問候語、Markdown 標籤或解釋性文字。" 
+          content: "你是一個黑暗奇幻遊戲的文字引擎。\n【全局最高指令】：你所有的輸出必須且只能使用「繁體中文(zh-TW)」。絕對禁止輸出任何簡體中文。\n請嚴格根據玩家的要求生成資料。「僅」回傳玩家要求的 JSON 格式，絕對不要包含任何額外的問候語、Markdown 標籤或解釋性文字。" 
         },
         { 
           role: "user", 
