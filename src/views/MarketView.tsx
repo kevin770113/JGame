@@ -4,7 +4,7 @@ import SlaveCard from '../components/SlaveCard';
 import { Slave } from '../types';
 
 export default function MarketView() {
-  const { gold } = useGameStore((state) => state.player);
+  const { gold, maxSlaveCapacity } = useGameStore((state) => state.player); // ★ 取出最大人口數
   const deductGold = useGameStore((state) => state.deductGold);
   const addSlave = useGameStore((state) => state.addSlave);
   const sellSlave = useGameStore((state) => state.sellSlave);
@@ -16,14 +16,15 @@ export default function MarketView() {
 
   const [activeTab, setActiveTab] = useState<'buy' | 'sell'>('buy');
 
-  // ［買入］商隊報價公式：基礎 150 + 屬性*3.5 + 技能*150 (溢價極高)
+  // ★ 判斷目前人口是否已滿
+  const isFull = slaves.length >= maxSlaveCapacity;
+
   const calculateBuyPrice = (slave: Slave) => {
     const statsSum = slave.primaryStats.combat + slave.primaryStats.endurance + slave.primaryStats.intelligence + slave.primaryStats.obedience;
     const skillsSum = (slave.skills?.combat || 1) + (slave.skills?.housework || 1) + (slave.skills?.survival || 1);
     return 150 + Math.floor(statsSum * 3.5) + (skillsSum * 150); 
   };
 
-  // ［賣出］黑市回收公式：基礎 50 + 屬性*1.5 + 技能*200 (屬性血虧，技能暴利)
   const calculateSellPrice = (slave: Slave) => {
     const statsSum = slave.primaryStats.combat + slave.primaryStats.endurance + slave.primaryStats.intelligence + slave.primaryStats.obedience;
     const skillsSum = (slave.skills?.combat || 1) + (slave.skills?.housework || 1) + (slave.skills?.survival || 1);
@@ -31,6 +32,11 @@ export default function MarketView() {
   };
 
   const handleBuy = (slave: Slave, price: number) => {
+    // 雙重保險
+    if (isFull) {
+      alert('［警告］據點已達人口上限，請先升級據點或拋售成員。');
+      return;
+    }
     if (gold >= price) {
       deductGold(price);
       addSlave(slave);
@@ -65,7 +71,6 @@ export default function MarketView() {
         </button>
       </div>
 
-      {/* 雙向交易分頁切換 */}
       <div className="flex gap-2 border-b border-gray-800 pb-1">
         <button
           onClick={() => setActiveTab('buy')}
@@ -116,13 +121,15 @@ export default function MarketView() {
                     <button 
                       onClick={() => handleBuy(slave, price)}
                       className={`px-4 py-2 rounded font-bold transition-colors text-xs tracking-widest ${
-                        gold >= price 
-                          ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-500 hover:border-gray-400' 
-                          : 'bg-gray-900 text-gray-700 border border-gray-800 cursor-not-allowed'
+                        isFull
+                          ? 'bg-gray-800 text-gray-600 border border-gray-700 cursor-not-allowed'
+                          : gold >= price 
+                            ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-500 hover:border-gray-400' 
+                            : 'bg-gray-900 text-gray-700 border border-gray-800 cursor-not-allowed'
                       }`}
-                      disabled={gold < price}
+                      disabled={isFull || gold < price}
                     >
-                      {gold >= price ? '［簽署血契］' : '［資金不足］'}
+                      {isFull ? '［據點已滿］' : gold >= price ? '［簽署血契］' : '［資金不足］'}
                     </button>
                   </div>
                 </div>
