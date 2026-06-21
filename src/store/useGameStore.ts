@@ -3,7 +3,8 @@ import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import localforage from 'localforage';
 import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
-import { generateSlaveIdentity } from '../services/aiService';
+// ★ 引入新的批次生成函數
+import { fetchIdentityBatch, IdentityRecord } from '../services/aiService';
 
 export interface Mission {
   id: string;
@@ -28,6 +29,12 @@ export interface GameStore {
   marketSlaves: Slave[];
   isMarketGenerating: boolean;
   
+  // ★ 新增：AI 通用資源池
+  identityPool: IdentityRecord[];
+  isPoolGenerating: boolean;
+  consumeIdentity: () => Promise<IdentityRecord>;
+  refillPoolIfNeeded: () => Promise<void>;
+
   currentScene: Scene;
   currentSubView: SubView;
 
@@ -49,7 +56,7 @@ export interface GameStore {
   dispatchSlave: (slaveId: string, missionId: string) => void;
 
   triggerBackgroundMarketRefresh: () => Promise<void>;
-  checkApRecovery: () => void; // ［新增］檢查並回復行動力
+  checkApRecovery: () => void; 
   processTurn: () => void;
 }
 
@@ -58,49 +65,33 @@ const generateDailyMissions = (): Mission[] => {
   const baseId = Date.now().toString(36);
   const actions = ['護送', '掠奪', '鎮壓', '搜刮', '暗殺', '勘探'];
   const targets = ['私掠物資', '深淵礦脈', '異端營地', '帝國商隊', '地下黑市', '古老遺跡'];
-
   const getName = () => `【${actions[Math.floor(Math.random() * actions.length)]}${targets[Math.floor(Math.random() * targets.length)]}】`;
 
   const greenCount = Math.floor(Math.random() * 2) + 3;
-  for (let i = 0; i < greenCount; i++) {
-    missions.push({
-      id: `m-grn-${baseId}-${i}`, title: `［常規］${getName()}`, rank: '翠綠', requiredPhases: 1, staminaCost: 20, stressGain: 10, reward: 300 + Math.floor(Math.random() * 100), description: '骯髒的體力活，適合壓榨低階成員的剩餘價值。'
-    });
-  }
+  for (let i = 0; i < greenCount; i++) missions.push({ id: `m-grn-${baseId}-${i}`, title: `［常規］${getName()}`, rank: '翠綠', requiredPhases: 1, staminaCost: 20, stressGain: 10, reward: 300 + Math.floor(Math.random() * 100), description: '骯髒的體力活，適合壓榨低階成員的剩餘價值。' });
 
   const blueCount = Math.floor(Math.random() * 2) + 1;
-  for (let i = 0; i < blueCount; i++) {
-    missions.push({
-      id: `m-blu-${baseId}-${i}`, title: `［進階］${getName()}`, rank: '蔚藍', requiredPhases: 2, staminaCost: 45, stressGain: 25, reward: 800 + Math.floor(Math.random() * 200), description: '離開據點保護圈的危險差事。'
-    });
-  }
+  for (let i = 0; i < blueCount; i++) missions.push({ id: `m-blu-${baseId}-${i}`, title: `［進階］${getName()}`, rank: '蔚藍', requiredPhases: 2, staminaCost: 45, stressGain: 25, reward: 800 + Math.floor(Math.random() * 200), description: '離開據點保護圈的危險差事。' });
 
-  if (Math.random() > 0.7) {
-    missions.push({
-      id: `m-pur-${baseId}`, title: `［特化］${getName()}`, rank: '紫色', requiredPhases: 2, staminaCost: 50, stressGain: 30, reward: 1200 + Math.floor(Math.random() * 300), description: '地區限定委託。結算時有極高機率獲得【商會威望】，或強制突破執行者的技能極限。'
-    });
-  }
+  if (Math.random() > 0.7) missions.push({ id: `m-pur-${baseId}`, title: `［特化］${getName()}`, rank: '紫色', requiredPhases: 2, staminaCost: 50, stressGain: 30, reward: 1200 + Math.floor(Math.random() * 300), description: '地區限定委託。結算時有極高機率獲得【商會威望】，或強制突破執行者的技能極限。' });
 
-  if (Math.random() > 0.8) {
-    missions.push({
-      id: `m-gld-${baseId}`, title: `［傳說］${getName()}`, rank: '黃金', requiredPhases: 5, staminaCost: 90, stressGain: 60, reward: 3500 + Math.floor(Math.random() * 1500), description: '九死一生的死亡委託。極易造成精神崩潰或致殘。'
-    });
-  }
+  if (Math.random() > 0.8) missions.push({ id: `m-gld-${baseId}`, title: `［傳說］${getName()}`, rank: '黃金', requiredPhases: 5, staminaCost: 90, stressGain: 60, reward: 3500 + Math.floor(Math.random() * 1500), description: '九死一生的死亡委託。極易造成精神崩潰或致殘。' });
 
   return missions;
 };
 
-const generateBaseMarketSlave = (idSuffix: string): Slave => {
+// ★ 修改：從通用資料生成基礎屬性
+const generateBaseMarketSlave = (idSuffix: string, identity: IdentityRecord): Slave => {
   const races: Race[] = ['人類', '精靈', '半獸人', '矮人', '不死族', '龍族'];
   const race = races[Math.floor(Math.random() * races.length)];
   const gender: Gender = Math.random() > 0.5 ? 'Male' : 'Female';
   
   return {
-    id: `market-${Date.now()}-${idSuffix}`, name: `未知的 ${race}`, race, gender, activityStatus: '閒置',
+    id: `market-${Date.now()}-${idSuffix}`, name: identity.name, race, gender, activityStatus: '閒置',
     skills: { combat: 1, housework: 1, survival: 1 },
     primaryStats: { combat: Math.floor(Math.random() * 60) + 20, endurance: Math.floor(Math.random() * 60) + 20, intelligence: Math.floor(Math.random() * 60) + 20, obedience: Math.floor(Math.random() * 40) + 10 },
     conditionStats: { stamina: 100, stress: 0, rebellion: Math.floor(Math.random() * 20) },
-    traits: [], backgroundStory: '［檔案傳輸中...］'
+    traits: [], backgroundStory: identity.story // 直接套用通用故事
   };
 };
 
@@ -123,6 +114,60 @@ export const useGameStore = create<GameStore>()(
       slaves: [],
       marketSlaves: [],
       isMarketGenerating: false,
+      
+      // ★ 初始化資源池
+      identityPool: [],
+      isPoolGenerating: false,
+
+      // ★ 核心邏輯：背景補充資源池
+      refillPoolIfNeeded: async () => {
+        const state = get();
+        // 如果庫存小於 5，且沒有正在生成的任務，則在背景安靜呼叫 AI
+        if (state.identityPool.length < 5 && !state.isPoolGenerating) {
+          set({ isPoolGenerating: true });
+          try {
+            const newIdentities = await fetchIdentityBatch();
+            set(s => ({ identityPool: [...s.identityPool, ...newIdentities] }));
+          } catch (e) {
+            console.error(e);
+          } finally {
+            set({ isPoolGenerating: false });
+          }
+        }
+      },
+
+      // ★ 核心邏輯：抽取資料
+      consumeIdentity: async () => {
+        let currentPool = get().identityPool;
+        
+        // 只有當池子「完全見底」時，才會強迫玩家等待 (此時才會有載入時間)
+        if (currentPool.length === 0) {
+           set({ isPoolGenerating: true });
+           try {
+             const newIdentities = await fetchIdentityBatch();
+             set({ identityPool: newIdentities });
+             currentPool = newIdentities;
+           } catch (e) {
+             console.error(e);
+           } finally {
+             set({ isPoolGenerating: false });
+           }
+        }
+
+        // 極端防呆
+        if (currentPool.length === 0) {
+            return { name: "深淵棄子", story: "［檔案毀損］極端異常的空白軀殼。" };
+        }
+
+        // 拿走第一筆資料
+        const identity = currentPool[0];
+        set(s => ({ identityPool: s.identityPool.slice(1) }));
+        
+        // 拿完後順便檢查是否需要補貨
+        get().refillPoolIfNeeded();
+        
+        return identity;
+      },
 
       addGold: (amount) => set((state) => ({ player: { ...state.player, gold: state.player.gold + amount } })),
       deductGold: (amount) => set((state) => ({ player: { ...state.player, gold: Math.max(0, state.player.gold - amount) } })),
@@ -169,20 +214,25 @@ export const useGameStore = create<GameStore>()(
         set({ activeDispatches: [...state.activeDispatches, { slaveId, mission, remainingPhases: mission.requiredPhases }], dailyMissions: state.dailyMissions.filter(m => m.id !== missionId) });
       },
 
+      // ★ 修改：市場進貨邏輯。改為從資料池提取，保留 isMarketGenerating 控制 UI
       triggerBackgroundMarketRefresh: async () => {
         if (get().isMarketGenerating) return;
-        set({ isMarketGenerating: true, marketSlaves: [generateBaseMarketSlave('1'), generateBaseMarketSlave('2'), generateBaseMarketSlave('3')] });
+        set({ isMarketGenerating: true, marketSlaves: [] });
         try {
-          const currentMarket = get().marketSlaves;
-          const enriched = await Promise.all(currentMarket.map(async (slave) => {
-            const aiData = await generateSlaveIdentity(slave.race, slave.gender);
-            return { ...slave, name: aiData.name, backgroundStory: aiData.story };
-          }));
-          set({ marketSlaves: enriched });
-        } catch (e) { console.error(e); } finally { set({ isMarketGenerating: false }); }
+          const newSlaves = [];
+          for (let i = 0; i < 3; i++) {
+            // 從池子抽出資料 (若池子空了這裡會 await 到有為止，畫面繼續轉圈)
+            const identity = await get().consumeIdentity();
+            newSlaves.push(generateBaseMarketSlave(String(i), identity));
+          }
+          set({ marketSlaves: newSlaves });
+        } catch (e) { 
+          console.error(e); 
+        } finally { 
+          set({ isMarketGenerating: false }); 
+        }
       },
 
-      // ［實作］行動力檢查與回復（每分鐘回復 1 點）
       checkApRecovery: () => set((state) => {
         const { actionPoints, lastApUpdateTime } = state.player;
         if (actionPoints >= 50) return state;
@@ -193,20 +243,18 @@ export const useGameStore = create<GameStore>()(
 
         if (recoverAmount > 0) {
           const newAp = Math.min(50, actionPoints + recoverAmount);
-          const newUpdateTime = lastApUpdateTime + (recoverAmount * 60000); // 保留剩餘未滿一分鐘的毫秒數
+          const newUpdateTime = lastApUpdateTime + (recoverAmount * 60000); 
           return { player: { ...state.player, actionPoints: newAp, lastApUpdateTime: newAp === 50 ? now : newUpdateTime } };
         }
         return state;
       }),
 
       processTurn: () => {
-        // 推進時優先核算一次行動力是否需要回復
         get().checkApRecovery();
         
         const state = get();
         const { player, slaves, activeDispatches, triggerBackgroundMarketRefresh } = state;
         
-        // ［實作］行動力防禦判斷
         if (player.actionPoints < 1) {
             console.warn('［系統］行動力不足，無法執行推進。');
             return;
@@ -223,10 +271,7 @@ export const useGameStore = create<GameStore>()(
         if (currentPhaseIndex === TIME_PHASES.length - 1) { nextPhase = '早上'; nextDay += 1; triggerDailySettlement = true; } 
         else { nextPhase = TIME_PHASES[currentPhaseIndex + 1]; }
 
-        // ［實作］計算人口溢出狀態
         const overpopulation = Math.max(0, slaves.length - player.maxSlaveCapacity);
-
-        // ［實作］環境髒亂度指數型爆發
         const dirtMultiplier = player.location === 'Capital' ? 1 : player.location === 'NeutralHub' ? 1.5 : 2;
         const baseAddedDirtiness = Math.ceil(slaves.length * dirtMultiplier);
         const penaltyDirtiness = Math.pow(overpopulation, 2) * 5;
@@ -297,7 +342,6 @@ export const useGameStore = create<GameStore>()(
               
               if (slave.activityStatus === '閒置') { 
                 newStamina = Math.min(100, newStamina + staminaRecover); 
-                // ［實作］人口溢出時剝奪閒置恢復壓力的福利
                 if (overpopulation === 0) {
                     newStress = Math.max(0, newStress - 5); 
                 }
@@ -308,7 +352,6 @@ export const useGameStore = create<GameStore>()(
                 newRebellion = Math.min(100, newRebellion + 15); 
               }
 
-              // ［實作］壓力鍋效應：強制給所有人疊加高額壓力與反抗
               if (overpopulation > 0) {
                   newStress = Math.min(100, newStress + (overpopulation * 5));
                   newRebellion = Math.min(100, newRebellion + (overpopulation * 3));
@@ -322,6 +365,7 @@ export const useGameStore = create<GameStore>()(
         }
       }
     }),
-    { name: 'dark-fantasy-save-v7', storage: createJSONStorage(() => storage) }
+    // ★ 變更：由於資料結構大幅翻新，升級儲存至 v8，自動幫您初始化 10 筆名單的陣列
+    { name: 'dark-fantasy-save-v8', storage: createJSONStorage(() => storage) }
   )
 );
