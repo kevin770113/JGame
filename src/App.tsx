@@ -6,10 +6,10 @@ import BreedingView from './views/BreedingView';
 import DispatchView from './views/DispatchView'; 
 import MapView from './views/MapView';
 import InteractionView from './views/InteractionView';
+import ArenaView from './views/ArenaView';
 import { useGameStore } from './store/useGameStore';
 import { Slave } from './types';
 
-// 宣告 R2 圖片伺服器根網址
 const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 
 function App() {
@@ -28,7 +28,6 @@ function App() {
     if (marketSlaves.length === 0) triggerBackgroundMarketRefresh();
   }, []);
 
-  // 動態計算當前時空背景圖 URL
   const getDynamicBackground = () => {
     const sceneKey = currentScene.toLowerCase();
     const locationKey = location.toLowerCase();
@@ -49,16 +48,13 @@ function App() {
         case 'Main':
           return (
             <div className="w-full min-h-[75vh] flex flex-col justify-between pb-10 animate-fade-in">
-              {/* 頂部文字面板加上暗色半透明與毛玻璃特效，確保可讀性 */}
               <div className="border-b border-gray-700 pb-2 bg-gray-950/70 p-3 rounded backdrop-blur-xs">
                 <h2 className="text-xl font-bold text-gray-300">城鎮市集</h2>
                 <p className="text-xs text-gray-500 mt-1">喧鬧的灰色地帶，充斥著酒精、金錢與血統的地下交易。</p>
               </div>
               
-              {/* 中間區域完全淨空，完美展現背景插圖 */}
               <div className="flex-1"></div>
 
-              {/* 行動按鈕全面向底部靠攏，消除留白 */}
               <div className="flex flex-col gap-3 bg-gray-950/50 p-3 rounded backdrop-blur-xs">
                 <button 
                   onClick={() => navigate('Town', 'Market')}
@@ -75,6 +71,13 @@ function App() {
                   <span className="text-xs text-gray-500 font-normal">查閱地區懸賞與傳說委託</span>
                 </button>
                 <button 
+                  onClick={() => navigate('Town', 'Arena')}
+                  className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"
+                >
+                  <span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［前往角鬥場］</span>
+                  <span className="text-xs text-gray-500 font-normal">參與血腥競技與死鬥</span>
+                </button>
+                <button 
                   onClick={() => navigate('Home', 'Main')}
                   className="py-3 bg-blood-red/20 hover:bg-blood-red/30 border border-blood-red/50 text-red-400 font-bold rounded-lg text-center transition-colors shadow mt-2 tracking-widest"
                 >
@@ -85,6 +88,7 @@ function App() {
           );
         case 'Market': return <MarketView />;
         case 'Tavern': return <DispatchView />;
+        case 'Arena': return <ArenaView />; 
         default: return <BaseView />;
       }
     }
@@ -107,7 +111,6 @@ function App() {
         backgroundRepeat: 'no-repeat'
       }}
     >
-      {/* 遮罩暗化層：確保全螢幕大圖不會干擾 UI 文字線條 */}
       <div className="absolute inset-0 bg-black/40 z-0 pointer-events-none"></div>
       
       <div className="shrink-0 z-20 shadow-md bg-gray-900 relative"><Header /></div>
