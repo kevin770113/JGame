@@ -53,7 +53,7 @@ export default function BaseView() {
               ［拔營遷移據點］
             </button>
             <div className="h-px bg-gray-800 my-1 mx-2"></div>
-            {/* ★ 精準修正：將開啟城鎮大門改名為［外出］ */}
+            {/* ★ 精準修正為［外出］ */}
             <button
               onClick={() => { navigate('Town', 'Main'); setIsMenuOpen(false); }}
               className="w-full py-3 bg-blood-red/90 hover:bg-red-700 text-white rounded font-bold text-xs sm:text-sm transition-all shadow-md active:scale-98 text-center border border-red-900 tracking-widest"
