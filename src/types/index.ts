@@ -1,5 +1,5 @@
 export type Scene = 'Home' | 'Town';
-export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map' | 'Interaction';
+export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map' | 'Interaction' | 'Arena';
 
 export type Race = '人類' | '精靈' | '半獸人' | '矮人' | '不死族' | '龍族';
 export type Gender = 'Male' | 'Female';
@@ -56,8 +56,8 @@ export interface Player {
   prestige: number;
   actionPoints: number;      
   lastApUpdateTime: number;  
-  deviceId: string;             // ［預留］匿名設備識別碼 (供未來課金/雲端備份驗證)
-  unlockedFacilities: string[]; // ［預留］解鎖設施陣列 (供奇美拉陣列等進度紀錄)
+  deviceId: string;             
+  unlockedFacilities: string[]; 
 }
 
 export interface ArenaNPC {
