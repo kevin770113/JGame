@@ -54,6 +54,24 @@ export interface Player {
   roomDirtiness: number;
   maxSlaveCapacity: number;
   prestige: number;
-  actionPoints: number;      // ［新增］行動力
-  lastApUpdateTime: number;  // ［新增］上次行動力更新的真實時間戳記
+  actionPoints: number;      
+  lastApUpdateTime: number;  
+  deviceId: string;             // ［預留］匿名設備識別碼 (供未來課金/雲端備份驗證)
+  unlockedFacilities: string[]; // ［預留］解鎖設施陣列 (供奇美拉陣列等進度紀錄)
+}
+
+export interface ArenaNPC {
+  id: string;
+  name: string;
+  description: string;
+  location: Location;
+  stats: { hp: number; attack: number; defense: number; speed: number; };
+  rewardGold: number;
+  rewardPrestige: number;
+}
+
+export interface CombatLog {
+  round: number;
+  message: string;
+  type: 'info' | 'damage' | 'heal' | 'skill' | 'system';
 }
