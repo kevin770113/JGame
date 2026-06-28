@@ -3,7 +3,7 @@ import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import localforage from 'localforage';
 import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, ArenaNPC, CombatLog } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
-import { fetchIdentityBatch, IdentityRecord } from '../services/aiService';
+import { fetchIdentityBatch } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
 
 export interface Mission {
@@ -32,9 +32,8 @@ export interface GameStore {
   dailyMissions: Mission[];
   activeDispatches: ActiveDispatch[];
 
-  // ［新增］與雲端連線的函數
   syncProfileToCloud: () => Promise<void>;
-  consumeIdentity: () => Promise<IdentityRecord>;
+  consumeIdentity: () => Promise<{name: string, story: string}>;
   
   addGold: (amount: number) => void;
   deductGold: (amount: number) => void;
@@ -69,7 +68,7 @@ const generateDailyMissions = (): Mission[] => {
   return missions;
 };
 
-const generateBaseMarketSlave = (idSuffix: string, identity: IdentityRecord): Slave => {
+const generateBaseMarketSlave = (idSuffix: string, identity: {name: string, story: string}): Slave => {
   const races: Race[] = ['人類', '精靈', '半獸人', '矮人', '不死族', '龍族'];
   const race = races[Math.floor(Math.random() * races.length)];
   const gender: Gender = Math.random() > 0.5 ? 'Male' : 'Female';
@@ -96,11 +95,10 @@ export const useGameStore = create<GameStore>()(
       player: { 
         day: 1, timePhase: '早上', gold: 99999, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 9999, actionPoints: 50, lastApUpdateTime: Date.now(),
         deviceId: '', unlockedFacilities: [], 
-        usedIdentityIds: [] // ★ v11 新增欄位
+        usedIdentityIds: [] 
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
 
-      // ★ 新增：非同步備份玩家重要資源到 Supabase
       syncProfileToCloud: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -116,27 +114,27 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
-      // ★ 全域池智能打撈機制
+      // ★ 終極優化版：前端精準過濾，徹底消滅 SQL 語法地雷與無限轉圈
       consumeIdentity: async () => {
-        const state = get();
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return { name: "無名幽影", story: "未與深淵建立正式連結的幻影。" };
 
         set({ isPoolGenerating: true });
         try {
-          // 1. 從全域池中尋找「沒有在本地 usedIdentityIds 陣列」裡的資料
-          let query = supabase.from('global_identities').select('*');
-          if (state.player.usedIdentityIds.length > 0) {
-             query = query.not('id', 'in', `(${state.player.usedIdentityIds.join(',')})`);
-          }
-          const { data: availableData } = await query.limit(1);
+          const usedIds = get().player.usedIdentityIds;
+          
+          // 1. 直接打撈前 50 筆資料，交給前端 JS 判斷是否用過（最穩定安全）
+          const { data: poolData, error: poolError } = await supabase.from('global_identities').select('*').limit(50);
+          if (poolError) throw poolError;
 
-          let identity = availableData && availableData.length > 0 ? availableData[0] : null;
+          const availableIdentities = (poolData || []).filter(d => !usedIds.includes(d.id));
+          let identity = availableIdentities.length > 0 ? availableIdentities[0] : null;
 
-          // 2. 如果全域池沒貨了，呼叫 AI 生成並「捐贈」到全域池中
+          // 2. 真的沒貨了，才呼叫 AI
           if (!identity) {
-             const newAiData = await fetchIdentityBatch(); // 這會產生 10 筆
-             const { data: insertedData } = await supabase.from('global_identities').insert(newAiData).select();
+             const newAiData = await fetchIdentityBatch(); 
+             const { data: insertedData, error: insertError } = await supabase.from('global_identities').insert(newAiData).select();
+             if (insertError) throw insertError;
              if (insertedData && insertedData.length > 0) {
                 identity = insertedData[0];
              }
@@ -144,15 +142,17 @@ export const useGameStore = create<GameStore>()(
 
           if (!identity) throw new Error('AI 與資料庫雙重潰堤');
 
-          // 3. 在雲端紀錄消耗，並在本地更新已用清單
-          await supabase.from('user_identity_logs').insert({ user_id: session.user.id, identity_id: identity.id });
-          const newUsedIds = [...state.player.usedIdentityIds, identity.id];
+          // 3. 雲端記錄與本地狀態同步
+          const { error: logError } = await supabase.from('user_identity_logs').insert({ user_id: session.user.id, identity_id: identity.id });
+          if (logError) console.warn("［寫入紀錄失敗］", logError); // 紀錄失敗不影響打撈結果
+
+          const newUsedIds = [...get().player.usedIdentityIds, identity.id];
           set(s => ({ player: { ...s.player, usedIdentityIds: newUsedIds } }));
 
           return { name: identity.name, story: identity.story };
 
         } catch (e) {
-          console.error(e);
+          console.error("［系統攔截］", e);
           return { name: "罪業之軀", story: "［檔案毀損］來自深淵的亂碼碎片。" };
         } finally {
           set({ isPoolGenerating: false });
@@ -183,8 +183,16 @@ export const useGameStore = create<GameStore>()(
       triggerBackgroundMarketRefresh: async () => {
         if (get().isMarketGenerating) return;
         set({ isMarketGenerating: true, marketSlaves: [] });
-        try { const newSlaves = []; for (let i = 0; i < 3; i++) { const identity = await get().consumeIdentity(); newSlaves.push(generateBaseMarketSlave(String(i), identity)); } set({ marketSlaves: newSlaves }); } 
-        catch (e) { console.error(e); } finally { set({ isMarketGenerating: false }); }
+        try { 
+           const newSlaves = []; 
+           for (let i = 0; i < 3; i++) { 
+             const identity = await get().consumeIdentity(); 
+             newSlaves.push(generateBaseMarketSlave(String(i), identity)); 
+           } 
+           set({ marketSlaves: newSlaves }); 
+        } 
+        catch (e) { console.error(e); } 
+        finally { set({ isMarketGenerating: false }); }
       },
 
       checkApRecovery: () => set((state) => {
@@ -250,7 +258,6 @@ export const useGameStore = create<GameStore>()(
           });
           triggerBackgroundMarketRefresh(); set({ dailyMissions: generateDailyMissions() });
         }
-        // ★ 推進時段結束後，背景同步存檔至雲端
         get().syncProfileToCloud();
       },
 
@@ -333,7 +340,6 @@ export const useGameStore = create<GameStore>()(
         let newRebellion = slave.conditionStats.rebellion;
 
         if (slave.race === '不死族') {
-          // 不死族免疫賽場壓力
         } else {
           newStress = Math.min(100, newStress + (isWin ? 5 : 15));
           newRebellion = Math.min(100, newRebellion + (isWin ? 2 : 10));
@@ -343,10 +349,10 @@ export const useGameStore = create<GameStore>()(
 
         get().updateSlave(slave.id, { conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
         get().processTurn(); 
-        get().syncProfileToCloud(); // ★ 戰鬥結算後同步雲端
+        get().syncProfileToCloud(); 
         return { logs, isWin };
       }
     }),
-    { name: 'dark-fantasy-save-v11', storage: createJSONStorage(() => storage) }
+    { name: 'dark-fantasy-save-v12', storage: createJSONStorage(() => storage) }
   )
 );
