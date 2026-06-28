@@ -7,7 +7,7 @@ interface LocationInfo {
   id: Location;
   name: string;
   cost: number;
-  reqPrestige: number; // ［新增］威望門檻
+  reqPrestige: number; 
   description: string;
   perks: string;
 }
@@ -53,7 +53,6 @@ export default function MapView() {
       return;
     }
 
-    // ★ 新增：威望檢查 ★
     if (prestige < targetLocation.reqPrestige) {
       setSysMessage({ text: `［拒絕］商會階級不符。進入【${targetLocation.name}】需要至少 ${targetLocation.reqPrestige} 點威望。`, type: 'error' });
       return;
@@ -79,9 +78,10 @@ export default function MapView() {
             <p className="text-2xs text-gray-500">當前威望: <span className="text-blue-400 font-mono font-bold">{prestige}</span></p>
           </div>
         </div>
+        {/* ★ 加入 whitespace-nowrap shrink-0 確保按鈕不被擠壓斷行 */}
         <button 
           onClick={() => navigate('Home', 'Main')}
-          className="px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
+          className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
         >
           ［返回大廳］
         </button>
