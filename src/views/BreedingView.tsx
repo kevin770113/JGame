@@ -9,7 +9,6 @@ export default function BreedingView() {
   const addSlave = useGameStore((state) => state.addSlave);
   const navigate = useGameStore((state) => state.navigate);
   
-  // ★ 取出池子裡的抽卡方法
   const consumeIdentity = useGameStore((state) => state.consumeIdentity);
 
   const [alphaId, setAlphaId] = useState<string>('');
@@ -64,10 +63,8 @@ export default function BreedingView() {
     const childGender: Gender = Math.random() > 0.5 ? 'Male' : 'Female';
     const childId = 'child-' + Math.random().toString(36).substring(2, 9);
 
-    // ★ 從資源池秒抽一張卡
     const aiData = await consumeIdentity();
     
-    // ★ 動態判定性別與背景覆寫
     const genderSuffix = childGender === 'Male' ? '之子' : '之女';
     const fatherName = p1.gender === 'Male' ? p1.name : p2.name;
     const motherName = p1.gender === 'Female' ? p1.name : p2.name;
@@ -87,7 +84,6 @@ export default function BreedingView() {
       },
       conditionStats: { stamina: 100, stress: 0, rebellion: 0 },
       traits: [],
-      // ★ 強制將背景故事改寫為：［密室誕生］XXX 與 XXX 之子 / 之女。加上 AI 提供的靈魂氣息
       backgroundStory: `［密室誕生］${fatherName} 與 ${motherName} ${genderSuffix}。${aiData.story}`,
       parents: { fatherId: p1.gender === 'Male' ? p1.id : p2.id, motherId: p1.gender === 'Female' ? p1.id : p2.id }
     };
@@ -114,9 +110,10 @@ export default function BreedingView() {
           <h2 className="text-xl font-bold text-gray-300">血統密室</h2>
           <p className="text-xs text-gray-500 mt-1">隱蔽於地下的實驗設施，進行著被帝國嚴格禁止的基因融合。</p>
         </div>
+        {/* ★ 加入 whitespace-nowrap shrink-0 確保按鈕不被擠壓斷行 */}
         <button 
           onClick={() => navigate('Home', 'Main')}
-          className="px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
+          className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
         >
           ［返回大廳］
         </button>
