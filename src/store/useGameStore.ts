@@ -4,6 +4,7 @@ import localforage from 'localforage';
 import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, ArenaNPC, CombatLog } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
 import { fetchIdentityBatch, IdentityRecord } from '../services/aiService';
+import { supabase } from '../services/supabaseClient';
 
 export interface Mission {
   id: string; title: string; rank: '黃金' | '紫色' | '蔚藍' | '翠綠';
@@ -25,15 +26,16 @@ export interface GameStore {
   slaves: Slave[];
   marketSlaves: Slave[];
   isMarketGenerating: boolean;
-  identityPool: IdentityRecord[];
   isPoolGenerating: boolean;
   currentScene: Scene;
   currentSubView: SubView;
   dailyMissions: Mission[];
   activeDispatches: ActiveDispatch[];
 
+  // ［新增］與雲端連線的函數
+  syncProfileToCloud: () => Promise<void>;
   consumeIdentity: () => Promise<IdentityRecord>;
-  refillPoolIfNeeded: () => Promise<void>;
+  
   addGold: (amount: number) => void;
   deductGold: (amount: number) => void;
   addFood: (amount: number) => void;
@@ -49,8 +51,6 @@ export interface GameStore {
   triggerBackgroundMarketRefresh: () => Promise<void>;
   checkApRecovery: () => void; 
   processTurn: () => void;
-
-  // ［新增］競技場戰鬥核心引擎
   executeArenaBattle: (slaveId: string, npcId: string) => { logs: CombatLog[], isWin: boolean } | null;
 }
 
@@ -95,31 +95,68 @@ export const useGameStore = create<GameStore>()(
     (set, get) => ({
       player: { 
         day: 1, timePhase: '早上', gold: 99999, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 9999, actionPoints: 50, lastApUpdateTime: Date.now(),
-        deviceId: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36), // 生成靜默識別碼
-        unlockedFacilities: [] 
+        deviceId: '', unlockedFacilities: [], 
+        usedIdentityIds: [] // ★ v11 新增欄位
       },
-      currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, identityPool: [], isPoolGenerating: false,
+      currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
 
-      refillPoolIfNeeded: async () => {
-        const state = get();
-        if (state.identityPool.length < 5 && !state.isPoolGenerating) {
-          set({ isPoolGenerating: true });
-          try { const newIdentities = await fetchIdentityBatch(); set(s => ({ identityPool: [...s.identityPool, ...newIdentities] })); } 
-          catch (e) { console.error(e); } finally { set({ isPoolGenerating: false }); }
-        }
+      // ★ 新增：非同步備份玩家重要資源到 Supabase
+      syncProfileToCloud: async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const p = get().player;
+        await supabase.from('profiles').upsert({
+          id: session.user.id,
+          day: p.day,
+          gold: p.gold,
+          food: p.food,
+          action_points: p.actionPoints,
+          prestige: p.prestige,
+          unlocked_facilities: p.unlockedFacilities
+        });
       },
+
+      // ★ 全域池智能打撈機制
       consumeIdentity: async () => {
-        let currentPool = get().identityPool;
-        if (currentPool.length === 0) {
-           set({ isPoolGenerating: true });
-           try { const newIds = await fetchIdentityBatch(); set({ identityPool: newIds }); currentPool = newIds; } 
-           catch (e) { console.error(e); } finally { set({ isPoolGenerating: false }); }
+        const state = get();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return { name: "無名幽影", story: "未與深淵建立正式連結的幻影。" };
+
+        set({ isPoolGenerating: true });
+        try {
+          // 1. 從全域池中尋找「沒有在本地 usedIdentityIds 陣列」裡的資料
+          let query = supabase.from('global_identities').select('*');
+          if (state.player.usedIdentityIds.length > 0) {
+             query = query.not('id', 'in', `(${state.player.usedIdentityIds.join(',')})`);
+          }
+          const { data: availableData } = await query.limit(1);
+
+          let identity = availableData && availableData.length > 0 ? availableData[0] : null;
+
+          // 2. 如果全域池沒貨了，呼叫 AI 生成並「捐贈」到全域池中
+          if (!identity) {
+             const newAiData = await fetchIdentityBatch(); // 這會產生 10 筆
+             const { data: insertedData } = await supabase.from('global_identities').insert(newAiData).select();
+             if (insertedData && insertedData.length > 0) {
+                identity = insertedData[0];
+             }
+          }
+
+          if (!identity) throw new Error('AI 與資料庫雙重潰堤');
+
+          // 3. 在雲端紀錄消耗，並在本地更新已用清單
+          await supabase.from('user_identity_logs').insert({ user_id: session.user.id, identity_id: identity.id });
+          const newUsedIds = [...state.player.usedIdentityIds, identity.id];
+          set(s => ({ player: { ...s.player, usedIdentityIds: newUsedIds } }));
+
+          return { name: identity.name, story: identity.story };
+
+        } catch (e) {
+          console.error(e);
+          return { name: "罪業之軀", story: "［檔案毀損］來自深淵的亂碼碎片。" };
+        } finally {
+          set({ isPoolGenerating: false });
         }
-        if (currentPool.length === 0) return { name: "深淵棄子", story: "［檔案毀損］極端異常的空白軀殼。" };
-        const identity = currentPool[0];
-        set(s => ({ identityPool: s.identityPool.slice(1) }));
-        get().refillPoolIfNeeded();
-        return identity;
       },
 
       addGold: (amount) => set((state) => ({ player: { ...state.player, gold: state.player.gold + amount } })),
@@ -213,9 +250,10 @@ export const useGameStore = create<GameStore>()(
           });
           triggerBackgroundMarketRefresh(); set({ dailyMissions: generateDailyMissions() });
         }
+        // ★ 推進時段結束後，背景同步存檔至雲端
+        get().syncProfileToCloud();
       },
 
-      // ［核心］競技場回合制引擎
       executeArenaBattle: (slaveId, npcId) => {
         const state = get();
         const slave = state.slaves.find(s => s.id === slaveId);
@@ -225,16 +263,14 @@ export const useGameStore = create<GameStore>()(
         const logs: CombatLog[] = [];
         logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system' });
 
-        // 計算基礎屬性
         let sHpMax = Math.floor(slave.primaryStats.endurance * 5);
-        let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100)); // 進場血量受體力限制
+        let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
         let sAtk = slave.primaryStats.combat;
         let sDef = Math.floor(slave.primaryStats.endurance * 0.5 + slave.skills.survival * 2);
         let sSpd = slave.primaryStats.intelligence;
         let sDmgMulti = 1 + (slave.skills.combat * 0.05);
         let sDmgReduc = slave.skills.combat * 0.03;
 
-        // 種族天賦白字修正
         if (slave.race === '精靈') sSpd = Math.floor(sSpd * 1.2);
         if (slave.race === '半獸人') { sAtk = Math.floor(sAtk * 1.15); sDef = Math.floor(sDef * 0.9); }
         if (slave.race === '矮人') { sHpMax = Math.floor(sHpMax * 1.2); sHp = Math.floor(sHp * 1.2); sDef = Math.floor(sDef * 1.15); }
@@ -243,7 +279,6 @@ export const useGameStore = create<GameStore>()(
         let nHp = npc.stats.hp; const nAtk = npc.stats.attack; const nDef = npc.stats.defense; const nSpd = npc.stats.speed;
         let round = 1; let orcStack = 0; let humanUnstoppable = false;
 
-        // 回合制迴圈 (最多 50 回合防死循環)
         while (sHp > 0 && nHp > 0 && round <= 50) {
           const isSlaveFirst = sSpd >= nSpd;
 
@@ -287,14 +322,13 @@ export const useGameStore = create<GameStore>()(
         const isWin = sHp > 0;
         logs.push({ round: round - 1, message: isWin ? `［結算］${slave.name} 屹立到了最後，取得勝利。` : `［結算］${slave.name} 不支倒地，戰敗被抬出賽場。`, type: 'system' });
 
-        // 結算數值扣除與獎勵發放
         set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
         if (isWin) {
           get().addGold(npc.rewardGold);
           if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige);
         }
 
-        let newStamina = Math.max(0, slave.conditionStats.stamina - 20); // 固定消耗體力
+        let newStamina = Math.max(0, slave.conditionStats.stamina - 20); 
         let newStress = slave.conditionStats.stress;
         let newRebellion = slave.conditionStats.rebellion;
 
@@ -308,10 +342,11 @@ export const useGameStore = create<GameStore>()(
         }
 
         get().updateSlave(slave.id, { conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
-        get().processTurn(); // 強制推進一格時段
+        get().processTurn(); 
+        get().syncProfileToCloud(); // ★ 戰鬥結算後同步雲端
         return { logs, isWin };
       }
     }),
-    { name: 'dark-fantasy-save-v10', storage: createJSONStorage(() => storage) }
+    { name: 'dark-fantasy-save-v11', storage: createJSONStorage(() => storage) }
   )
 );
