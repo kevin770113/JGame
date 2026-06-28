@@ -127,9 +127,10 @@ export default function InteractionView() {
           <h2 className="text-xl font-bold text-gray-300">互動與管理</h2>
           <p className="text-xs text-gray-500 mt-1">凝視深淵，並將您的意志強加於他們之上。</p>
         </div>
+        {/* ★ 加入 whitespace-nowrap shrink-0 確保按鈕不被擠壓斷行 */}
         <button 
           onClick={() => navigate('Home', 'Main')}
-          className="px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
+          className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
         >
           ［返回大廳］
         </button>
