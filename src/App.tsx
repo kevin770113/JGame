@@ -7,7 +7,9 @@ import DispatchView from './views/DispatchView';
 import MapView from './views/MapView';
 import InteractionView from './views/InteractionView';
 import ArenaView from './views/ArenaView';
+import LoginView from './views/LoginView';
 import { useGameStore } from './store/useGameStore';
+import { supabase } from './services/supabaseClient';
 import { Slave } from './types';
 
 const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
@@ -23,10 +25,27 @@ function App() {
   const triggerBackgroundMarketRefresh = useGameStore((state) => state.triggerBackgroundMarketRefresh);
 
   const [activeSlave, setActiveSlave] = useState<Slave | null>(null);
+  
+  // ［新增］身分驗證狀態
+  const [session, setSession] = useState<any>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
+  // ［新增］掛載 Supabase 監聽器
   useEffect(() => {
-    if (marketSlaves.length === 0) triggerBackgroundMarketRefresh();
-  }, []);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setIsAuthChecking(false);
+      // 確保登入後才觸發市場生成
+      if (session && marketSlaves.length === 0) triggerBackgroundMarketRefresh();
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session && marketSlaves.length === 0) triggerBackgroundMarketRefresh();
+    });
+
+    return () => subscription.unsubscribe();
+  }, [marketSlaves.length, triggerBackgroundMarketRefresh]);
 
   const getDynamicBackground = () => {
     const sceneKey = currentScene.toLowerCase();
@@ -100,6 +119,15 @@ function App() {
     if (stamina < 60 || stress > 50) return 'bg-yellow-500';
     return 'bg-green-500';
   };
+
+  // ［新增］路由守衛：未通過驗證則顯示登入介面
+  if (isAuthChecking) {
+    return <div className="w-full h-screen bg-dark-bg flex items-center justify-center text-gray-500 font-bold tracking-widest animate-pulse">［連線深淵印記中...］</div>;
+  }
+
+  if (!session) {
+    return <LoginView />;
+  }
 
   return (
     <div 
