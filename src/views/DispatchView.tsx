@@ -58,22 +58,22 @@ export default function DispatchView() {
 
   const getRankStyle = (rank: string) => {
     if (rank === '黃金') return 'text-yellow-500 border-yellow-700 bg-yellow-950/30';
-    if (rank === '紫色') return 'text-purple-400 border-purple-700 bg-purple-950/30'; // ★ 補上紫階專屬顏色
+    if (rank === '紫色') return 'text-purple-400 border-purple-700 bg-purple-950/30'; 
     if (rank === '蔚藍') return 'text-blue-400 border-blue-700 bg-blue-950/30';
     return 'text-green-500 border-green-700 bg-green-950/30';
   };
 
   return (
-    // ★ 將底部的 pb-10 改為 pb-48，預留極大的空間給下拉選單，防止遭到截斷
     <div className="w-full flex flex-col gap-4 pb-48 animate-fade-in">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
           <h2 className="text-xl font-bold text-gray-300">深淵酒館</h2>
           <p className="text-xs text-gray-500 mt-1">充斥著劣質麥酒與血腥味的地下酒館。佈告欄上釘滿了以生命為籌碼的委託。</p>
         </div>
+        {/* ★ 加入 whitespace-nowrap shrink-0 確保按鈕不被擠壓斷行 */}
         <button 
           onClick={() => navigate('Town', 'Main')}
-          className="px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
+          className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
         >
           ［返回城鎮］
         </button>
