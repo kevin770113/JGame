@@ -58,6 +58,7 @@ export interface Player {
   lastApUpdateTime: number;  
   deviceId: string;             
   unlockedFacilities: string[]; 
+  usedIdentityIds: string[]; // ［新增］記錄玩家已抽過的全域 AI 資源 UUID
 }
 
 export interface ArenaNPC {
