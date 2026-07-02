@@ -9,7 +9,7 @@ export type Location = 'Frontlines' | 'NeutralHub' | 'Capital';
 
 export type ActivityStatus = '閒置' | '外派中' | '特訓中';
 
-// ★ V2.4 新增系統抽屜的全域互斥型別
+// ★ V2.4 新增全域互斥視窗型別
 export type ActiveWindow = 'quest' | 'roster' | 'system' | null;
 
 export interface Skills {
