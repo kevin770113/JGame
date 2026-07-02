@@ -10,7 +10,7 @@ import ArenaView from './views/ArenaView';
 import AbyssView from './views/AbyssView'; 
 import LoginView from './views/LoginView';
 import QuestPanel from './components/QuestPanel';
-import SlavePanel from './components/SlavePanel'; // ★ 引入置中名冊視窗
+import SlavePanel from './components/SlavePanel'; 
 import { useGameStore } from './store/useGameStore';
 import { supabase } from './services/supabaseClient';
 import { Slave } from './types';
@@ -113,18 +113,15 @@ function App() {
 
   return (
     <div className="absolute inset-0 flex flex-col bg-dark-bg text-gray-200 overflow-hidden select-none transition-all duration-700" style={{backgroundImage: `url(${getDynamicBackground()})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat'}}>
-      {/* ★ 全局黑色遮罩加深至 70% 提高文字清晰度與高對比閱讀 */}
       <div className="absolute inset-0 bg-black/70 z-0 pointer-events-none"></div>
       
       <div className="shrink-0 z-20 shadow-md bg-gray-900 relative"><Header /></div>
       
-      {/* ★ 雙向全局控制元件（互斥） */}
       <QuestPanel />
       <SlavePanel onSelectSlave={setActiveSlave} />
 
       <div className="flex-1 flex overflow-hidden relative z-10">
         <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center z-10 overscroll-contain">
-          {/* ★ 右側 aside 欄位已整根拔除，中間寬度完美釋放 */}
           <div className={`w-full transition-all duration-300 ${currentScene === 'Town' ? 'max-w-3xl' : 'max-w-lg'}`}>{renderMainStage()}</div>
         </main>
       </div>
@@ -135,11 +132,16 @@ function App() {
             <button onClick={() => setActiveSlave(null)} className="absolute top-2 right-3 text-gray-400 hover:text-white text-sm font-bold transition-colors z-20">［關閉］</button>
             <div className="w-full sm:w-1/3 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[180px] sm:min-h-[380px] relative overflow-hidden group"><div className="absolute inset-0 bg-gray-800/10 group-hover:bg-gray-800/30 transition-colors"></div><span className="text-gray-600 text-xs italic tracking-widest z-10">［立繪預留區］</span></div>
             
-            {/* ★ 右側資訊面板注入 max-h 限制與自適應上下捲動，絕不破版 */}
             <div className="w-full sm:w-2/3 flex flex-col gap-4 overflow-y-auto max-h-[60vh] sm:max-h-[70vh] pr-1 scrollbar-none">
               <div>
                 <h3 className="text-xl font-bold text-gray-200 flex items-center gap-2">{activeSlave.name}<span className={`text-sm ${activeSlave.gender === 'Male' ? 'text-blue-400' : 'text-pink-400'}`}>[{activeSlave.gender === 'Male' ? '男' : '女'}]</span></h3>
-                <div className="flex gap-2 mt-1.5"><span className="text-xs text-gray-300 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-700">種族：{activeSlave.race}</span><span className={`text-xs px-2.5 py-0.5 rounded border ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-700 text-gray-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-500 font-bold'}`}>狀態：{activeSlave.activityStatus}</span></div>
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  <span className="text-xs text-gray-300 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-700">種族：{activeSlave.race}</span>
+                  <span className={`text-xs px-2.5 py-0.5 rounded border ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-700 text-gray-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-500 font-bold'}`}>狀態：{activeSlave.activityStatus}</span>
+                  {/* ★ V2.3 詳細資訊面板新增負傷標籤與戰績數據外顯 */}
+                  {activeSlave.isInjured && <span className="text-xs px-2.5 py-0.5 bg-red-950 border border-red-700 text-red-400 font-extrabold rounded animate-pulse">［負傷狀態］</span>}
+                  <span className="text-xs text-gray-400 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-800 font-mono flex items-center gap-1">⚔️ 勝 {activeSlave.combatRecord?.wins || 0} / 敗 {activeSlave.combatRecord?.losses || 0}</span>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm bg-gray-950 p-3 rounded border border-gray-800">
                 <div className="flex flex-col gap-1.5 border-r border-gray-800 pr-3"><div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-1 mb-1 tracking-widest">［天賦屬性］</div><div className="flex justify-between"><span className="text-gray-500">武力:</span> <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.combat}</span></div><div className="flex justify-between"><span className="text-gray-500">體質:</span> <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.endurance}</span></div><div className="flex justify-between"><span className="text-gray-500">智力:</span> <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.intelligence}</span></div><div className="flex justify-between"><span className="text-gray-500">服從:</span> <span className={activeSlave.primaryStats.obedience < 20 ? 'text-red-400 font-bold' : 'text-gray-200 font-mono'}>{activeSlave.primaryStats.obedience}</span></div></div>
