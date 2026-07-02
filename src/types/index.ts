@@ -1,5 +1,5 @@
 export type Scene = 'Home' | 'Town';
-export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map' | 'Interaction' | 'Arena';
+export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map' | 'Interaction' | 'Arena' | 'Abyss';
 
 export type Race = '人類' | '精靈' | '半獸人' | '矮人' | '不死族' | '龍族';
 export type Gender = 'Male' | 'Female';
@@ -43,6 +43,9 @@ export interface Slave {
     fatherId: string;
     motherId: string;
   };
+  equipment?: {
+    weaponId?: string;
+  };
 }
 
 export interface Player {
@@ -58,7 +61,11 @@ export interface Player {
   lastApUpdateTime: number;  
   deviceId: string;             
   unlockedFacilities: string[]; 
-  usedIdentityIds: string[]; // ［新增］記錄玩家已抽過的全域 AI 資源 UUID
+  usedIdentityIds: string[]; 
+  // ★ V2.0 新增擴充系統狀態
+  inventory: Record<string, number>; 
+  quests: Record<string, 'hidden' | 'active' | 'completed'>;
+  abyssFloor: number;
 }
 
 export interface ArenaNPC {
