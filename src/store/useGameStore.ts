@@ -5,7 +5,7 @@ import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, Arena
 import { GAME_CONSTANTS } from '../utils/constants';
 import { fetchIdentityBatch } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
-import { ITEMS_DATA } from '../utils/gameData';
+import { ITEMS_DATA, HEROES_DATA } from '../utils/gameData';
 
 export interface Mission {
   id: string; title: string; rank: '黃金' | '紫色' | '蔚藍' | '翠綠';
@@ -27,6 +27,25 @@ export const ARENA_NPCS: ArenaNPC[] = [
   { id: 'npc-2', location: 'NeutralHub', name: '鐵血角鬥士', description: '公會重金培育的職業鬥士，裝備精良且受過專業訓練。', stats: { hp: 800, attack: 55, defense: 35, speed: 40 }, rewardGold: 2500, rewardPrestige: 10 },
   { id: 'npc-3', location: 'Capital', name: '皇家處刑者', description: '帝國皇室的殺人機器，專門用來粉碎挑戰者的絕望。', stats: { hp: 2000, attack: 110, defense: 60, speed: 70 }, rewardGold: 6000, rewardPrestige: 50 }
 ];
+
+// ★ 深淵敵方動態生成器
+export const getAbyssEnemy = (floor: number) => {
+  const boss = HEROES_DATA.find(h => h.floor === floor);
+  const multiplier = 1 + (floor - 1) * 0.05;
+  if (boss) {
+    return {
+      name: boss.name, quote: boss.quote,
+      stats: { hp: Math.floor(boss.stats.hp * multiplier), attack: Math.floor(boss.stats.attack * multiplier), defense: Math.floor(boss.stats.defense * multiplier), speed: Math.floor(boss.stats.speed * multiplier) },
+      rewardGold: boss.rewardGold, rewardPrestige: boss.rewardPrestige, isBoss: true
+    };
+  }
+  const baseHp = 400; const baseAtk = 35; const baseDef = 15; const baseSpd = 20;
+  return {
+    name: `深淵衛士 (第 ${floor} 階)`, quote: '……（空洞的盔甲發出低沉的摩擦聲）',
+    stats: { hp: Math.floor(baseHp * multiplier), attack: Math.floor(baseAtk * multiplier), defense: Math.floor(baseDef * multiplier), speed: Math.floor(baseSpd * multiplier) },
+    rewardGold: 500 + floor * 150, rewardPrestige: Math.floor(floor / 2), isBoss: false
+  };
+};
 
 export interface GameStore {
   player: Player;
@@ -60,13 +79,13 @@ export interface GameStore {
   checkApRecovery: () => void; 
   processTurn: () => void;
   executeArenaBattle: (slaveId: string, npcId: string) => { logs: CombatLog[], isWin: boolean } | null;
+  executeAbyssBattle: (slaveId: string) => { logs: CombatLog[], isWin: boolean } | null; // ★ 新增深淵戰鬥
 
   buyItem: (itemId: string) => void;
   useItem: (itemId: string, slaveId: string) => void;
   equipWeapon: (itemId: string, slaveId: string) => void;
   fulfillEvent: (slaveId: string) => boolean;
 
-  // ★ 任務追蹤引擎
   triggerQuest: (questId: string) => void;
   checkQuestCompletion: () => void;
 }
@@ -82,7 +101,6 @@ const generateDailyMissions = (): Mission[] => {
   for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) missions.push({ id: `m-blu-${baseId}-${i}`, title: `［進階］${getName()}`, rank: '蔚藍', requiredPhases: 2, staminaCost: 45, stressGain: 25, reward: 800 + Math.floor(Math.random() * 200), description: '危險差事。' });
   if (Math.random() > 0.7) missions.push({ id: `m-pur-${baseId}`, title: `［特化］${getName()}`, rank: '紫色', requiredPhases: 2, staminaCost: 50, stressGain: 30, reward: 1200 + Math.floor(Math.random() * 300), description: '極高機率獲得威望或技能突破。' });
   if (Math.random() > 0.8) missions.push({ id: `m-gld-${baseId}`, title: `［傳說］${getName()}`, rank: '黃金', requiredPhases: 5, staminaCost: 90, stressGain: 60, reward: 3500 + Math.floor(Math.random() * 1500), description: '死亡委託。' });
-
   return missions;
 };
 
@@ -118,31 +136,20 @@ export const useGameStore = create<GameStore>()(
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
       activeEvent: null,
 
-      // ★ 任務引擎實作
       triggerQuest: (questId) => set(state => {
         if (!state.player.quests[questId]) {
            const newQuests = { ...state.player.quests, [questId]: 'active' as const };
-           setTimeout(() => get().syncProfileToCloud(), 100); // 確保觸發後上雲
+           setTimeout(() => get().syncProfileToCloud(), 100); 
            return { player: { ...state.player, quests: newQuests } };
         }
         return state;
       }),
 
       checkQuestCompletion: () => {
-         const state = get();
-         let updated = false;
-         const newQuests = { ...state.player.quests };
-         let addG = 0; let addP = 0;
-
-         if (newQuests['q_first_blood'] === 'active' && state.slaves.length > 0) {
-            newQuests['q_first_blood'] = 'completed'; addG += 2000; addP += 50; updated = true;
-         }
-         if (newQuests['q_first_fusion'] === 'active' && state.slaves.some(s => s.parents)) {
-            newQuests['q_first_fusion'] = 'completed'; addP += 100; updated = true;
-         }
-         if (newQuests['q_enter_hub'] === 'active' && (state.player.location === 'NeutralHub' || state.player.location === 'Capital')) {
-            newQuests['q_enter_hub'] = 'completed'; addG += 5000; addP += 200; updated = true;
-         }
+         const state = get(); let updated = false; const newQuests = { ...state.player.quests }; let addG = 0; let addP = 0;
+         if (newQuests['q_first_blood'] === 'active' && state.slaves.length > 0) { newQuests['q_first_blood'] = 'completed'; addG += 2000; addP += 50; updated = true; }
+         if (newQuests['q_first_fusion'] === 'active' && state.slaves.some(s => s.parents)) { newQuests['q_first_fusion'] = 'completed'; addP += 100; updated = true; }
+         if (newQuests['q_enter_hub'] === 'active' && (state.player.location === 'NeutralHub' || state.player.location === 'Capital')) { newQuests['q_enter_hub'] = 'completed'; addG += 5000; addP += 200; updated = true; }
 
          if (updated) {
             set({ player: { ...state.player, quests: newQuests, gold: state.player.gold + addG, prestige: state.player.prestige + addP } });
@@ -154,26 +161,10 @@ export const useGameStore = create<GameStore>()(
       syncProfileToCloud: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        const state = get();
-        const p = state.player;
+        const state = get(); const p = state.player;
         await supabase.from('profiles').upsert({
-          id: session.user.id,
-          day: p.day,
-          gold: p.gold,
-          food: p.food,
-          action_points: p.actionPoints,
-          prestige: p.prestige,
-          unlocked_facilities: p.unlockedFacilities,
-          save_data: {
-             usedIdentityIds: p.usedIdentityIds,
-             inventory: p.inventory,
-             quests: p.quests,
-             abyssFloor: p.abyssFloor,
-             slaves: state.slaves,
-             marketSlaves: state.marketSlaves,
-             activeDispatches: state.activeDispatches,
-             activeEvent: state.activeEvent
-          }
+          id: session.user.id, day: p.day, gold: p.gold, food: p.food, action_points: p.actionPoints, prestige: p.prestige, unlocked_facilities: p.unlockedFacilities,
+          save_data: { usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent }
         });
       },
 
@@ -182,58 +173,34 @@ export const useGameStore = create<GameStore>()(
         if (!session) return;
         const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
         if (error || !data) return;
-
         const sData = data.save_data || {};
         set((state) => ({
-          player: {
-            ...state.player,
-            day: data.day ?? state.player.day,
-            gold: data.gold ?? state.player.gold,
-            food: data.food ?? state.player.food,
-            actionPoints: data.action_points ?? state.player.actionPoints,
-            prestige: data.prestige ?? state.player.prestige,
-            unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities,
-            usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds,
-            inventory: sData.inventory || state.player.inventory,
-            quests: sData.quests || state.player.quests,
-            abyssFloor: sData.abyssFloor || state.player.abyssFloor,
-          },
-          slaves: sData.slaves || state.slaves,
-          marketSlaves: sData.marketSlaves || state.marketSlaves,
-          activeDispatches: sData.activeDispatches || state.activeDispatches,
-          activeEvent: sData.activeEvent || state.activeEvent
+          player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor },
+          slaves: sData.slaves || state.slaves, marketSlaves: sData.marketSlaves || state.marketSlaves, activeDispatches: sData.activeDispatches || state.activeDispatches, activeEvent: sData.activeEvent || state.activeEvent
         }));
       },
 
       buyItem: (itemId) => set(state => {
         const item = ITEMS_DATA[itemId];
-        if (item && state.player.gold >= item.price) {
-            return { player: { ...state.player, gold: state.player.gold - item.price, inventory: { ...state.player.inventory, [itemId]: (state.player.inventory[itemId] || 0) + 1 } } };
-        }
+        if (item && state.player.gold >= item.price) return { player: { ...state.player, gold: state.player.gold - item.price, inventory: { ...state.player.inventory, [itemId]: (state.player.inventory[itemId] || 0) + 1 } } };
         return state;
       }),
 
       useItem: (itemId, slaveId) => set(state => {
-        const item = ITEMS_DATA[itemId];
-        const slave = state.slaves.find(s => s.id === slaveId);
-        const qty = state.player.inventory[itemId] || 0;
+        const item = ITEMS_DATA[itemId]; const slave = state.slaves.find(s => s.id === slaveId); const qty = state.player.inventory[itemId] || 0;
         if (qty > 0 && slave && item.type === 'potion') {
             const newStamina = Math.min(100, slave.conditionStats.stamina + (item.effect.stamina || 0));
-            const newInv = { ...state.player.inventory, [itemId]: qty - 1 };
-            if (newInv[itemId] <= 0) delete newInv[itemId];
+            const newInv = { ...state.player.inventory, [itemId]: qty - 1 }; if (newInv[itemId] <= 0) delete newInv[itemId];
             return { player: { ...state.player, inventory: newInv }, slaves: state.slaves.map(s => s.id === slaveId ? { ...s, conditionStats: { ...s.conditionStats, stamina: newStamina } } : s) };
         }
         return state;
       }),
 
       equipWeapon: (itemId, slaveId) => set(state => {
-        const qty = state.player.inventory[itemId] || 0;
-        const slave = state.slaves.find(s => s.id === slaveId);
+        const qty = state.player.inventory[itemId] || 0; const slave = state.slaves.find(s => s.id === slaveId);
         if (qty > 0 && slave && ITEMS_DATA[itemId].type === 'weapon') {
-            const oldWeapon = slave.equipment?.weaponId;
-            const newInv = { ...state.player.inventory, [itemId]: qty - 1 };
-            if (oldWeapon) newInv[oldWeapon] = (newInv[oldWeapon] || 0) + 1;
-            if (newInv[itemId] <= 0) delete newInv[itemId];
+            const oldWeapon = slave.equipment?.weaponId; const newInv = { ...state.player.inventory, [itemId]: qty - 1 };
+            if (oldWeapon) newInv[oldWeapon] = (newInv[oldWeapon] || 0) + 1; if (newInv[itemId] <= 0) delete newInv[itemId];
             return { player: { ...state.player, inventory: newInv }, slaves: state.slaves.map(s => s.id === slaveId ? { ...s, equipment: { weaponId: itemId } } : s) };
         }
         return state;
@@ -242,59 +209,41 @@ export const useGameStore = create<GameStore>()(
       fulfillEvent: (slaveId) => {
         const state = get(); const evt = state.activeEvent; const slave = state.slaves.find(s => s.id === slaveId);
         if (!evt || !slave || slave.activityStatus !== '閒置') return false;
-        
         if (evt.reqRace && slave.race !== evt.reqRace) return false;
         if (evt.reqGender && slave.gender !== evt.reqGender) return false;
         if (evt.reqStat && evt.reqStat.key === 'obedience' && slave.primaryStats.obedience < evt.reqStat.val) return false;
         if (evt.reqStat && evt.reqStat.key === 'combat' && slave.primaryStats.combat < evt.reqStat.val) return false;
 
-        const newSlaves = state.slaves.filter(s => s.id !== slaveId);
-        const newInv = { ...state.player.inventory };
+        const newSlaves = state.slaves.filter(s => s.id !== slaveId); const newInv = { ...state.player.inventory };
         if (evt.reward.item) newInv[evt.reward.item] = (newInv[evt.reward.item] || 0) + 1;
-        
-        set({
-            slaves: newSlaves, activeEvent: null,
-            player: { ...state.player, gold: state.player.gold + evt.reward.gold, prestige: state.player.prestige + evt.reward.prestige, inventory: newInv }
-        });
-        get().syncProfileToCloud();
-        return true;
+        set({ slaves: newSlaves, activeEvent: null, player: { ...state.player, gold: state.player.gold + evt.reward.gold, prestige: state.player.prestige + evt.reward.prestige, inventory: newInv } });
+        get().syncProfileToCloud(); return true;
       },
 
       consumeIdentity: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return { name: "無名幽影", story: "未與深淵建立正式連結的幻影。" };
-
         set({ isPoolGenerating: true });
         try {
           const usedIds = get().player.usedIdentityIds;
           const { data: poolData, error: poolError } = await supabase.from('global_identities').select('*').limit(50);
           if (poolError) throw poolError;
-
           const availableIdentities = (poolData || []).filter(d => !usedIds.includes(d.id));
           let identity = availableIdentities.length > 0 ? availableIdentities[0] : null;
-
           if (!identity) {
              const newAiData = await fetchIdentityBatch(); 
              const { data: insertedData, error: insertError } = await supabase.from('global_identities').insert(newAiData).select();
              if (insertError) throw insertError;
-             if (insertedData && insertedData.length > 0) {
-                identity = insertedData[0];
-             }
+             if (insertedData && insertedData.length > 0) identity = insertedData[0];
           }
-
           if (!identity) throw new Error('AI 與資料庫雙重潰堤');
-
           const { error: logError } = await supabase.from('user_identity_logs').insert({ user_id: session.user.id, identity_id: identity.id });
           if (logError) console.warn("［寫入紀錄失敗］", logError); 
-
           const newUsedIds = [...get().player.usedIdentityIds, identity.id];
           set(s => ({ player: { ...s.player, usedIdentityIds: newUsedIds } }));
-
           return { name: identity.name, story: identity.story };
-
         } catch (e) {
-          console.error("［系統攔截］", e);
-          return { name: "罪業之軀", story: "［檔案毀損］來自深淵的亂碼碎片。" };
+          console.error("［系統攔截］", e); return { name: "罪業之軀", story: "［檔案毀損］來自深淵的亂碼碎片。" };
         } finally {
           set({ isPoolGenerating: false });
         }
@@ -305,20 +254,13 @@ export const useGameStore = create<GameStore>()(
       addFood: (amount) => set((state) => ({ player: { ...state.player, food: state.player.food + amount } })),
       deductFood: (amount) => set((state) => ({ player: { ...state.player, food: Math.max(0, state.player.food - amount) } })),
       addPrestige: (amount) => set((state) => ({ player: { ...state.player, prestige: state.player.prestige + amount } })),
-      changeLocation: (loc) => {
-          set((state) => { let capacity = 5; if (loc === 'NeutralHub') capacity = 10; if (loc === 'Capital') capacity = 20; return { player: { ...state.player, location: loc, maxSlaveCapacity: capacity } }; });
-          get().checkQuestCompletion();
-      },
+      changeLocation: (loc) => { set((state) => { let capacity = 5; if (loc === 'NeutralHub') capacity = 10; if (loc === 'Capital') capacity = 20; return { player: { ...state.player, location: loc, maxSlaveCapacity: capacity } }; }); get().checkQuestCompletion(); },
       navigate: (scene, subView) => set({ currentScene: scene, currentSubView: subView }),
       cleanRoom: () => set((state) => { if (state.player.gold >= 50) return { player: { ...state.player, gold: state.player.gold - 50, roomDirtiness: Math.max(0, state.player.roomDirtiness - 40) } }; return state; }),
-      addSlave: (slave) => {
-          set((state) => ({ slaves: [...state.slaves, slave] }));
-          get().checkQuestCompletion();
-      },
+      addSlave: (slave) => { set((state) => ({ slaves: [...state.slaves, slave] })); get().checkQuestCompletion(); },
       updateSlave: (id, updates) => set((state) => ({ slaves: state.slaves.map(s => s.id === id ? { ...s, ...updates, conditionStats: { ...s.conditionStats, ...(updates.conditionStats || {}) } } : s) })),
       sellSlave: (slaveId) => set((state) => {
-        const slave = state.slaves.find(s => s.id === slaveId);
-        if (!slave || slave.activityStatus !== '閒置') return state;
+        const slave = state.slaves.find(s => s.id === slaveId); if (!slave || slave.activityStatus !== '閒置') return state;
         const sellPrice = 50 + Math.floor((slave.primaryStats.combat + slave.primaryStats.endurance + slave.primaryStats.intelligence + slave.primaryStats.obedience) * 1.5) + ((slave.skills.combat + slave.skills.housework + slave.skills.survival) * 200);
         return { slaves: state.slaves.filter(s => s.id !== slaveId), player: { ...state.player, gold: state.player.gold + sellPrice } };
       }),
@@ -330,26 +272,14 @@ export const useGameStore = create<GameStore>()(
       triggerBackgroundMarketRefresh: async () => {
         if (get().isMarketGenerating) return;
         set({ isMarketGenerating: true, marketSlaves: [] });
-        try { 
-           const newSlaves = []; 
-           for (let i = 0; i < 3; i++) { 
-             const identity = await get().consumeIdentity(); 
-             newSlaves.push(generateBaseMarketSlave(String(i), identity)); 
-           } 
-           set({ marketSlaves: newSlaves }); 
-        } 
-        catch (e) { console.error(e); } 
-        finally { set({ isMarketGenerating: false }); }
+        try { const newSlaves = []; for (let i = 0; i < 3; i++) { const identity = await get().consumeIdentity(); newSlaves.push(generateBaseMarketSlave(String(i), identity)); } set({ marketSlaves: newSlaves }); } 
+        catch (e) { console.error(e); } finally { set({ isMarketGenerating: false }); }
       },
 
       checkApRecovery: () => set((state) => {
-        const { actionPoints, lastApUpdateTime } = state.player;
-        if (actionPoints >= 50) return state;
+        const { actionPoints, lastApUpdateTime } = state.player; if (actionPoints >= 50) return state;
         const now = Date.now(); const elapsed = now - lastApUpdateTime; const recoverAmount = Math.floor(elapsed / 60000); 
-        if (recoverAmount > 0) {
-          const newAp = Math.min(50, actionPoints + recoverAmount);
-          return { player: { ...state.player, actionPoints: newAp, lastApUpdateTime: newAp === 50 ? now : lastApUpdateTime + (recoverAmount * 60000) } };
-        }
+        if (recoverAmount > 0) { const newAp = Math.min(50, actionPoints + recoverAmount); return { player: { ...state.player, actionPoints: newAp, lastApUpdateTime: newAp === 50 ? now : lastApUpdateTime + (recoverAmount * 60000) } }; }
         return state;
       }),
 
@@ -358,8 +288,7 @@ export const useGameStore = create<GameStore>()(
         const state = get(); const { player, slaves, activeDispatches, triggerBackgroundMarketRefresh } = state;
         if (player.actionPoints < 1) return;
 
-        const newAp = player.actionPoints - 1;
-        const newApUpdateTime = player.actionPoints === 50 ? Date.now() : player.lastApUpdateTime;
+        const newAp = player.actionPoints - 1; const newApUpdateTime = player.actionPoints === 50 ? Date.now() : player.lastApUpdateTime;
         const currentPhaseIndex = TIME_PHASES.indexOf(player.timePhase);
         let nextPhase: TimePhase; let nextDay = player.day; let triggerDailySettlement = false;
 
@@ -373,8 +302,7 @@ export const useGameStore = create<GameStore>()(
         activeDispatches.forEach(dispatch => {
           dispatch.remainingPhases -= 1;
           if (dispatch.remainingPhases <= 0) {
-            earnedGold += dispatch.mission.reward;
-            const slave = get().slaves.find(s => s.id === dispatch.slaveId);
+            earnedGold += dispatch.mission.reward; const slave = get().slaves.find(s => s.id === dispatch.slaveId);
             if (slave) {
                let updatedSkills = { ...slave.skills };
                if (dispatch.mission.rank === '紫色') {
@@ -390,8 +318,7 @@ export const useGameStore = create<GameStore>()(
         set({ activeDispatches: newDispatches });
 
         if (triggerDailySettlement) {
-          const foodNeeded = slaves.length * GAME_CONSTANTS.FOOD_CONSUMPTION_PER_SLAVE;
-          let isStarving = false;
+          const foodNeeded = slaves.length * GAME_CONSTANTS.FOOD_CONSUMPTION_PER_SLAVE; let isStarving = false;
           if (get().player.food >= foodNeeded) get().deductFood(foodNeeded); else { get().deductFood(get().player.food); isStarving = true; }
 
           slaves.forEach(slave => {
@@ -405,11 +332,8 @@ export const useGameStore = create<GameStore>()(
           });
 
           let nextEvent = null;
-          if (get().player.location === 'NeutralHub' && Math.random() < 0.4) {
-            nextEvent = { id: 'evt1', type: 'merchant', desc: '【地頭蛇老張】急需一名服從度達 60 的女性半獸人。', reqRace: '半獸人', reqGender: 'Female', reqStat: { key: 'obedience', val: 60 }, reward: { gold: 12000, prestige: 20, item: 'potion_heal_small' } } as const;
-          } else if (get().player.location === 'Capital' && Math.random() < 0.3) {
-            nextEvent = { id: 'evt2', type: 'noble', desc: '【腥紅伯爵】徵求武力達 80 的精靈，願以精鋼長劍交換。', reqRace: '精靈', reqStat: { key: 'combat', val: 80 }, reward: { gold: 35000, prestige: 100, item: 'weapon_iron_sword' } } as const;
-          }
+          if (get().player.location === 'NeutralHub' && Math.random() < 0.4) { nextEvent = { id: 'evt1', type: 'merchant', desc: '【地頭蛇老張】急需一名服從度達 60 的女性半獸人。', reqRace: '半獸人', reqGender: 'Female', reqStat: { key: 'obedience', val: 60 }, reward: { gold: 12000, prestige: 20, item: 'potion_heal_small' } } as const; } 
+          else if (get().player.location === 'Capital' && Math.random() < 0.3) { nextEvent = { id: 'evt2', type: 'noble', desc: '【腥紅伯爵】徵求武力達 80 的精靈，願以精鋼長劍交換。', reqRace: '精靈', reqStat: { key: 'combat', val: 80 }, reward: { gold: 35000, prestige: 100, item: 'weapon_iron_sword' } } as const; }
 
           triggerBackgroundMarketRefresh(); 
           set({ dailyMissions: generateDailyMissions(), activeEvent: nextEvent });
@@ -418,26 +342,16 @@ export const useGameStore = create<GameStore>()(
       },
 
       executeArenaBattle: (slaveId, npcId) => {
-        const state = get();
-        const slave = state.slaves.find(s => s.id === slaveId);
-        const npc = ARENA_NPCS.find(n => n.id === npcId);
+        const state = get(); const slave = state.slaves.find(s => s.id === slaveId); const npc = ARENA_NPCS.find(n => n.id === npcId);
         if (!slave || !npc || state.player.actionPoints < 1) return null;
 
-        const logs: CombatLog[] = [];
-        logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system' });
+        const logs: CombatLog[] = []; logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system' });
 
-        let weaponAtk = 0;
-        if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) {
-            weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
-        }
+        let weaponAtk = 0; if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
 
-        let sHpMax = Math.floor(slave.primaryStats.endurance * 5);
-        let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
-        let sAtk = slave.primaryStats.combat + weaponAtk; 
-        let sDef = Math.floor(slave.primaryStats.endurance * 0.5 + slave.skills.survival * 2);
-        let sSpd = slave.primaryStats.intelligence;
-        let sDmgMulti = 1 + (slave.skills.combat * 0.05);
-        let sDmgReduc = slave.skills.combat * 0.03;
+        let sHpMax = Math.floor(slave.primaryStats.endurance * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
+        let sAtk = slave.primaryStats.combat + weaponAtk; let sDef = Math.floor(slave.primaryStats.endurance * 0.5 + slave.skills.survival * 2); let sSpd = slave.primaryStats.intelligence;
+        let sDmgMulti = 1 + (slave.skills.combat * 0.05); let sDmgReduc = slave.skills.combat * 0.03;
 
         if (slave.race === '精靈') sSpd = Math.floor(sSpd * 1.2);
         if (slave.race === '半獸人') { sAtk = Math.floor(sAtk * 1.15); sDef = Math.floor(sDef * 0.9); }
@@ -449,71 +363,107 @@ export const useGameStore = create<GameStore>()(
 
         while (sHp > 0 && nHp > 0 && round <= 50) {
           const isSlaveFirst = sSpd >= nSpd;
-
           const slaveAction = () => {
-            if (sHp <= 0) return;
-            let atkPower = sAtk; let dmgMulti = sDmgMulti;
-
-            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) {
-                humanUnstoppable = true;
-                logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill' });
-            }
+            if (sHp <= 0) return; let atkPower = sAtk; let dmgMulti = sDmgMulti;
+            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill' }); }
             if (humanUnstoppable) atkPower = Math.floor(atkPower * 1.25);
             if (slave.race === '精靈' && isSlaveFirst) dmgMulti += 0.15;
             if (slave.race === '半獸人') dmgMulti += Math.min(0.3, orcStack * 0.03);
-
-            let dmg = Math.floor(Math.max(1, atkPower - nDef) * dmgMulti);
-            nHp -= dmg;
+            let dmg = Math.floor(Math.max(1, atkPower - nDef) * dmgMulti); nHp -= dmg;
             logs.push({ round, message: `${slave.name} 發動攻擊，對 ${npc.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
-
-            if (slave.race === '不死族') {
-                const heal = Math.floor(dmg * 0.15);
-                if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal' }); }
-            }
+            if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal' }); } }
           };
-
           const npcAction = () => {
-            if (nHp <= 0) return;
-            let dmg = Math.max(1, nAtk - sDef);
-            if (slave.race === '矮人') dmg = Math.max(1, dmg - 5);
-            dmg = Math.floor(dmg * (1 - sDmgReduc));
-            sHp -= dmg;
-            logs.push({ round, message: `${npc.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
-
+            if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); if (slave.race === '矮人') dmg = Math.max(1, dmg - 5);
+            dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; logs.push({ round, message: `${npc.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
             if (slave.race === '半獸人') orcStack++;
           };
+          if (isSlaveFirst) { slaveAction(); npcAction(); } else { npcAction(); slaveAction(); }
+          round++;
+        }
 
+        const isWin = sHp > 0; logs.push({ round: round - 1, message: isWin ? `［結算］${slave.name} 屹立到了最後，取得勝利。` : `［結算］${slave.name} 不支倒地，戰敗被抬出賽場。`, type: 'system' });
+        set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
+        if (isWin) { get().addGold(npc.rewardGold); if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige); }
+
+        let newStamina = Math.max(0, slave.conditionStats.stamina - 20); let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
+        if (slave.race !== '不死族') {
+          newStress = Math.min(100, newStress + (isWin ? 5 : 15)); newRebellion = Math.min(100, newRebellion + (isWin ? 2 : 10));
+          if (slave.race === '人類' && isWin) newStress = Math.max(0, newStress - (round * 2));
+          if (slave.race === '龍族' && newStamina < 30) newRebellion = Math.min(100, newRebellion + 20);
+        }
+        get().updateSlave(slave.id, { conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
+        get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
+      },
+
+      // ★ 深淵塔戰鬥演算法實作
+      executeAbyssBattle: (slaveId) => {
+        const state = get(); const slave = state.slaves.find(s => s.id === slaveId);
+        if (!slave || state.player.actionPoints < 1) return null;
+
+        const floor = state.player.abyssFloor;
+        const enemy = getAbyssEnemy(floor);
+        const logs: CombatLog[] = [];
+
+        logs.push({ round: 0, message: `［系統］${slave.name} 踏入深淵第 ${floor} 階，迎戰 ${enemy.name}。`, type: 'system' });
+        logs.push({ round: 0, message: `「${enemy.quote}」`, type: 'system' });
+
+        let weaponAtk = 0; if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
+
+        let sHpMax = Math.floor(slave.primaryStats.endurance * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
+        let sAtk = slave.primaryStats.combat + weaponAtk; let sDef = Math.floor(slave.primaryStats.endurance * 0.5 + slave.skills.survival * 2); let sSpd = slave.primaryStats.intelligence;
+        let sDmgMulti = 1 + (slave.skills.combat * 0.05); let sDmgReduc = slave.skills.combat * 0.03;
+
+        if (slave.race === '精靈') sSpd = Math.floor(sSpd * 1.2);
+        if (slave.race === '半獸人') { sAtk = Math.floor(sAtk * 1.15); sDef = Math.floor(sDef * 0.9); }
+        if (slave.race === '矮人') { sHpMax = Math.floor(sHpMax * 1.2); sHp = Math.floor(sHp * 1.2); sDef = Math.floor(sDef * 1.15); }
+        if (slave.race === '龍族') { sAtk = Math.floor(sAtk * 1.1); sDef = Math.floor(sDef * 1.1); sSpd = Math.floor(sSpd * 1.1); sDmgReduc += 0.2; }
+
+        let nHp = enemy.stats.hp; const nAtk = enemy.stats.attack; const nDef = enemy.stats.defense; const nSpd = enemy.stats.speed;
+        let round = 1; let orcStack = 0; let humanUnstoppable = false;
+
+        while (sHp > 0 && nHp > 0 && round <= 50) {
+          const isSlaveFirst = sSpd >= nSpd;
+          const slaveAction = () => {
+            if (sHp <= 0) return; let atkPower = sAtk; let dmgMulti = sDmgMulti;
+            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill' }); }
+            if (humanUnstoppable) atkPower = Math.floor(atkPower * 1.25);
+            if (slave.race === '精靈' && isSlaveFirst) dmgMulti += 0.15;
+            if (slave.race === '半獸人') dmgMulti += Math.min(0.3, orcStack * 0.03);
+            let dmg = Math.floor(Math.max(1, atkPower - nDef) * dmgMulti); nHp -= dmg;
+            logs.push({ round, message: `${slave.name} 發動攻擊，對 ${enemy.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
+            if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal' }); } }
+          };
+          const npcAction = () => {
+            if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); if (slave.race === '矮人') dmg = Math.max(1, dmg - 5);
+            dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; logs.push({ round, message: `${enemy.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
+            if (slave.race === '半獸人') orcStack++;
+          };
           if (isSlaveFirst) { slaveAction(); npcAction(); } else { npcAction(); slaveAction(); }
           round++;
         }
 
         const isWin = sHp > 0;
-        logs.push({ round: round - 1, message: isWin ? `［結算］${slave.name} 屹立到了最後，取得勝利。` : `［結算］${slave.name} 不支倒地，戰敗被抬出賽場。`, type: 'system' });
-
+        logs.push({ round: round - 1, message: isWin ? `［結算］${slave.name} 擊潰了深淵的阻礙，成功晉級！` : `［結算］${slave.name} 不支倒地，被深淵無情吞噬。`, type: 'system' });
+        
         set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
         if (isWin) {
-          get().addGold(npc.rewardGold);
-          if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige);
+          get().addGold(enemy.rewardGold);
+          if (enemy.rewardPrestige > 0) get().addPrestige(enemy.rewardPrestige);
+          set((s) => ({ player: { ...s.player, abyssFloor: s.player.abyssFloor + 1 } }));
         }
 
-        let newStamina = Math.max(0, slave.conditionStats.stamina - 20); 
-        let newStress = slave.conditionStats.stress;
-        let newRebellion = slave.conditionStats.rebellion;
-
-        if (slave.race === '不死族') {
-        } else {
-          newStress = Math.min(100, newStress + (isWin ? 5 : 15));
-          newRebellion = Math.min(100, newRebellion + (isWin ? 2 : 10));
+        let newStamina = Math.max(0, slave.conditionStats.stamina - 30); // 深淵消耗 30 體力
+        let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
+        if (slave.race !== '不死族') {
+          newStress = Math.min(100, newStress + (isWin ? 10 : 25)); newRebellion = Math.min(100, newRebellion + (isWin ? 5 : 15));
           if (slave.race === '人類' && isWin) newStress = Math.max(0, newStress - (round * 2));
           if (slave.race === '龍族' && newStamina < 30) newRebellion = Math.min(100, newRebellion + 20);
         }
-
         get().updateSlave(slave.id, { conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
-        get().processTurn(); 
-        get().syncProfileToCloud(); 
-        return { logs, isWin };
+        get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
       }
     }),
-    { name: 'dark-fantasy-save-v15', storage: createJSONStorage(() => storage) }
+    { name: 'dark-fantasy-save-v16', storage: createJSONStorage(() => storage) }
   )
 );
