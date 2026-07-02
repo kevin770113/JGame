@@ -46,6 +46,8 @@ export interface Slave {
   equipment?: {
     weaponId?: string;
   };
+  combatRecord: { wins: number; losses: number; }; // ★ V2.3 新增戰鬥紀錄
+  isInjured: boolean; // ★ V2.3 新增負傷標記
 }
 
 export interface Player {
@@ -62,10 +64,10 @@ export interface Player {
   deviceId: string;             
   unlockedFacilities: string[]; 
   usedIdentityIds: string[]; 
-  // ★ V2.0 新增擴充系統狀態
   inventory: Record<string, number>; 
   quests: Record<string, 'hidden' | 'active' | 'completed'>;
   abyssFloor: number;
+  shopStock: Record<string, number>;
 }
 
 export interface ArenaNPC {
