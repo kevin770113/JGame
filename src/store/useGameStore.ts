@@ -66,9 +66,11 @@ export interface GameStore {
   activeEvent: DynamicEvent | null; 
   globalModal: GlobalModal | null; 
   activeWindow: 'quest' | 'roster' | null; 
+  isSaving: boolean; // ★ V2.4 新增存檔狀態鎖
 
   setActiveWindow: (win: 'quest' | 'roster' | null) => void;
   setGlobalModal: (modal: GlobalModal | null) => void;
+  setIsSaving: (val: boolean) => void; // ★ V2.4
   syncProfileToCloud: () => Promise<void>;
   loadProfileFromCloud: () => Promise<void>;
   consumeIdentity: () => Promise<{name: string, story: string}>;
@@ -147,12 +149,12 @@ export const useGameStore = create<GameStore>()(
         inventory: {}, quests: {}, abyssFloor: 1, shopStock: { ...DEFAULT_SHOP_STOCK }
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
-      activeEvent: null, globalModal: null, activeWindow: null,
+      activeEvent: null, globalModal: null, activeWindow: null, isSaving: false,
 
       setActiveWindow: (win) => set({ activeWindow: win }),
       setGlobalModal: (modal) => set({ globalModal: modal }),
+      setIsSaving: (val) => set({ isSaving: val }),
 
-      // ★ V2.3 被動觸發任務時，強制跳出專屬劇情對話彈窗
       triggerQuest: (questId) => set(state => {
         if (!state.player.quests[questId]) {
            const newQuests = { ...state.player.quests, [questId]: 'active' as const };
@@ -172,7 +174,6 @@ export const useGameStore = create<GameStore>()(
         return state;
       }),
 
-      // ★ V2.3 拔除引導型任務威望，改為純資金獎勵與高沉浸提示
       checkQuestCompletion: () => {
          const state = get(); let updated = false; const newQuests = { ...state.player.quests }; let title = ''; let msg = ''; let addG = 0;
          
@@ -196,14 +197,17 @@ export const useGameStore = create<GameStore>()(
          }
       },
 
+      // ★ V2.4 加入存檔狀態鎖
       syncProfileToCloud: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
+        set({ isSaving: true });
         const state = get(); const p = state.player;
         await supabase.from('profiles').upsert({
           id: session.user.id, day: p.day, gold: p.gold, food: p.food, action_points: p.actionPoints, prestige: p.prestige, unlocked_facilities: p.unlockedFacilities,
           save_data: { usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent }
         });
+        set({ isSaving: false });
       },
 
       loadProfileFromCloud: async () => {
@@ -226,14 +230,11 @@ export const useGameStore = create<GameStore>()(
         return state;
       }),
 
-      // ★ V2.3 負傷狀態下，恢復藥劑效果強行砍半衰減
       useItem: (itemId, slaveId) => set(state => {
         const item = ITEMS_DATA[itemId]; const slave = state.slaves.find(s => s.id === slaveId); const qty = state.player.inventory[itemId] || 0;
         if (qty > 0 && slave && item.type === 'potion') {
             let healAmount = item.effect.stamina || 0;
-            if (slave.isInjured) {
-                healAmount = Math.floor(healAmount * 0.5); 
-            }
+            if (slave.isInjured) { healAmount = Math.floor(healAmount * 0.5); }
             const newStamina = Math.min(100, slave.conditionStats.stamina + healAmount);
             const newInv = { ...state.player.inventory, [itemId]: qty - 1 }; if (newInv[itemId] <= 0) delete newInv[itemId];
             return { player: { ...state.player, inventory: newInv }, slaves: state.slaves.map(s => s.id === slaveId ? { ...s, conditionStats: { ...s.conditionStats, stamina: newStamina } } : s) };
@@ -356,7 +357,6 @@ export const useGameStore = create<GameStore>()(
             let baseReward = dispatch.mission.reward;
             const slave = get().slaves.find(s => s.id === dispatch.slaveId);
             if (slave) {
-               // ★ V2.3 智力影響外派「大成功 1.5 倍收益」判定
                const successChance = slave.primaryStats.intelligence / 200;
                if (Math.random() < successChance) {
                   baseReward = Math.floor(baseReward * 1.5);
@@ -386,27 +386,16 @@ export const useGameStore = create<GameStore>()(
           let totalPrestigeLoss = 0;
 
           slaves.forEach(slave => {
-            // ★ V2.3 滿血自癒邏輯：體力達到 100 自動清除負傷標記
             let currentIsInjured = slave.isInjured;
-            if (currentIsInjured && slave.conditionStats.stamina >= 100) {
-                currentIsInjured = false;
-            }
+            if (currentIsInjured && slave.conditionStats.stamina >= 100) { currentIsInjured = false; }
 
             let newStamina = slave.conditionStats.stamina; let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
             if (isStarving) { newStress = Math.min(100, newStress + 20); newRebellion = Math.min(100, newRebellion + 10); } else {
               if (slave.activityStatus === '閒置') { newStamina = Math.min(100, newStamina + (newDirtiness > 50 ? 10 : 30)); if (overpopulation === 0) newStress = Math.max(0, newStress - 5); }
-              if (newDirtiness > 80) { newStress = Math.min(100, newStress + 20); 
-                // ★ V2.3 服從度可大幅減緩日常反抗值增長的速度
-                const rebGain = Math.max(1, 15 - Math.floor(slave.primaryStats.obedience / 10));
-                newRebellion = Math.min(100, newRebellion + rebGain); 
-              }
-              if (overpopulation > 0) { newStress = Math.min(100, newStress + (overpopulation * 5)); 
-                const rebGain = Math.max(1, 3 - Math.floor(slave.primaryStats.obedience / 20));
-                newRebellion = Math.min(100, newRebellion + rebGain); 
-              }
+              if (newDirtiness > 80) { newStress = Math.min(100, newStress + 20); const rebGain = Math.max(1, 15 - Math.floor(slave.primaryStats.obedience / 10)); newRebellion = Math.min(100, newRebellion + rebGain); }
+              if (overpopulation > 0) { newStress = Math.min(100, newStress + (overpopulation * 5)); const rebGain = Math.max(1, 3 - Math.floor(slave.primaryStats.obedience / 20)); newRebellion = Math.min(100, newRebellion + rebGain); }
             }
 
-            // ★ V2.3 深夜叛逃判定邏輯（洗劫金錢與扣除威望）
             if (newRebellion >= 100) {
                desertedNames.push(slave.name);
                totalStolenGold += Math.floor(Math.random() * 1500) + 500;
@@ -416,28 +405,14 @@ export const useGameStore = create<GameStore>()(
             }
           });
 
-          // 執行叛逃清除與全域大彈窗警告
           if (desertedNames.length > 0) {
              const actualStolen = Math.min(get().player.gold, totalStolenGold);
              const actualPrestigeLoss = Math.min(get().player.prestige, totalPrestigeLoss);
-             set(s => ({
-                slaves: s.slaves.filter(sl => !desertedNames.includes(sl.name)),
-                player: { ...s.player, gold: Math.max(0, s.player.gold - actualStolen), prestige: Math.max(0, s.player.prestige - actualPrestigeLoss) }
-             }));
-             setTimeout(() => {
-                get().setGlobalModal({
-                   title: '［⚠️ 據點突發事件：試驗體叛逃］',
-                   message: `因反抗心高漲至極限，以下成員已於深夜趁亂切斷枷鎖逃離據點：\n\n【${desertedNames.join('】、【')}】\n\n逃跑時他們洗劫了商會庫房，共計損失資金：$${actualStolen}，商會威望降低了 ${actualPrestigeLoss} 點。`,
-                   isConfirm: false
-                });
-             }, 200);
+             set(s => ({ slaves: s.slaves.filter(sl => !desertedNames.includes(sl.name)), player: { ...s.player, gold: Math.max(0, s.player.gold - actualStolen), prestige: Math.max(0, s.player.prestige - actualPrestigeLoss) } }));
+             setTimeout(() => { get().setGlobalModal({ title: '［⚠️ 據點突發事件：試驗體叛逃］', message: `因反抗心高漲至極限，以下成員已於深夜趁亂切斷枷鎖逃離據點：\n\n【${desertedNames.join('】、【')}】\n\n逃跑時他們洗劫了商會庫房，共計損失資金：$${actualStolen}，商會威望降低了 ${actualPrestigeLoss} 點。`, isConfirm: false }); }, 200);
           }
 
-          if (dispatchLogs.length > 0 && desertedNames.length === 0) {
-             setTimeout(() => {
-                get().setGlobalModal({ title: '［外派成果回報］', message: dispatchLogs.join('\n'), isConfirm: false });
-             }, 250);
-          }
+          if (dispatchLogs.length > 0 && desertedNames.length === 0) { setTimeout(() => { get().setGlobalModal({ title: '［外派成果回報］', message: dispatchLogs.join('\n'), isConfirm: false }); }, 250); }
 
           let nextEvent = null;
           if (get().player.location === 'NeutralHub' && Math.random() < 0.4) { nextEvent = { id: 'evt1', type: 'merchant', desc: '【地頭蛇老張】急需一名服從度達 60 的女性半獸人。', reqRace: '半獸人', reqGender: 'Female', reqStat: { key: 'obedience', val: 60 }, reward: { gold: 12000, prestige: 20, item: 'potion_heal_small' } } as const; } 
@@ -498,7 +473,6 @@ export const useGameStore = create<GameStore>()(
           round++;
         }
 
-        // ★ V2.3 戰勝/戰敗與淨勝場屬性加成計算 (排除服從)
         const isWin = sHp > 0;
         let newWins = slave.combatRecord?.wins || 0;
         let newLosses = slave.combatRecord?.losses || 0;
@@ -590,7 +564,6 @@ export const useGameStore = create<GameStore>()(
           round++;
         }
 
-        // ★ V2.3 深淵戰鬥歷練成長與負傷標記
         const isWin = sHp > 0;
         let newWins = slave.combatRecord?.wins || 0;
         let newLosses = slave.combatRecord?.losses || 0;
