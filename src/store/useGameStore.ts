@@ -65,15 +65,17 @@ export interface GameStore {
   activeDispatches: ActiveDispatch[];
   activeEvent: DynamicEvent | null; 
   globalModal: GlobalModal | null; 
-  activeWindow: ActiveWindow; 
+  activeWindow: ActiveWindow | null; 
   isSaving: boolean; 
-  localSaveVersion: number; // ★ V2.4 本地版號追蹤器
+  localSaveVersion: number; 
+  _hasHydrated: boolean; // ★ V2.4 水合鎖狀態
 
-  setActiveWindow: (win: ActiveWindow) => void;
+  setActiveWindow: (win: ActiveWindow | null) => void;
   setGlobalModal: (modal: GlobalModal | null) => void;
   setIsSaving: (val: boolean) => void; 
+  setHasHydrated: (val: boolean) => void; // ★ V2.4 觸發水合解鎖
   syncProfileToCloud: () => Promise<void>;
-  loadProfileFromCloud: (forceLoad?: boolean) => Promise<void>; // ★ V2.4 支援強制讀取
+  loadProfileFromCloud: (forceLoad?: boolean) => Promise<void>; 
   consumeIdentity: () => Promise<{name: string, story: string}>;
   
   addGold: (amount: number) => void;
@@ -150,11 +152,12 @@ export const useGameStore = create<GameStore>()(
         inventory: {}, quests: {}, abyssFloor: 1, shopStock: { ...DEFAULT_SHOP_STOCK }
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
-      activeEvent: null, globalModal: null, activeWindow: null, isSaving: false, localSaveVersion: 0,
+      activeEvent: null, globalModal: null, activeWindow: null, isSaving: false, localSaveVersion: 0, _hasHydrated: false,
 
       setActiveWindow: (win) => set({ activeWindow: win }),
       setGlobalModal: (modal) => set({ globalModal: modal }),
       setIsSaving: (val) => set({ isSaving: val }),
+      setHasHydrated: (val) => set({ _hasHydrated: val }),
 
       triggerQuest: (questId) => set(state => {
         if (!state.player.quests[questId]) {
@@ -198,14 +201,15 @@ export const useGameStore = create<GameStore>()(
          }
       },
 
-      // ★ V2.4 寫入版號保護
+      // ★ V2.4 寫入版號防護網
       syncProfileToCloud: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         set({ isSaving: true });
         
+        // 每次存檔時，本地版號 +1
         const newVersion = (get().localSaveVersion || 0) + 1;
-        set({ localSaveVersion: newVersion }); // 本地版號立即 +1
+        set({ localSaveVersion: newVersion });
 
         const state = get(); const p = state.player;
         const { error } = await supabase.from('profiles').upsert({
@@ -217,7 +221,7 @@ export const useGameStore = create<GameStore>()(
         set({ isSaving: false });
       },
 
-      // ★ V2.4 嚴格攔截舊檔，阻絕回溯
+      // ★ V2.4 拔除版號 0 陷阱，絕對信任本地
       loadProfileFromCloud: async (forceLoad = false) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -228,14 +232,14 @@ export const useGameStore = create<GameStore>()(
         const cloudVersion = sData.localSaveVersion || 0;
         const currentLocalVersion = get().localSaveVersion || 0;
 
-        // 若不是強制拉取，且雲端版號沒有大於本地，則代表是舊檔，強制攔截！
-        if (!forceLoad && cloudVersion <= currentLocalVersion && currentLocalVersion > 0) {
-           console.log(`［防禦網啟動］雲端版號 (v${cloudVersion}) <= 本地版號 (v${currentLocalVersion})，拒絕下載覆蓋。`);
+        // 若不是玩家按下的強制讀取，只要雲端版號沒有「嚴格大於」本地版號，就絕對信任本地並攔截！
+        if (!forceLoad && cloudVersion <= currentLocalVersion) {
+           console.log(`［防禦網啟動］雲端版號 (v${cloudVersion}) <= 本地版號 (v${currentLocalVersion})，絕對信任本地資料，攔截覆蓋。`);
            return; 
         }
 
         set((state) => ({
-          localSaveVersion: cloudVersion, // 同步版號
+          localSaveVersion: cloudVersion,
           player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor, shopStock: sData.shopStock || state.player.shopStock },
           slaves: sData.slaves || state.slaves, marketSlaves: sData.marketSlaves || state.marketSlaves, activeDispatches: sData.activeDispatches || state.activeDispatches, activeEvent: sData.activeEvent || state.activeEvent
         }));
@@ -622,6 +626,15 @@ export const useGameStore = create<GameStore>()(
         get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
       }
     }),
-    { name: 'dark-fantasy-save-v18', storage: createJSONStorage(() => storage) }
+    { 
+      name: 'dark-fantasy-save-v18', 
+      storage: createJSONStorage(() => storage),
+      // ★ V2.4 水合鎖防護：本地 IndexedDB 讀取完畢後解開 _hasHydrated 鎖
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.setHasHydrated(true);
+        }
+      }
+    }
   )
 );
