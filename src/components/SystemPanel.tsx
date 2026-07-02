@@ -58,17 +58,15 @@ export default function SystemPanel() {
 
   return (
     <>
-      {/* 頂部隱藏邊緣觸發器 */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 z-50 animate-fade-in pointer-events-none">
         <button
           onClick={handleToggle}
           className="pointer-events-auto bg-gray-900 border-x border-b border-gray-600 text-gray-400 px-6 py-1 rounded-b-xl shadow-lg font-bold text-xs tracking-widest transition-colors hover:bg-gray-800 hover:text-white flex items-center justify-center gap-2 active:scale-95"
         >
-          <span className="text-gray-500">▼</span> 系統選單 <span className="text-gray-500">▼</span>
+          <span className="text-gray-500">▼</span> 系統 <span className="text-gray-500">▼</span>
         </button>
       </div>
 
-      {/* 互斥暗色背景遮罩 */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 transition-opacity duration-300"
@@ -76,11 +74,10 @@ export default function SystemPanel() {
         ></div>
       )}
 
-      {/* 由上往下滑出的抽屜 */}
       <div 
         className={`fixed top-0 left-0 w-full bg-gray-950 border-b-2 border-purple-900/50 shadow-2xl z-50 flex flex-col items-center transform transition-transform duration-300 ease-out ${isOpen ? 'translate-y-0' : '-translate-y-full'}`}
       >
-        <div className="w-full max-w-md p-5 flex flex-col gap-4 pb-6">
+        <div className="w-full max-w-md p-5 flex flex-col gap-4 pb-6 pt-8">
           <div className="flex justify-between items-center border-b border-gray-800 pb-3">
             <h3 className="text-base font-bold text-gray-200 tracking-widest flex items-center gap-2">
               <span className="text-purple-400">⚙️</span> ［系統控制樞紐］
@@ -94,11 +91,10 @@ export default function SystemPanel() {
           </div>
 
           <div className="flex flex-col gap-3">
-            {/* 1. 手動存檔 */}
             <div className="bg-gray-900/80 p-3 rounded border border-gray-800 flex justify-between items-center shadow-inner">
               <div className="flex flex-col gap-1 pr-2">
                 <span className="text-sm font-bold text-gray-300">資料同步</span>
-                <span className="text-xs text-gray-500">將目前的最新進度強制上傳至深淵伺服器</span>
+                <span className="text-xs text-gray-500">將目前的進度手動強制上傳</span>
               </div>
               <button 
                 onClick={handleManualSave}
@@ -113,11 +109,10 @@ export default function SystemPanel() {
               </button>
             </div>
 
-            {/* 2. 強制讀取雲端 (急救) */}
             <div className="bg-red-950/20 p-3 rounded border border-red-900/30 flex justify-between items-center shadow-inner mt-1">
               <div className="flex flex-col gap-1 pr-2">
                 <span className="text-sm font-bold text-red-400">系統急救：強制覆蓋</span>
-                <span className="text-xs text-red-500/70">無視版號防護鎖，強制拉取雲端存檔覆蓋本地</span>
+                <span className="text-xs text-red-500/70">強行拉取雲端存檔以修復異常死鎖</span>
               </div>
               <button 
                 onClick={handleForceLoad}
@@ -129,16 +124,15 @@ export default function SystemPanel() {
 
             <div className="h-px bg-gray-800 my-1 w-full"></div>
 
-            {/* 3. 未來預留功能與登出 */}
             <div className="grid grid-cols-2 gap-2">
               <button disabled className="py-2.5 bg-gray-900/40 border border-gray-800/50 text-gray-600 rounded text-xs font-bold tracking-widest cursor-not-allowed">
-                ［改版日誌 (敬請期待)］
+                ［改版日誌］
               </button>
               <button disabled className="py-2.5 bg-gray-900/40 border border-gray-800/50 text-gray-600 rounded text-xs font-bold tracking-widest cursor-not-allowed">
-                ［商會說明文件］
+                ［說明文件］
               </button>
               <button disabled className="py-2.5 bg-gray-900/40 border border-gray-800/50 text-gray-600 rounded text-xs font-bold tracking-widest cursor-not-allowed">
-                ［回報深淵異常］
+                ［錯誤回報］
               </button>
               <button 
                 onClick={handleForceLogout}
