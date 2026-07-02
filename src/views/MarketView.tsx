@@ -3,6 +3,7 @@ import { useGameStore, ARENA_NPCS } from '../store/useGameStore';
 import SlaveCard from '../components/SlaveCard';
 import CustomSelect, { Option } from '../components/CustomSelect';
 import { Slave, CombatLog } from '../types';
+import { ITEMS_DATA } from '../utils/gameData';
 
 export default function MarketView() {
   const { gold, maxSlaveCapacity, location } = useGameStore((state) => state.player);
@@ -17,8 +18,14 @@ export default function MarketView() {
   const isMarketGenerating = useGameStore((state) => state.isMarketGenerating);
   const actionPoints = useGameStore((state) => state.player.actionPoints);
 
-  const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'arena'>('buy');
+  // ★ 新增系統函式
+  const buyItem = useGameStore((state) => state.buyItem);
+  const activeEvent = useGameStore((state) => state.activeEvent);
+  const fulfillEvent = useGameStore((state) => state.fulfillEvent);
+
+  const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'arena' | 'shop'>('buy');
   const [selectedFighterId, setSelectedFighterId] = useState<string>('');
+  const [eventSlaveId, setEventSlaveId] = useState<string>('');
   const [combatResult, setCombatResult] = useState<{ logs: CombatLog[], isWin: boolean, npcName: string } | null>(null);
 
   const logEndRef = useRef<HTMLDivElement>(null);
@@ -55,6 +62,15 @@ export default function MarketView() {
 
   const fighterOptions: Option[] = idleSlaves.map(s => ({ value: s.id, label: `${s.name} (武力: ${s.primaryStats.combat} | 體質: ${s.primaryStats.endurance})` }));
 
+  const tabs = [
+    { id: 'buy', label: '［商隊進貨］', color: 'border-blood-red' },
+    { id: 'sell', label: '［黑市變現］', color: 'border-blue-500' },
+    { id: 'arena', label: '［血腥競技］', color: 'border-yellow-500' }
+  ];
+  if (location !== 'Frontlines') {
+    tabs.push({ id: 'shop', label: '［道具黑市］', color: 'border-purple-500' });
+  }
+
   return (
     <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
@@ -62,15 +78,36 @@ export default function MarketView() {
           <h2 className="text-xl font-bold text-gray-300">地下奴隸市場</h2>
           <p className="text-2xs text-gray-500 mt-0.5">持有資金: <span className="text-yellow-500 font-mono font-bold">{gold}</span></p>
         </div>
-        {/* ★ 加入 whitespace-nowrap shrink-0 確保按鈕不被擠壓斷行 */}
         <button onClick={() => navigate('Town', 'Main')} className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest">
           ［返回城鎮］
         </button>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-800 pb-1">
-        {[ { id: 'buy', label: '［商隊進貨］', color: 'border-blood-red' }, { id: 'sell', label: '［黑市變現］', color: 'border-blue-500' }, { id: 'arena', label: '［血腥競技］', color: 'border-yellow-500' } ].map(tab => (
-          <button key={tab.id} onClick={() => { setActiveTab(tab.id as any); setCombatResult(null); }} className={`px-4 py-2 text-xs font-bold transition-colors tracking-widest ${ activeTab === tab.id ? `text-white border-b-2 ${tab.color}` : 'text-gray-500 hover:text-gray-300' }`}>
+      {/* ★ 動態事件橫幅 */}
+      {activeEvent && (
+        <div className="bg-yellow-950/40 border border-yellow-800 rounded p-3 mb-2 animate-fade-in shadow-lg">
+           <h3 className="text-sm font-bold text-yellow-500 mb-1 tracking-widest flex items-center gap-2">
+             <span>⚠️</span> ［突發懸賞］
+           </h3>
+           <p className="text-xs text-gray-300 leading-relaxed mb-3">{activeEvent.desc}</p>
+           <div className="flex gap-2">
+              <div className="flex-1">
+                 <CustomSelect options={idleSlaves.map(s => ({ value: s.id, label: s.name }))} value={eventSlaveId} onChange={setEventSlaveId} focusColor="yellow" />
+              </div>
+              <button onClick={() => {
+                 if (!eventSlaveId) return;
+                 if (fulfillEvent(eventSlaveId)) { alert('［結算］交易成功！獲取高額報酬。'); setEventSlaveId(''); }
+                 else alert('［拒絕］該成員不符合權貴的嚴苛要求！');
+              }} className="px-4 bg-yellow-900/50 hover:bg-yellow-800 border border-yellow-700 text-yellow-400 font-bold rounded text-xs transition-colors shrink-0 tracking-widest shadow">
+                 ［交付交易］
+              </button>
+           </div>
+        </div>
+      )}
+
+      <div className="flex gap-2 border-b border-gray-800 pb-1 overflow-x-auto scrollbar-none">
+        {tabs.map(tab => (
+          <button key={tab.id} onClick={() => { setActiveTab(tab.id as any); setCombatResult(null); }} className={`px-4 py-2 text-xs font-bold transition-colors tracking-widest whitespace-nowrap ${ activeTab === tab.id ? `text-white border-b-2 ${tab.color}` : 'text-gray-500 hover:text-gray-300' }`}>
             {tab.label}
           </button>
         ))}
@@ -149,7 +186,7 @@ export default function MarketView() {
                 {idleSlaves.length > 0 ? <CustomSelect options={fighterOptions} value={selectedFighterId} onChange={setSelectedFighterId} focusColor="gray" /> : <div className="text-xs text-red-500 p-2 border border-red-900/30 rounded bg-red-950/20">無閒置成員可參賽。</div>}
               </div>
 
-              <div className="text-xs text-gray-500 italic mt-2">※ 參賽將消耗 1 點行動力與 20 點體力。戰鬥中血量由體力與體質共同決定。</div>
+              <div className="text-xs text-gray-500 italic mt-2">※ 參賽將消耗 1 點行動力與 20 點體力。戰鬥中最大血量與防禦力受體質與生存技能折算，進場血量受當前體力百分比限制。</div>
               
               <button onClick={startBattle} disabled={!selectedFighterId || actionPoints < 1} className={`w-full py-3 rounded font-bold text-xs tracking-widest border transition-colors shadow ${!selectedFighterId || actionPoints < 1 ? 'bg-gray-800 text-gray-600 border-gray-700' : 'bg-red-900/20 text-red-400 border-red-900/50 hover:bg-red-900/40'}`}>
                 ［開始決鬥］
@@ -158,6 +195,29 @@ export default function MarketView() {
           ) : (
             <div className="text-xs text-gray-500 text-center mt-10">此據點目前未開放賽場。</div>
           )}
+        </div>
+      )}
+
+      {/* ★ 新增道具黑市 */}
+      {activeTab === 'shop' && (
+        <div className="flex flex-col gap-4 animate-fade-in">
+          <p className="text-xs text-gray-400 italic border-l-2 border-purple-500 pl-2">「這裡流通著帝國明令禁止的特種物資與軍械。」</p>
+          <div className="flex flex-col gap-3">
+            {Object.entries(ITEMS_DATA).map(([id, item]) => (
+              <div key={id} className="bg-gray-950 border border-gray-800 p-3 rounded flex justify-between items-center shadow-inner">
+                 <div className="flex flex-col gap-1">
+                    <h4 className="text-sm font-bold text-gray-200">{item.name}</h4>
+                    <p className="text-xs text-gray-500">{item.desc}</p>
+                 </div>
+                 <button onClick={() => {
+                    if (gold >= item.price) { buyItem(id); alert(`［購入］獲得 ${item.name}。`); }
+                    else alert('［拒絕］資金不足。');
+                 }} className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-700 rounded font-bold text-xs shrink-0 tracking-widest shadow transition-colors">
+                   <span className="text-yellow-600 font-mono">${item.price}</span> ［購買］
+                 </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
