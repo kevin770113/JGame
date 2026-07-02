@@ -7,7 +7,7 @@ import DispatchView from './views/DispatchView';
 import MapView from './views/MapView';
 import InteractionView from './views/InteractionView';
 import ArenaView from './views/ArenaView';
-import AbyssView from './views/AbyssView'; // ★ 引入深淵塔
+import AbyssView from './views/AbyssView'; 
 import LoginView from './views/LoginView';
 import QuestPanel from './components/QuestPanel';
 import { useGameStore } from './store/useGameStore';
@@ -25,6 +25,10 @@ function App() {
   const slaves = useGameStore((state) => state.slaves);
   const triggerBackgroundMarketRefresh = useGameStore((state) => state.triggerBackgroundMarketRefresh);
   const loadProfileFromCloud = useGameStore((state) => state.loadProfileFromCloud);
+
+  // ★ 引入全局視窗狀態
+  const globalModal = useGameStore((state) => state.globalModal);
+  const setGlobalModal = useGameStore((state) => state.setGlobalModal);
 
   const [activeSlave, setActiveSlave] = useState<Slave | null>(null);
   const [session, setSession] = useState<any>(null);
@@ -84,7 +88,6 @@ function App() {
                 <button onClick={() => navigate('Town', 'Tavern')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"><span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［前往深淵酒館］</span><span className="text-xs text-gray-500 font-normal">查閱地區懸賞與傳說委託</span></button>
                 <button onClick={() => navigate('Town', 'Arena')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"><span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［前往角鬥場］</span><span className="text-xs text-gray-500 font-normal">參與血腥競技與死鬥</span></button>
                 
-                {/* ★ 僅在皇城開放深淵之塔 */}
                 {location === 'Capital' && (
                   <button onClick={() => navigate('Town', 'Abyss')} className="py-4 bg-purple-900/20 hover:bg-purple-900/40 border border-purple-800/50 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group mt-1">
                      <span className="flex items-center gap-2 text-purple-400 group-hover:text-purple-300 tracking-widest">［挑戰深淵之塔］</span>
@@ -99,7 +102,7 @@ function App() {
         case 'Market': return <MarketView />;
         case 'Tavern': return <DispatchView />;
         case 'Arena': return <ArenaView />; 
-        case 'Abyss': return <AbyssView />; // ★ 加入深淵路由
+        case 'Abyss': return <AbyssView />; 
         default: return <BaseView />;
       }
     }
@@ -165,6 +168,39 @@ function App() {
                   <div className="flex flex-col gap-0.5"><div className="flex justify-between text-3xs text-gray-500 font-bold"><span>反抗</span><span className="font-mono">{activeSlave.conditionStats.rebellion}/100</span></div><div className="w-full h-1.5 bg-gray-950 rounded overflow-hidden border border-gray-800"><div className="bg-blood-red h-full" style={{ width: `${activeSlave.conditionStats.rebellion}%` }}></div></div></div>
               </div>
               <div className="text-xs text-gray-400 italic bg-gray-950 p-3 rounded border-l-2 border-blood-red bg-gray-950/40 leading-relaxed overflow-y-auto max-h-32">［檔案紀錄］{activeSlave.backgroundStory}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ★ 深淵風格全局彈出視窗 */}
+      {globalModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-fade-in">
+          <div className="bg-gray-900 border-t-2 border-blood-red rounded-lg p-5 max-w-sm w-full shadow-2xl border-x border-b border-gray-700 relative">
+            <h3 className={`text-lg font-bold tracking-widest flex items-center gap-2 mb-2 ${globalModal.title.includes('警告') || globalModal.title.includes('錯誤') || globalModal.title.includes('拒絕') ? 'text-red-500' : 'text-yellow-500'}`}>
+              {globalModal.title}
+            </h3>
+            <div className="text-sm text-gray-300 leading-relaxed mb-6 bg-gray-950 p-4 rounded border border-gray-800 whitespace-pre-wrap shadow-inner">
+              {globalModal.message}
+            </div>
+            <div className="flex gap-3">
+              {globalModal.isConfirm && (
+                <button 
+                  onClick={() => setGlobalModal(null)}
+                  className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-400 font-bold rounded border border-gray-600 transition-colors text-sm tracking-widest shadow"
+                >
+                  ［取消］
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  if (globalModal.action) globalModal.action();
+                  setGlobalModal(null);
+                }}
+                className={`flex-1 py-2.5 font-bold rounded border transition-colors text-sm tracking-widest shadow ${globalModal.isConfirm ? 'bg-blood-red/80 hover:bg-blood-red text-white border-red-900' : 'bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-500'}`}
+              >
+                {globalModal.isConfirm ? '［確認執行］' : '［確認］'}
+              </button>
             </div>
           </div>
         </div>
