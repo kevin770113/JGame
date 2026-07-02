@@ -13,6 +13,7 @@ import QuestPanel from './components/QuestPanel';
 import { useGameStore } from './store/useGameStore';
 import { supabase } from './services/supabaseClient';
 import { Slave } from './types';
+import { ITEMS_DATA } from './utils/gameData'; // ★ 引入裝備靜態資料庫
 
 const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 
@@ -26,7 +27,6 @@ function App() {
   const triggerBackgroundMarketRefresh = useGameStore((state) => state.triggerBackgroundMarketRefresh);
   const loadProfileFromCloud = useGameStore((state) => state.loadProfileFromCloud);
 
-  // ★ 引入全局視窗狀態
   const globalModal = useGameStore((state) => state.globalModal);
   const setGlobalModal = useGameStore((state) => state.setGlobalModal);
 
@@ -162,6 +162,30 @@ function App() {
                 <div className="flex flex-col gap-1.5 border-r border-gray-800 pr-3"><div className="text-xs text-gray-500 font-bold border-b border-gray-800 pb-1 mb-1 tracking-widest">［天賦屬性］</div><div className="flex justify-between"><span className="text-gray-500">武力:</span> <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.combat}</span></div><div className="flex justify-between"><span className="text-gray-500">體質:</span> <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.endurance}</span></div><div className="flex justify-between"><span className="text-gray-500">智力:</span> <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.intelligence}</span></div><div className="flex justify-between"><span className="text-gray-500">服從:</span> <span className={activeSlave.primaryStats.obedience < 20 ? 'text-red-400 font-bold' : 'text-gray-200 font-mono'}>{activeSlave.primaryStats.obedience}</span></div></div>
                 <div className="flex flex-col gap-1.5 pl-1"><div className="text-xs text-gray-500 font-bold border-b border-gray-800 pb-1 mb-1 tracking-widest">［掌握技能］</div><div className="flex justify-between"><span className="text-gray-500">戰鬥:</span> <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.combat || 1}</span></div><div className="flex justify-between"><span className="text-gray-500">管家:</span> <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.housework || 1}</span></div><div className="flex justify-between"><span className="text-gray-500">生存:</span> <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.survival || 1}</span></div></div>
               </div>
+              
+              {/* ★ 新增：血脈被動與當前武裝面板 */}
+              <div className="flex flex-col gap-2 bg-gray-950 p-3 rounded border border-gray-800 text-sm shadow-inner">
+                <div className="flex flex-col gap-1 border-b border-gray-800 pb-2">
+                  <span className="text-xs text-gray-500 font-bold tracking-widest">［血脈被動］</span>
+                  <span className="text-yellow-500 text-xs leading-relaxed font-bold">
+                    {activeSlave.race === '人類' && '【絕境意志】血量低於 40% 時爆發，武力提升 25%。'}
+                    {activeSlave.race === '精靈' && '【風之眷顧】速度提升 20%，若取得先手則首擊傷害增加 15%。'}
+                    {activeSlave.race === '半獸人' && '【狂熱戰血】武力提升 15%，防禦降低 10%。受擊疊加印記，最高增傷 30%。'}
+                    {activeSlave.race === '矮人' && '【堅岩體魄】最大血量提升 20%，防禦提升 15%。受擊固定減免 5 點傷害。'}
+                    {activeSlave.race === '龍族' && '【真龍威壓】武力、防禦、速度全面提升 10%，自帶 20% 最終傷害減免。'}
+                    {activeSlave.race === '不死族' && '【枯骨不朽】每次攻擊造成傷害時，將吸收 15% 轉化為自身生命力。'}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1 pt-1">
+                  <span className="text-xs text-gray-500 font-bold tracking-widest">［當前武裝］</span>
+                  <span className="text-blue-400 text-xs font-bold">
+                    {activeSlave.equipment?.weaponId && ITEMS_DATA[activeSlave.equipment.weaponId] 
+                      ? `【${ITEMS_DATA[activeSlave.equipment.weaponId].name}】 ${ITEMS_DATA[activeSlave.equipment.weaponId].desc}`
+                      : '［無配戴武器］'}
+                  </span>
+                </div>
+              </div>
+
               <div className="flex flex-col gap-2">
                   <div className="flex flex-col gap-0.5"><div className="flex justify-between text-3xs text-gray-500 font-bold"><span>體力</span><span className="font-mono">{activeSlave.conditionStats.stamina}/100</span></div><div className="w-full h-1.5 bg-gray-950 rounded overflow-hidden border border-gray-800"><div className="bg-green-600 h-full" style={{ width: `${activeSlave.conditionStats.stamina}%` }}></div></div></div>
                   <div className="flex flex-col gap-0.5"><div className="flex justify-between text-3xs text-gray-500 font-bold"><span>壓力</span><span className="font-mono">{activeSlave.conditionStats.stress}/100</span></div><div className="w-full h-1.5 bg-gray-950 rounded overflow-hidden border border-gray-800"><div className="bg-yellow-600 h-full" style={{ width: `${activeSlave.conditionStats.stress}%` }}></div></div></div>
@@ -173,7 +197,6 @@ function App() {
         </div>
       )}
 
-      {/* ★ 深淵風格全局彈出視窗 */}
       {globalModal && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-fade-in">
           <div className="bg-gray-900 border-t-2 border-blood-red rounded-lg p-5 max-w-sm w-full shadow-2xl border-x border-b border-gray-700 relative">
