@@ -33,6 +33,7 @@ export interface GameStore {
   activeDispatches: ActiveDispatch[];
 
   syncProfileToCloud: () => Promise<void>;
+  loadProfileFromCloud: () => Promise<void>;
   consumeIdentity: () => Promise<{name: string, story: string}>;
   
   addGold: (amount: number) => void;
@@ -95,14 +96,17 @@ export const useGameStore = create<GameStore>()(
       player: { 
         day: 1, timePhase: '早上', gold: 99999, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 9999, actionPoints: 50, lastApUpdateTime: Date.now(),
         deviceId: '', unlockedFacilities: [], 
-        usedIdentityIds: [] 
+        usedIdentityIds: [],
+        inventory: {}, quests: {}, abyssFloor: 1 // ★ V2.0 擴充設定
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
 
+      // ★ V2.0 完美雲端同步 (包含奴隸、物品等所有進度打包進 save_data)
       syncProfileToCloud: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        const p = get().player;
+        const state = get();
+        const p = state.player;
         await supabase.from('profiles').upsert({
           id: session.user.id,
           day: p.day,
@@ -110,11 +114,48 @@ export const useGameStore = create<GameStore>()(
           food: p.food,
           action_points: p.actionPoints,
           prestige: p.prestige,
-          unlocked_facilities: p.unlockedFacilities
+          unlocked_facilities: p.unlockedFacilities,
+          save_data: {
+             usedIdentityIds: p.usedIdentityIds,
+             inventory: p.inventory,
+             quests: p.quests,
+             abyssFloor: p.abyssFloor,
+             slaves: state.slaves,
+             marketSlaves: state.marketSlaves,
+             activeDispatches: state.activeDispatches
+          }
         });
       },
 
-      // ★ 終極優化版：前端精準過濾，徹底消滅 SQL 語法地雷與無限轉圈
+      // ★ V2.0 從雲端強制下載並覆蓋本地 (防止換手機進度被洗白)
+      loadProfileFromCloud: async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        if (error || !data) return;
+
+        const sData = data.save_data || {};
+        
+        set((state) => ({
+          player: {
+            ...state.player,
+            day: data.day ?? state.player.day,
+            gold: data.gold ?? state.player.gold,
+            food: data.food ?? state.player.food,
+            actionPoints: data.action_points ?? state.player.actionPoints,
+            prestige: data.prestige ?? state.player.prestige,
+            unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities,
+            usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds,
+            inventory: sData.inventory || state.player.inventory,
+            quests: sData.quests || state.player.quests,
+            abyssFloor: sData.abyssFloor || state.player.abyssFloor,
+          },
+          slaves: sData.slaves || state.slaves,
+          marketSlaves: sData.marketSlaves || state.marketSlaves,
+          activeDispatches: sData.activeDispatches || state.activeDispatches
+        }));
+      },
+
       consumeIdentity: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return { name: "無名幽影", story: "未與深淵建立正式連結的幻影。" };
@@ -122,15 +163,12 @@ export const useGameStore = create<GameStore>()(
         set({ isPoolGenerating: true });
         try {
           const usedIds = get().player.usedIdentityIds;
-          
-          // 1. 直接打撈前 50 筆資料，交給前端 JS 判斷是否用過（最穩定安全）
           const { data: poolData, error: poolError } = await supabase.from('global_identities').select('*').limit(50);
           if (poolError) throw poolError;
 
           const availableIdentities = (poolData || []).filter(d => !usedIds.includes(d.id));
           let identity = availableIdentities.length > 0 ? availableIdentities[0] : null;
 
-          // 2. 真的沒貨了，才呼叫 AI
           if (!identity) {
              const newAiData = await fetchIdentityBatch(); 
              const { data: insertedData, error: insertError } = await supabase.from('global_identities').insert(newAiData).select();
@@ -142,9 +180,8 @@ export const useGameStore = create<GameStore>()(
 
           if (!identity) throw new Error('AI 與資料庫雙重潰堤');
 
-          // 3. 雲端記錄與本地狀態同步
           const { error: logError } = await supabase.from('user_identity_logs').insert({ user_id: session.user.id, identity_id: identity.id });
-          if (logError) console.warn("［寫入紀錄失敗］", logError); // 紀錄失敗不影響打撈結果
+          if (logError) console.warn("［寫入紀錄失敗］", logError); 
 
           const newUsedIds = [...get().player.usedIdentityIds, identity.id];
           set(s => ({ player: { ...s.player, usedIdentityIds: newUsedIds } }));
@@ -353,6 +390,6 @@ export const useGameStore = create<GameStore>()(
         return { logs, isWin };
       }
     }),
-    { name: 'dark-fantasy-save-v12', storage: createJSONStorage(() => storage) }
+    { name: 'dark-fantasy-save-v13', storage: createJSONStorage(() => storage) }
   )
 );
