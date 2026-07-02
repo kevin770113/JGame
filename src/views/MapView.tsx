@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { GAME_CONSTANTS } from '../utils/constants';
 import { Location } from '../types';
@@ -44,8 +44,14 @@ export default function MapView() {
   const deductGold = useGameStore((state) => state.deductGold);
   const changeLocation = useGameStore((state) => state.changeLocation);
   const navigate = useGameStore((state) => state.navigate);
+  const triggerQuest = useGameStore((state) => state.triggerQuest);
 
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // ★ 玩家第一次進入地圖，觸發「踏入灰色地帶」任務
+  useEffect(() => {
+    triggerQuest('q_enter_hub');
+  }, [triggerQuest]);
 
   const handleRelocate = (targetLocation: LocationInfo) => {
     if (currentLocation === targetLocation.id) {
@@ -78,11 +84,7 @@ export default function MapView() {
             <p className="text-2xs text-gray-500">當前威望: <span className="text-blue-400 font-mono font-bold">{prestige}</span></p>
           </div>
         </div>
-        {/* ★ 加入 whitespace-nowrap shrink-0 確保按鈕不被擠壓斷行 */}
-        <button 
-          onClick={() => navigate('Home', 'Main')}
-          className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
-        >
+        <button onClick={() => navigate('Home', 'Main')} className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest">
           ［返回大廳］
         </button>
       </div>
@@ -92,9 +94,7 @@ export default function MapView() {
       </p>
 
       {sysMessage && (
-        <div className={`p-3 border rounded text-xs leading-relaxed tracking-wide ${
-          sysMessage.type === 'success' ? 'bg-gray-900 border-green-800 text-green-500' : 'bg-gray-900 border-red-900 text-red-500'
-        }`}>
+        <div className={`p-3 border rounded text-xs leading-relaxed tracking-wide ${ sysMessage.type === 'success' ? 'bg-gray-900 border-green-800 text-green-500' : 'bg-gray-900 border-red-900 text-red-500' }`}>
           {sysMessage.text}
         </div>
       )}
@@ -107,12 +107,7 @@ export default function MapView() {
           const canRelocate = meetsPrestige && canAfford;
 
           return (
-            <div 
-              key={loc.id} 
-              className={`p-4 rounded-lg border flex flex-col gap-3 shadow-md relative overflow-hidden ${
-                isCurrent ? 'bg-gray-800 border-blood-red' : 'bg-gray-900 border-gray-700'
-              }`}
-            >
+            <div key={loc.id} className={`p-4 rounded-lg border flex flex-col gap-3 shadow-md relative overflow-hidden ${ isCurrent ? 'bg-gray-800 border-blood-red' : 'bg-gray-900 border-gray-700' }`}>
               <div className="flex justify-between items-start z-10">
                 <div>
                   <h3 className={`text-base font-bold flex items-center gap-2 tracking-widest ${isCurrent ? 'text-blood-red' : 'text-gray-200'}`}>
@@ -130,22 +125,10 @@ export default function MapView() {
               {!isCurrent && (
                 <div className="flex justify-between items-center mt-1 z-10 border-t border-gray-800 pt-3">
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-400 font-bold tracking-widest">
-                      疏通開銷: <strong className={canAfford ? 'text-yellow-500 font-mono' : 'text-red-500 font-mono'}>{loc.cost}</strong>
-                    </span>
-                    <span className="text-xs text-gray-400 font-bold tracking-widest">
-                      威望需求: <strong className={meetsPrestige ? 'text-blue-400 font-mono' : 'text-red-500 font-mono'}>{loc.reqPrestige}</strong>
-                    </span>
+                    <span className="text-xs text-gray-400 font-bold tracking-widest">疏通開銷: <strong className={canAfford ? 'text-yellow-500 font-mono' : 'text-red-500 font-mono'}>{loc.cost}</strong></span>
+                    <span className="text-xs text-gray-400 font-bold tracking-widest">威望需求: <strong className={meetsPrestige ? 'text-blue-400 font-mono' : 'text-red-500 font-mono'}>{loc.reqPrestige}</strong></span>
                   </div>
-                  <button
-                    onClick={() => handleRelocate(loc)}
-                    disabled={!canRelocate}
-                    className={`px-4 py-2 rounded font-bold text-xs transition-colors tracking-widest ${
-                      canRelocate 
-                        ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-500 hover:border-gray-400' 
-                        : 'bg-gray-900 text-gray-700 border border-gray-800 cursor-not-allowed'
-                    }`}
-                  >
+                  <button onClick={() => handleRelocate(loc)} disabled={!canRelocate} className={`px-4 py-2 rounded font-bold text-xs transition-colors tracking-widest ${ canRelocate ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-500 hover:border-gray-400' : 'bg-gray-900 text-gray-700 border border-gray-800 cursor-not-allowed' }`}>
                     {canRelocate ? '［下令拔營］' : '［條件不足］'}
                   </button>
                 </div>
