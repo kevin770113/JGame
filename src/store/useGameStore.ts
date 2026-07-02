@@ -5,7 +5,7 @@ import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, Arena
 import { GAME_CONSTANTS } from '../utils/constants';
 import { fetchIdentityBatch } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
-import { ITEMS_DATA, HEROES_DATA } from '../utils/gameData';
+import { ITEMS_DATA, HEROES_DATA, QUESTS_DATA } from '../utils/gameData';
 
 export interface Mission {
   id: string; title: string; rank: '黃金' | '紫色' | '蔚藍' | '翠綠';
@@ -65,7 +65,7 @@ export interface GameStore {
   activeDispatches: ActiveDispatch[];
   activeEvent: DynamicEvent | null; 
   globalModal: GlobalModal | null; 
-  activeWindow: 'quest' | 'roster' | null; // ★ V2.2 全局互斥視窗鎖
+  activeWindow: 'quest' | 'roster' | null; 
 
   setActiveWindow: (win: 'quest' | 'roster' | null) => void;
   setGlobalModal: (modal: GlobalModal | null) => void;
@@ -123,7 +123,9 @@ const generateBaseMarketSlave = (idSuffix: string, identity: {name: string, stor
     skills: { combat: 1, housework: 1, survival: 1 },
     primaryStats: { combat: Math.floor(Math.random() * 60) + 20, endurance: Math.floor(Math.random() * 60) + 20, intelligence: Math.floor(Math.random() * 60) + 20, obedience: Math.floor(Math.random() * 40) + 10 },
     conditionStats: { stamina: 100, stress: 0, rebellion: Math.floor(Math.random() * 20) },
-    traits: [], backgroundStory: identity.story
+    traits: [], backgroundStory: identity.story,
+    combatRecord: { wins: 0, losses: 0 },
+    isInjured: false
   };
 };
 
@@ -150,34 +152,45 @@ export const useGameStore = create<GameStore>()(
       setActiveWindow: (win) => set({ activeWindow: win }),
       setGlobalModal: (modal) => set({ globalModal: modal }),
 
+      // ★ V2.3 被動觸發任務時，強制跳出專屬劇情對話彈窗
       triggerQuest: (questId) => set(state => {
         if (!state.player.quests[questId]) {
            const newQuests = { ...state.player.quests, [questId]: 'active' as const };
-           setTimeout(() => get().syncProfileToCloud(), 100); 
+           const qData = QUESTS_DATA[questId as keyof typeof QUESTS_DATA];
+           setTimeout(() => {
+             get().syncProfileToCloud();
+             if (qData) {
+               get().setGlobalModal({
+                 title: '［⚡ 發現新劇情任務解鎖］',
+                 message: `${qData.title}\n\n任務目標：${qData.description}`,
+                 isConfirm: false
+               });
+             }
+           }, 100); 
            return { player: { ...state.player, quests: newQuests } };
         }
         return state;
       }),
 
-      // ★ V2.2 任務具名明確化提示
+      // ★ V2.3 拔除引導型任務威望，改為純資金獎勵與高沉浸提示
       checkQuestCompletion: () => {
-         const state = get(); let updated = false; const newQuests = { ...state.player.quests }; let title = ''; let msg = ''; let addG = 0; let addP = 0;
+         const state = get(); let updated = false; const newQuests = { ...state.player.quests }; let title = ''; let msg = ''; let addG = 0;
          
          if (newQuests['q_first_blood'] === 'active' && state.slaves.length > 0) { 
-            newQuests['q_first_blood'] = 'completed'; addG = 2000; addP = 50; updated = true;
-            title = '［任務達成］【深淵的初啼】'; msg = `引進了第一名試驗體，商會基礎規模確立。\n\n獲得報酬：\n資金 +2,000\n威望 +50`;
+            newQuests['q_first_blood'] = 'completed'; addG = 2000; updated = true;
+            title = '［任務達成］【深淵的初啼】'; msg = `成功簽署第一份血脈契約！商會基礎雛形已然確立。\n\n獲得報酬：\n資金 +2,000`;
          }
          else if (newQuests['q_first_fusion'] === 'active' && state.slaves.some(s => s.parents)) { 
-            newQuests['q_first_fusion'] = 'completed'; addG = 0; addP = 100; updated = true;
-            title = '［任務達成］【禁忌的鍊金術】'; msg = `成功在密室融合出全新的生命血脈！\n\n獲得報酬：\n威望 +100`;
+            newQuests['q_first_fusion'] = 'completed'; addG = 1500; updated = true;
+            title = '［任務達成］【禁忌的鍊金術】'; msg = `成功在血統密室中編織融合出全新的生命血脈！\n\n獲得報酬：\n資金 +1,500`;
          }
          else if (newQuests['q_enter_hub'] === 'active' && (state.player.location === 'NeutralHub' || state.player.location === 'Capital')) { 
-            newQuests['q_enter_hub'] = 'completed'; addG = 5000; addP = 200; updated = true;
-            title = '［任務達成］【踏入灰色地帶】'; msg = `成功突破邊境，將據點正式喬遷擴展！\n\n獲得報酬：\n資金 +5,000\n威望 +200`;
+            newQuests['q_enter_hub'] = 'completed'; addG = 5000; updated = true;
+            title = '［任務達成］【踏入灰色地帶】'; msg = `成功突破混亂前線，向核心城區拔營挺進！\n\n獲得報酬：\n資金 +5,000`;
          }
 
          if (updated) {
-            set({ player: { ...state.player, quests: newQuests, gold: state.player.gold + addG, prestige: state.player.prestige + addP } });
+            set({ player: { ...state.player, quests: newQuests, gold: state.player.gold + addG } });
             get().setGlobalModal({ title, message: msg, isConfirm: false });
             get().syncProfileToCloud();
          }
@@ -213,10 +226,15 @@ export const useGameStore = create<GameStore>()(
         return state;
       }),
 
+      // ★ V2.3 負傷狀態下，恢復藥劑效果強行砍半衰減
       useItem: (itemId, slaveId) => set(state => {
         const item = ITEMS_DATA[itemId]; const slave = state.slaves.find(s => s.id === slaveId); const qty = state.player.inventory[itemId] || 0;
         if (qty > 0 && slave && item.type === 'potion') {
-            const newStamina = Math.min(100, slave.conditionStats.stamina + (item.effect.stamina || 0));
+            let healAmount = item.effect.stamina || 0;
+            if (slave.isInjured) {
+                healAmount = Math.floor(healAmount * 0.5); 
+            }
+            const newStamina = Math.min(100, slave.conditionStats.stamina + healAmount);
             const newInv = { ...state.player.inventory, [itemId]: qty - 1 }; if (newInv[itemId] <= 0) delete newInv[itemId];
             return { player: { ...state.player, inventory: newInv }, slaves: state.slaves.map(s => s.id === slaveId ? { ...s, conditionStats: { ...s.conditionStats, stamina: newStamina } } : s) };
         }
@@ -330,11 +348,22 @@ export const useGameStore = create<GameStore>()(
         set({ player: { ...player, day: nextDay, timePhase: nextPhase, roomDirtiness: newDirtiness, actionPoints: newAp, lastApUpdateTime: newApUpdateTime, shopStock: newShopStock } });
 
         const newDispatches: ActiveDispatch[] = []; let earnedGold = 0; let earnedPrestige = 0;
+        let dispatchLogs: string[] = [];
+
         activeDispatches.forEach(dispatch => {
           dispatch.remainingPhases -= 1;
           if (dispatch.remainingPhases <= 0) {
-            earnedGold += dispatch.mission.reward; const slave = get().slaves.find(s => s.id === dispatch.slaveId);
+            let baseReward = dispatch.mission.reward;
+            const slave = get().slaves.find(s => s.id === dispatch.slaveId);
             if (slave) {
+               // ★ V2.3 智力影響外派「大成功 1.5 倍收益」判定
+               const successChance = slave.primaryStats.intelligence / 200;
+               if (Math.random() < successChance) {
+                  baseReward = Math.floor(baseReward * 1.5);
+                  dispatchLogs.push(`［⚡ 外派大成功］${slave.name} 憑藉卓越智力完美規避風險，帶回了額外 1.5 倍收益！`);
+               }
+               earnedGold += baseReward;
+
                let updatedSkills = { ...slave.skills };
                if (dispatch.mission.rank === '紫色') {
                  if (Math.random() > 0.5) earnedPrestige += Math.floor(Math.random() * 20) + 10;
@@ -352,15 +381,63 @@ export const useGameStore = create<GameStore>()(
           const foodNeeded = slaves.length * GAME_CONSTANTS.FOOD_CONSUMPTION_PER_SLAVE; let isStarving = false;
           if (get().player.food >= foodNeeded) get().deductFood(foodNeeded); else { get().deductFood(get().player.food); isStarving = true; }
 
+          let desertedNames: string[] = [];
+          let totalStolenGold = 0;
+          let totalPrestigeLoss = 0;
+
           slaves.forEach(slave => {
+            // ★ V2.3 滿血自癒邏輯：體力達到 100 自動清除負傷標記
+            let currentIsInjured = slave.isInjured;
+            if (currentIsInjured && slave.conditionStats.stamina >= 100) {
+                currentIsInjured = false;
+            }
+
             let newStamina = slave.conditionStats.stamina; let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
             if (isStarving) { newStress = Math.min(100, newStress + 20); newRebellion = Math.min(100, newRebellion + 10); } else {
               if (slave.activityStatus === '閒置') { newStamina = Math.min(100, newStamina + (newDirtiness > 50 ? 10 : 30)); if (overpopulation === 0) newStress = Math.max(0, newStress - 5); }
-              if (newDirtiness > 80) { newStress = Math.min(100, newStress + 20); newRebellion = Math.min(100, newRebellion + 15); }
-              if (overpopulation > 0) { newStress = Math.min(100, newStress + (overpopulation * 5)); newRebellion = Math.min(100, newRebellion + (overpopulation * 3)); }
+              if (newDirtiness > 80) { newStress = Math.min(100, newStress + 20); 
+                // ★ V2.3 服從度可大幅減緩日常反抗值增長的速度
+                const rebGain = Math.max(1, 15 - Math.floor(slave.primaryStats.obedience / 10));
+                newRebellion = Math.min(100, newRebellion + rebGain); 
+              }
+              if (overpopulation > 0) { newStress = Math.min(100, newStress + (overpopulation * 5)); 
+                const rebGain = Math.max(1, 3 - Math.floor(slave.primaryStats.obedience / 20));
+                newRebellion = Math.min(100, newRebellion + rebGain); 
+              }
             }
-            get().updateSlave(slave.id, { conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
+
+            // ★ V2.3 深夜叛逃判定邏輯（洗劫金錢與扣除威望）
+            if (newRebellion >= 100) {
+               desertedNames.push(slave.name);
+               totalStolenGold += Math.floor(Math.random() * 1500) + 500;
+               totalPrestigeLoss += Math.floor(Math.random() * 20) + 10;
+            } else {
+               get().updateSlave(slave.id, { isInjured: currentIsInjured, conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
+            }
           });
+
+          // 執行叛逃清除與全域大彈窗警告
+          if (desertedNames.length > 0) {
+             const actualStolen = Math.min(get().player.gold, totalStolenGold);
+             const actualPrestigeLoss = Math.min(get().player.prestige, totalPrestigeLoss);
+             set(s => ({
+                slaves: s.slaves.filter(sl => !desertedNames.includes(sl.name)),
+                player: { ...s.player, gold: Math.max(0, s.player.gold - actualStolen), prestige: Math.max(0, s.player.prestige - actualPrestigeLoss) }
+             }));
+             setTimeout(() => {
+                get().setGlobalModal({
+                   title: '［⚠️ 據點突發事件：試驗體叛逃］',
+                   message: `因反抗心高漲至極限，以下成員已於深夜趁亂切斷枷鎖逃離據點：\n\n【${desertedNames.join('】、【')}】\n\n逃跑時他們洗劫了商會庫房，共計損失資金：$${actualStolen}，商會威望降低了 ${actualPrestigeLoss} 點。`,
+                   isConfirm: false
+                });
+             }, 200);
+          }
+
+          if (dispatchLogs.length > 0 && desertedNames.length === 0) {
+             setTimeout(() => {
+                get().setGlobalModal({ title: '［外派成果回報］', message: dispatchLogs.join('\n'), isConfirm: false });
+             }, 250);
+          }
 
           let nextEvent = null;
           if (get().player.location === 'NeutralHub' && Math.random() < 0.4) { nextEvent = { id: 'evt1', type: 'merchant', desc: '【地頭蛇老張】急需一名服從度達 60 的女性半獸人。', reqRace: '半獸人', reqGender: 'Female', reqStat: { key: 'obedience', val: 60 }, reward: { gold: 12000, prestige: 20, item: 'potion_heal_small' } } as const; } 
@@ -413,33 +490,50 @@ export const useGameStore = create<GameStore>()(
           };
           const npcAction = () => {
             if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); 
-            // ★ 矮人受擊時獨立播報減傷
-            if (slave.race === '矮人') { 
-              dmg = Math.max(1, dmg - 5); 
-              logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill' });
-            }
+            if (slave.race === '矮人') { dmg = Math.max(1, dmg - 5); logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill' }); }
             dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; logs.push({ round, message: `${npc.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
-            // ★ 半獸人受擊時獨立播報憤怒疊加
-            if (slave.race === '半獸人') {
-              orcStack++;
-              logs.push({ round, message: `［天賦狂暴］${slave.name} 的【狂熱戰血】受到痛覺刺激，怒氣加劇（當前層數: ${orcStack}，額外增傷: +${Math.min(30, orcStack * 3)}%）！`, type: 'skill' });
-            }
+            if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦狂暴］${slave.name} 的【狂熱戰血】受到痛覺刺激，怒氣加劇（當前層數: ${orcStack}，額外增傷: +${Math.min(30, orcStack * 3)}%）！`, type: 'skill' }); }
           };
           if (isSlaveFirst) { slaveAction(); npcAction(); } else { npcAction(); slaveAction(); }
           round++;
         }
 
-        const isWin = sHp > 0; logs.push({ round: round - 1, message: isWin ? `［結算］${slave.name} 屹立到了最後，取得勝利。` : `［結算］${slave.name} 不支倒地，戰敗被抬出賽場。`, type: 'system' });
-        set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
-        if (isWin) { get().addGold(npc.rewardGold); if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige); }
+        // ★ V2.3 戰勝/戰敗與淨勝場屬性加成計算 (排除服從)
+        const isWin = sHp > 0;
+        let newWins = slave.combatRecord?.wins || 0;
+        let newLosses = slave.combatRecord?.losses || 0;
+        let isInjuredNow = slave.isInjured || false;
+        let newStamina = Math.max(0, slave.conditionStats.stamina - 20);
 
-        let newStamina = Math.max(0, slave.conditionStats.stamina - 20); let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
+        if (isWin) {
+          newWins++;
+          logs.push({ round: round - 1, message: `［結算］${slave.name} 屹立到了最後，取得勝利。`, type: 'system' });
+          get().addGold(npc.rewardGold); if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige);
+
+          const netWins = newWins - newLosses;
+          if (netWins > 0 && netWins % 5 === 0) {
+            const pool = ['combat', 'endurance', 'intelligence'] as const;
+            const picked = pool[Math.floor(Math.random() * pool.length)];
+            slave.primaryStats[picked] = Math.min(100, slave.primaryStats[picked] + 1);
+            const nameMap = { combat: '武力', endurance: '體質', intelligence: '智力' };
+            logs.push({ round: round - 1, message: `⚡ 歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill' });
+          }
+        } else {
+          newLosses++;
+          newStamina = 0; 
+          isInjuredNow = true; 
+          logs.push({ round: round - 1, message: `［結算］${slave.name} 遭受重創倒地，體力徹底耗盡並陷入【負傷】狀態！`, type: 'system' });
+        }
+
+        set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
+        let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
         if (slave.race !== '不死族') {
           newStress = Math.min(100, newStress + (isWin ? 5 : 15)); newRebellion = Math.min(100, newRebellion + (isWin ? 2 : 10));
           if (slave.race === '人類' && isWin) newStress = Math.max(0, newStress - (round * 2));
           if (slave.race === '龍族' && newStamina < 30) newRebellion = Math.min(100, newRebellion + 20);
         }
-        get().updateSlave(slave.id, { conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
+
+        get().updateSlave(slave.id, { combatRecord: { wins: newWins, losses: newLosses }, isInjured: isInjuredNow, conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion }, primaryStats: slave.primaryStats });
         get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
       },
 
@@ -488,42 +582,54 @@ export const useGameStore = create<GameStore>()(
           };
           const npcAction = () => {
             if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); 
-            // ★ 矮人受擊時獨立播報減傷
-            if (slave.race === '矮人') { 
-              dmg = Math.max(1, dmg - 5); 
-              logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill' });
-            }
-            dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; logs.push({ round, message: `${enemy.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
-            // ★ 半獸人受擊時獨立播報憤怒加成
-            if (slave.race === '半獸人') {
-              orcStack++;
-              logs.push({ round, message: `［天賦層數］${slave.name} 承受攻擊，痛苦激發狂暴，傷害額外提升！`, type: 'skill' });
-            }
+            if (slave.race === '矮人') { dmg = Math.max(1, dmg - 5); logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill' }); }
+            dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; logs.push({ round, message: `${enemy.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害.`, type: 'damage' });
+            if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦層數］${slave.name} 承受攻擊，痛苦激發狂暴，傷害額外提升！`, type: 'skill' }); }
           };
           if (isSlaveFirst) { slaveAction(); npcAction(); } else { npcAction(); slaveAction(); }
           round++;
         }
 
+        // ★ V2.3 深淵戰鬥歷練成長與負傷標記
         const isWin = sHp > 0;
-        logs.push({ round: round - 1, message: isWin ? `［結算］${slave.name} 擊潰了深淵的阻礙，成功晉級！` : `［結算］${slave.name} 不支倒地，被深淵無情吞噬。`, type: 'system' });
-        
-        set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
+        let newWins = slave.combatRecord?.wins || 0;
+        let newLosses = slave.combatRecord?.losses || 0;
+        let isInjuredNow = slave.isInjured || false;
+        let newStamina = Math.max(0, slave.conditionStats.stamina - 30);
+
         if (isWin) {
+          newWins++;
+          logs.push({ round: round - 1, message: `［結算］${slave.name} 擊潰了深淵的阻礙，成功晉級！`, type: 'system' });
           get().addGold(enemy.rewardGold); if (enemy.rewardPrestige > 0) get().addPrestige(enemy.rewardPrestige);
           set((s) => ({ player: { ...s.player, abyssFloor: s.player.abyssFloor + 1 } }));
+
+          const netWins = newWins - newLosses;
+          if (netWins > 0 && netWins % 5 === 0) {
+            const pool = ['combat', 'endurance', 'intelligence'] as const;
+            const picked = pool[Math.floor(Math.random() * pool.length)];
+            slave.primaryStats[picked] = Math.min(100, slave.primaryStats[picked] + 1);
+            const nameMap = { combat: '武力', endurance: '體質', intelligence: '智力' };
+            logs.push({ round: round - 1, message: `⚡ 歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill' });
+          }
+        } else {
+          newLosses++;
+          newStamina = 0; 
+          isInjuredNow = true; 
+          logs.push({ round: round - 1, message: `［結算］${slave.name} 不支倒地，被深淵無情吞噬並陷入【負傷】狀態！`, type: 'system' });
         }
 
-        let newStamina = Math.max(0, slave.conditionStats.stamina - 30);
+        set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
         let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
         if (slave.race !== '不死族') {
           newStress = Math.min(100, newStress + (isWin ? 10 : 25)); newRebellion = Math.min(100, newRebellion + (isWin ? 5 : 15));
           if (slave.race === '人類' && isWin) newStress = Math.max(0, newStress - (round * 2));
           if (slave.race === '龍族' && newStamina < 30) newRebellion = Math.min(100, newRebellion + 20);
         }
-        get().updateSlave(slave.id, { conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
+
+        get().updateSlave(slave.id, { combatRecord: { wins: newWins, losses: newLosses }, isInjured: isInjuredNow, conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion }, primaryStats: slave.primaryStats });
         get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
       }
     }),
-    { name: 'dark-fantasy-save-v17', storage: createJSONStorage(() => storage) }
+    { name: 'dark-fantasy-save-v18', storage: createJSONStorage(() => storage) }
   )
 );
