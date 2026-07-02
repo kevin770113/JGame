@@ -10,19 +10,9 @@ export default function QuestPanel() {
   const hasActive = activeQuests.length > 0;
 
   return (
-    <div className="fixed right-0 top-1/4 z-50 flex items-start animate-fade-in pointer-events-none">
-      <div className={`pointer-events-auto flex transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="absolute -left-8 top-0 bg-gray-900 border-y border-l border-gray-600 text-gray-300 py-3 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1.5 hover:bg-gray-800 transition-colors"
-        >
-          {hasActive && !isOpen && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
-          <span>任</span>
-          <span>務</span>
-          <span>追</span>
-          <span>蹤</span>
-        </button>
-        <div className="bg-gray-900/95 border border-gray-600 shadow-2xl p-4 w-56 sm:w-64 min-h-[200px] backdrop-blur-md rounded-l-lg border-r-0">
+    <div className="fixed left-0 top-1/4 z-50 flex items-start animate-fade-in pointer-events-none">
+      <div className={`pointer-events-auto flex transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="bg-gray-900/95 border border-gray-600 shadow-2xl p-4 w-56 sm:w-64 min-h-[200px] backdrop-blur-md rounded-r-lg border-l-0 relative">
           <h3 className="text-sm font-bold text-gray-200 border-b border-gray-700 pb-2 mb-3 tracking-widest">［劇情追蹤］</h3>
           {!hasActive ? (
             <p className="text-xs text-gray-500 italic leading-relaxed">「深淵目前保持靜默，繼續您的探索……」</p>
@@ -42,6 +32,18 @@ export default function QuestPanel() {
             </div>
           )}
         </div>
+        
+        {/* ★ 按鈕移至面板右側邊緣 */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="absolute -right-8 top-0 bg-gray-900 border-y border-r border-gray-600 text-gray-300 py-3 px-1.5 rounded-r-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1.5 hover:bg-gray-800 transition-colors"
+        >
+          {hasActive && !isOpen && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
+          <span>任</span>
+          <span>務</span>
+          <span>追</span>
+          <span>蹤</span>
+        </button>
       </div>
     </div>
   );
