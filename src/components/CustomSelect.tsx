@@ -11,7 +11,8 @@ interface CustomSelectProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  focusColor?: 'purple' | 'blue' | 'gray'; // ✅ 加上 'gray' 允許值
+  // ★ 增加 'yellow' 允許值
+  focusColor?: 'purple' | 'blue' | 'gray' | 'yellow'; 
 }
 
 export default function CustomSelect({ options, value, onChange, placeholder = '［請選擇］', focusColor = 'purple' }: CustomSelectProps) {
@@ -30,7 +31,6 @@ export default function CustomSelect({ options, value, onChange, placeholder = '
 
   const selectedOption = options.find(opt => opt.value === value);
   
-  // ✅ 根據傳入的 focusColor 給予對應的邊框與高光顏色
   let borderColorClass = 'border-purple-500';
   let highlightColorClass = 'text-purple-400';
   
@@ -40,6 +40,10 @@ export default function CustomSelect({ options, value, onChange, placeholder = '
   } else if (focusColor === 'gray') {
     borderColorClass = 'border-gray-500';
     highlightColorClass = 'text-gray-300';
+  } else if (focusColor === 'yellow') {
+    // ★ 增加 yellow 的對應 Tailwind 顏色
+    borderColorClass = 'border-yellow-500';
+    highlightColorClass = 'text-yellow-400';
   }
 
   return (
