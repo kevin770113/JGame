@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
-import { supabase } from '../services/supabaseClient';
-import localforage from 'localforage'; 
 
 export default function BaseView() {
   const { location, roomDirtiness } = useGameStore((state) => state.player);
@@ -18,38 +16,18 @@ export default function BaseView() {
     }
   };
 
-  const handleForceLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.clear(); 
-    await localforage.clear(); // ★ 徹底清空 IndexedDB 幽靈快取
-    window.location.reload(); 
-  };
-
   return (
     <div className="w-full flex flex-col justify-between pb-24 relative min-h-[75vh] animate-fade-in">
       <div className="border-b border-gray-700 pb-2 bg-gray-950/70 p-3 rounded backdrop-blur-xs">
         <h2 className="text-xl font-bold text-gray-300">{getLocationName()}</h2>
         <p className="text-xs text-gray-400 mt-1">商會的核心調度中樞，掌控所有內部設施與據點動態。</p>
-
-        <div className="mt-3 p-2 bg-red-950/50 border border-red-800 rounded text-xs text-red-300 break-all leading-relaxed shadow-inner">
-           <span className="font-bold text-red-500 tracking-widest">［系統連線除錯面板］</span><br/>
-           連線 URL 指向驗證：<br/>
-           <span className="text-yellow-500 font-mono">{import.meta.env.VITE_SUPABASE_URL || '【嚴重錯誤】未讀取到任何 URL'}</span>
-           
-           <button 
-             onClick={handleForceLogout}
-             className="mt-3 w-full py-2 bg-red-900/80 hover:bg-red-700 border border-red-500 text-white rounded font-bold tracking-widest active:scale-95 transition-colors shadow-lg"
-           >
-             ［強制登出與徹底清除快取］
-           </button>
-        </div>
       </div>
 
       <div className="flex-1 min-h-[200px]"></div>
 
       {roomDirtiness > 50 && (
         <div className="p-3 bg-red-950/40 border border-red-900/60 rounded text-xs text-red-400 leading-relaxed animate-pulse tracking-wide backdrop-blur-xs my-2">
-          ［系統警告］環境過於髒亂！成員睡眠恢復效率已大打折扣。請儘速傳喚成員前往進行整頓打鎖。
+          ［系統警告］環境過於髒亂！成員睡眠恢復效率已大打折扣。請儘速傳喚成員前往進行整頓打掃。
         </div>
       )}
 
