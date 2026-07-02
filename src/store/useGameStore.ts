@@ -5,6 +5,7 @@ import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, Arena
 import { GAME_CONSTANTS } from '../utils/constants';
 import { fetchIdentityBatch } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
+import { ITEMS_DATA } from '../utils/gameData';
 
 export interface Mission {
   id: string; title: string; rank: '黃金' | '紫色' | '蔚藍' | '翠綠';
@@ -13,6 +14,12 @@ export interface Mission {
 
 export interface ActiveDispatch {
   slaveId: string; mission: Mission; remainingPhases: number;
+}
+
+export interface DynamicEvent {
+  id: string; type: 'merchant' | 'noble'; desc: string;
+  reqRace?: Race; reqGender?: Gender; reqStat?: { key: 'combat' | 'obedience'; val: number };
+  reward: { gold: number; prestige: number; item?: string };
 }
 
 export const ARENA_NPCS: ArenaNPC[] = [
@@ -31,6 +38,7 @@ export interface GameStore {
   currentSubView: SubView;
   dailyMissions: Mission[];
   activeDispatches: ActiveDispatch[];
+  activeEvent: DynamicEvent | null; // ★ V2.0 動態事件
 
   syncProfileToCloud: () => Promise<void>;
   loadProfileFromCloud: () => Promise<void>;
@@ -52,6 +60,11 @@ export interface GameStore {
   checkApRecovery: () => void; 
   processTurn: () => void;
   executeArenaBattle: (slaveId: string, npcId: string) => { logs: CombatLog[], isWin: boolean } | null;
+
+  buyItem: (itemId: string) => void;
+  useItem: (itemId: string, slaveId: string) => void;
+  equipWeapon: (itemId: string, slaveId: string) => void;
+  fulfillEvent: (slaveId: string) => boolean;
 }
 
 const generateDailyMissions = (): Mission[] => {
@@ -95,13 +108,13 @@ export const useGameStore = create<GameStore>()(
     (set, get) => ({
       player: { 
         day: 1, timePhase: '早上', gold: 99999, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 9999, actionPoints: 50, lastApUpdateTime: Date.now(),
-        deviceId: '', unlockedFacilities: [], 
-        usedIdentityIds: [],
+        deviceId: '', unlockedFacilities: [], usedIdentityIds: [],
         inventory: {}, quests: {}, abyssFloor: 1 // ★ V2.0 擴充設定
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
+      activeEvent: null,
 
-      // ★ V2.0 完美雲端同步 (包含奴隸、物品等所有進度打包進 save_data)
+      // ★ V2.0 完美雲端同步
       syncProfileToCloud: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -122,12 +135,12 @@ export const useGameStore = create<GameStore>()(
              abyssFloor: p.abyssFloor,
              slaves: state.slaves,
              marketSlaves: state.marketSlaves,
-             activeDispatches: state.activeDispatches
+             activeDispatches: state.activeDispatches,
+             activeEvent: state.activeEvent
           }
         });
       },
 
-      // ★ V2.0 從雲端強制下載並覆蓋本地 (防止換手機進度被洗白)
       loadProfileFromCloud: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -135,7 +148,6 @@ export const useGameStore = create<GameStore>()(
         if (error || !data) return;
 
         const sData = data.save_data || {};
-        
         set((state) => ({
           player: {
             ...state.player,
@@ -152,8 +164,65 @@ export const useGameStore = create<GameStore>()(
           },
           slaves: sData.slaves || state.slaves,
           marketSlaves: sData.marketSlaves || state.marketSlaves,
-          activeDispatches: sData.activeDispatches || state.activeDispatches
+          activeDispatches: sData.activeDispatches || state.activeDispatches,
+          activeEvent: sData.activeEvent || state.activeEvent
         }));
+      },
+
+      buyItem: (itemId) => set(state => {
+        const item = ITEMS_DATA[itemId];
+        if (item && state.player.gold >= item.price) {
+            return { player: { ...state.player, gold: state.player.gold - item.price, inventory: { ...state.player.inventory, [itemId]: (state.player.inventory[itemId] || 0) + 1 } } };
+        }
+        return state;
+      }),
+
+      useItem: (itemId, slaveId) => set(state => {
+        const item = ITEMS_DATA[itemId];
+        const slave = state.slaves.find(s => s.id === slaveId);
+        const qty = state.player.inventory[itemId] || 0;
+        if (qty > 0 && slave && item.type === 'potion') {
+            const newStamina = Math.min(100, slave.conditionStats.stamina + (item.effect.stamina || 0));
+            const newInv = { ...state.player.inventory, [itemId]: qty - 1 };
+            if (newInv[itemId] <= 0) delete newInv[itemId];
+            return { player: { ...state.player, inventory: newInv }, slaves: state.slaves.map(s => s.id === slaveId ? { ...s, conditionStats: { ...s.conditionStats, stamina: newStamina } } : s) };
+        }
+        return state;
+      }),
+
+      equipWeapon: (itemId, slaveId) => set(state => {
+        const qty = state.player.inventory[itemId] || 0;
+        const slave = state.slaves.find(s => s.id === slaveId);
+        if (qty > 0 && slave && ITEMS_DATA[itemId].type === 'weapon') {
+            const oldWeapon = slave.equipment?.weaponId;
+            const newInv = { ...state.player.inventory, [itemId]: qty - 1 };
+            if (oldWeapon) newInv[oldWeapon] = (newInv[oldWeapon] || 0) + 1;
+            if (newInv[itemId] <= 0) delete newInv[itemId];
+            return { player: { ...state.player, inventory: newInv }, slaves: state.slaves.map(s => s.id === slaveId ? { ...s, equipment: { weaponId: itemId } } : s) };
+        }
+        return state;
+      }),
+
+      fulfillEvent: (slaveId) => {
+        const state = get(); const evt = state.activeEvent; const slave = state.slaves.find(s => s.id === slaveId);
+        if (!evt || !slave || slave.activityStatus !== '閒置') return false;
+        
+        // 嚴格審核條件
+        if (evt.reqRace && slave.race !== evt.reqRace) return false;
+        if (evt.reqGender && slave.gender !== evt.reqGender) return false;
+        if (evt.reqStat && evt.reqStat.key === 'obedience' && slave.primaryStats.obedience < evt.reqStat.val) return false;
+        if (evt.reqStat && evt.reqStat.key === 'combat' && slave.primaryStats.combat < evt.reqStat.val) return false;
+
+        const newSlaves = state.slaves.filter(s => s.id !== slaveId);
+        const newInv = { ...state.player.inventory };
+        if (evt.reward.item) newInv[evt.reward.item] = (newInv[evt.reward.item] || 0) + 1;
+        
+        set({
+            slaves: newSlaves, activeEvent: null,
+            player: { ...state.player, gold: state.player.gold + evt.reward.gold, prestige: state.player.prestige + evt.reward.prestige, inventory: newInv }
+        });
+        get().syncProfileToCloud();
+        return true;
       },
 
       consumeIdentity: async () => {
@@ -293,7 +362,17 @@ export const useGameStore = create<GameStore>()(
             }
             get().updateSlave(slave.id, { conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
           });
-          triggerBackgroundMarketRefresh(); set({ dailyMissions: generateDailyMissions() });
+
+          // ★ 隨機事件引擎骰點
+          let nextEvent = null;
+          if (get().player.location === 'NeutralHub' && Math.random() < 0.4) {
+            nextEvent = { id: 'evt1', type: 'merchant', desc: '【地頭蛇老張】急需一名服從度達 60 的女性半獸人。', reqRace: '半獸人', reqGender: 'Female', reqStat: { key: 'obedience', val: 60 }, reward: { gold: 12000, prestige: 20, item: 'potion_heal_small' } } as const;
+          } else if (get().player.location === 'Capital' && Math.random() < 0.3) {
+            nextEvent = { id: 'evt2', type: 'noble', desc: '【腥紅伯爵】徵求武力達 80 的精靈，願以精鋼長劍交換。', reqRace: '精靈', reqStat: { key: 'combat', val: 80 }, reward: { gold: 35000, prestige: 100, item: 'weapon_iron_sword' } } as const;
+          }
+
+          triggerBackgroundMarketRefresh(); 
+          set({ dailyMissions: generateDailyMissions(), activeEvent: nextEvent });
         }
         get().syncProfileToCloud();
       },
@@ -307,9 +386,15 @@ export const useGameStore = create<GameStore>()(
         const logs: CombatLog[] = [];
         logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system' });
 
+        // ★ 裝備武器加成
+        let weaponAtk = 0;
+        if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) {
+            weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
+        }
+
         let sHpMax = Math.floor(slave.primaryStats.endurance * 5);
         let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
-        let sAtk = slave.primaryStats.combat;
+        let sAtk = slave.primaryStats.combat + weaponAtk; 
         let sDef = Math.floor(slave.primaryStats.endurance * 0.5 + slave.skills.survival * 2);
         let sSpd = slave.primaryStats.intelligence;
         let sDmgMulti = 1 + (slave.skills.combat * 0.05);
@@ -390,6 +475,6 @@ export const useGameStore = create<GameStore>()(
         return { logs, isWin };
       }
     }),
-    { name: 'dark-fantasy-save-v13', storage: createJSONStorage(() => storage) }
+    { name: 'dark-fantasy-save-v14', storage: createJSONStorage(() => storage) }
   )
 );
