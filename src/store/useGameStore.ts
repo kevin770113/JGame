@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import localforage from 'localforage';
-import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, ArenaNPC, CombatLog } from '../types';
+import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, ArenaNPC, CombatLog, ActiveWindow } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
 import { fetchIdentityBatch } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
@@ -65,14 +65,15 @@ export interface GameStore {
   activeDispatches: ActiveDispatch[];
   activeEvent: DynamicEvent | null; 
   globalModal: GlobalModal | null; 
-  activeWindow: 'quest' | 'roster' | null; 
-  isSaving: boolean; // ★ V2.4 新增存檔狀態鎖
+  activeWindow: ActiveWindow; 
+  isSaving: boolean; 
+  localSaveVersion: number; // ★ V2.4 本地版號追蹤器
 
-  setActiveWindow: (win: 'quest' | 'roster' | null) => void;
+  setActiveWindow: (win: ActiveWindow) => void;
   setGlobalModal: (modal: GlobalModal | null) => void;
-  setIsSaving: (val: boolean) => void; // ★ V2.4
+  setIsSaving: (val: boolean) => void; 
   syncProfileToCloud: () => Promise<void>;
-  loadProfileFromCloud: () => Promise<void>;
+  loadProfileFromCloud: (forceLoad?: boolean) => Promise<void>; // ★ V2.4 支援強制讀取
   consumeIdentity: () => Promise<{name: string, story: string}>;
   
   addGold: (amount: number) => void;
@@ -149,7 +150,7 @@ export const useGameStore = create<GameStore>()(
         inventory: {}, quests: {}, abyssFloor: 1, shopStock: { ...DEFAULT_SHOP_STOCK }
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
-      activeEvent: null, globalModal: null, activeWindow: null, isSaving: false,
+      activeEvent: null, globalModal: null, activeWindow: null, isSaving: false, localSaveVersion: 0,
 
       setActiveWindow: (win) => set({ activeWindow: win }),
       setGlobalModal: (modal) => set({ globalModal: modal }),
@@ -197,26 +198,44 @@ export const useGameStore = create<GameStore>()(
          }
       },
 
-      // ★ V2.4 加入存檔狀態鎖
+      // ★ V2.4 寫入版號保護
       syncProfileToCloud: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         set({ isSaving: true });
+        
+        const newVersion = (get().localSaveVersion || 0) + 1;
+        set({ localSaveVersion: newVersion }); // 本地版號立即 +1
+
         const state = get(); const p = state.player;
-        await supabase.from('profiles').upsert({
+        const { error } = await supabase.from('profiles').upsert({
           id: session.user.id, day: p.day, gold: p.gold, food: p.food, action_points: p.actionPoints, prestige: p.prestige, unlocked_facilities: p.unlockedFacilities,
-          save_data: { usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent }
+          save_data: { localSaveVersion: newVersion, usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent }
         });
+        
+        if (error) console.error('［同步異常］', error);
         set({ isSaving: false });
       },
 
-      loadProfileFromCloud: async () => {
+      // ★ V2.4 嚴格攔截舊檔，阻絕回溯
+      loadProfileFromCloud: async (forceLoad = false) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
         if (error || !data) return;
         const sData = data.save_data || {};
+
+        const cloudVersion = sData.localSaveVersion || 0;
+        const currentLocalVersion = get().localSaveVersion || 0;
+
+        // 若不是強制拉取，且雲端版號沒有大於本地，則代表是舊檔，強制攔截！
+        if (!forceLoad && cloudVersion <= currentLocalVersion && currentLocalVersion > 0) {
+           console.log(`［防禦網啟動］雲端版號 (v${cloudVersion}) <= 本地版號 (v${currentLocalVersion})，拒絕下載覆蓋。`);
+           return; 
+        }
+
         set((state) => ({
+          localSaveVersion: cloudVersion, // 同步版號
           player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor, shopStock: sData.shopStock || state.player.shopStock },
           slaves: sData.slaves || state.slaves, marketSlaves: sData.marketSlaves || state.marketSlaves, activeDispatches: sData.activeDispatches || state.activeDispatches, activeEvent: sData.activeEvent || state.activeEvent
         }));
