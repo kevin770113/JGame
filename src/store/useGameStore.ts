@@ -22,13 +22,20 @@ export interface DynamicEvent {
   reward: { gold: number; prestige: number; item?: string };
 }
 
+// ★ 新增全局視窗介面
+export interface GlobalModal {
+  title: string;
+  message: string;
+  isConfirm: boolean;
+  action?: () => void;
+}
+
 export const ARENA_NPCS: ArenaNPC[] = [
   { id: 'npc-1', location: 'Frontlines', name: '地下狂徒', description: '滿身泥濘與血污的亡命之徒，毫無技巧可言。', stats: { hp: 300, attack: 25, defense: 10, speed: 15 }, rewardGold: 800, rewardPrestige: 0 },
   { id: 'npc-2', location: 'NeutralHub', name: '鐵血角鬥士', description: '公會重金培育的職業鬥士，裝備精良且受過專業訓練。', stats: { hp: 800, attack: 55, defense: 35, speed: 40 }, rewardGold: 2500, rewardPrestige: 10 },
   { id: 'npc-3', location: 'Capital', name: '皇家處刑者', description: '帝國皇室的殺人機器，專門用來粉碎挑戰者的絕望。', stats: { hp: 2000, attack: 110, defense: 60, speed: 70 }, rewardGold: 6000, rewardPrestige: 50 }
 ];
 
-// ★ 深淵敵方動態生成器
 export const getAbyssEnemy = (floor: number) => {
   const boss = HEROES_DATA.find(h => h.floor === floor);
   const multiplier = 1 + (floor - 1) * 0.05;
@@ -58,6 +65,9 @@ export interface GameStore {
   dailyMissions: Mission[];
   activeDispatches: ActiveDispatch[];
   activeEvent: DynamicEvent | null; 
+  globalModal: GlobalModal | null; // ★ 掛載全局視窗
+
+  setGlobalModal: (modal: GlobalModal | null) => void;
 
   syncProfileToCloud: () => Promise<void>;
   loadProfileFromCloud: () => Promise<void>;
@@ -79,7 +89,7 @@ export interface GameStore {
   checkApRecovery: () => void; 
   processTurn: () => void;
   executeArenaBattle: (slaveId: string, npcId: string) => { logs: CombatLog[], isWin: boolean } | null;
-  executeAbyssBattle: (slaveId: string) => { logs: CombatLog[], isWin: boolean } | null; // ★ 新增深淵戰鬥
+  executeAbyssBattle: (slaveId: string) => { logs: CombatLog[], isWin: boolean } | null;
 
   buyItem: (itemId: string) => void;
   useItem: (itemId: string, slaveId: string) => void;
@@ -135,6 +145,9 @@ export const useGameStore = create<GameStore>()(
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
       activeEvent: null,
+      globalModal: null,
+
+      setGlobalModal: (modal) => set({ globalModal: modal }),
 
       triggerQuest: (questId) => set(state => {
         if (!state.player.quests[questId]) {
@@ -153,7 +166,12 @@ export const useGameStore = create<GameStore>()(
 
          if (updated) {
             set({ player: { ...state.player, quests: newQuests, gold: state.player.gold + addG, prestige: state.player.prestige + addP } });
-            alert(`［系統提示］任務完成！\n獲得資金: ${addG}\n獲得威望: ${addP}`);
+            // ★ 取代系統 alert，改用深淵風格視窗
+            get().setGlobalModal({ 
+              title: '［系統提示］任務完成！', 
+              message: `獲得資金: ${addG}\n獲得威望: ${addP}`, 
+              isConfirm: false 
+            });
             get().syncProfileToCloud();
          }
       },
@@ -396,7 +414,6 @@ export const useGameStore = create<GameStore>()(
         get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
       },
 
-      // ★ 深淵塔戰鬥演算法實作
       executeAbyssBattle: (slaveId) => {
         const state = get(); const slave = state.slaves.find(s => s.id === slaveId);
         if (!slave || state.player.actionPoints < 1) return null;
@@ -453,7 +470,7 @@ export const useGameStore = create<GameStore>()(
           set((s) => ({ player: { ...s.player, abyssFloor: s.player.abyssFloor + 1 } }));
         }
 
-        let newStamina = Math.max(0, slave.conditionStats.stamina - 30); // 深淵消耗 30 體力
+        let newStamina = Math.max(0, slave.conditionStats.stamina - 30);
         let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
         if (slave.race !== '不死族') {
           newStress = Math.min(100, newStress + (isWin ? 10 : 25)); newRebellion = Math.min(100, newRebellion + (isWin ? 5 : 15));
