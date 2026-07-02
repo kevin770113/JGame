@@ -11,6 +11,7 @@ import AbyssView from './views/AbyssView';
 import LoginView from './views/LoginView';
 import QuestPanel from './components/QuestPanel';
 import SlavePanel from './components/SlavePanel'; 
+import SystemPanel from './components/SystemPanel'; // ★ V2.4 引入系統抽屜
 import { useGameStore } from './store/useGameStore';
 import { supabase } from './services/supabaseClient';
 import { Slave } from './types';
@@ -39,7 +40,6 @@ function App() {
     const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (mounted) setSession(session);
-      // 初次載入 APP 時，允許下載存檔
       if (session) {
         await loadProfileFromCloud();
         if (useGameStore.getState().marketSlaves.length === 0) triggerBackgroundMarketRefresh();
@@ -48,12 +48,11 @@ function App() {
     };
     initSession();
 
-    // ★ V2.4 阻斷回溯機制：防禦性雲端讀取 (Smart Hydration)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
-      // 只有當玩家剛開啟遊戲 (INITIAL_SESSION) 或進行登入 (SIGNED_IN) 時，才允許下載雲端存檔覆蓋本地
-      // 堅決拒絕手機背景喚醒造成的憑證刷新 (TOKEN_REFRESHED) 去觸發舊檔下載，藉此徹底消滅回溯 Bug！
-      if (session && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
+      if (session) {
+        // ★ V2.4 無論是 INITIAL 或是 TOKEN_REFRESH，一律呼叫拉取。
+        // 由 useGameStore 底層的版號比對去負責防禦並攔截舊檔，徹底根絕回溯！
         await loadProfileFromCloud();
         if (useGameStore.getState().marketSlaves.length === 0) triggerBackgroundMarketRefresh();
       }
@@ -121,6 +120,8 @@ function App() {
       
       <div className="shrink-0 z-20 shadow-md bg-gray-900 relative"><Header /></div>
       
+      {/* ★ V2.4 三大互斥視窗 */}
+      <SystemPanel /> 
       <QuestPanel />
       <SlavePanel onSelectSlave={setActiveSlave} />
 
@@ -187,7 +188,7 @@ function App() {
       {globalModal && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-fade-in">
           <div className="bg-gray-900 border-t-2 border-blood-red rounded-lg p-5 max-w-sm w-full shadow-2xl border-x border-b border-gray-700 relative">
-            <h3 className={`text-lg font-bold tracking-widest flex items-center gap-2 mb-2 ${globalModal.title.includes('警告') || globalModal.title.includes('錯誤') || globalModal.title.includes('拒絕') ? 'text-red-500' : 'text-yellow-500'}`}>
+            <h3 className={`text-lg font-bold tracking-widest flex items-center gap-2 mb-2 ${globalModal.title.includes('警告') || globalModal.title.includes('錯誤') || globalModal.title.includes('急救') ? 'text-red-500' : 'text-yellow-500'}`}>
               {globalModal.title}
             </h3>
             <div className="text-sm text-gray-300 leading-relaxed mb-6 bg-gray-950 p-4 rounded border border-gray-800 whitespace-pre-wrap shadow-inner">
