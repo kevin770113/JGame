@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { Slave, Gender } from '../types';
 import CustomSelect, { Option } from '../components/CustomSelect';
@@ -10,10 +10,16 @@ export default function BreedingView() {
   const navigate = useGameStore((state) => state.navigate);
   
   const consumeIdentity = useGameStore((state) => state.consumeIdentity);
+  const triggerQuest = useGameStore((state) => state.triggerQuest);
 
   const [alphaId, setAlphaId] = useState<string>('');
   const [betaId, setBetaId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' | 'loading' } | null>(null);
+
+  // ★ 玩家第一次進入血統密室，觸發「禁忌的鍊金術」任務
+  useEffect(() => {
+    triggerQuest('q_first_fusion');
+  }, [triggerQuest]);
 
   const isFull = slaves.length >= maxSlaveCapacity;
 
@@ -110,11 +116,7 @@ export default function BreedingView() {
           <h2 className="text-xl font-bold text-gray-300">血統密室</h2>
           <p className="text-xs text-gray-500 mt-1">隱蔽於地下的實驗設施，進行著被帝國嚴格禁止的基因融合。</p>
         </div>
-        {/* ★ 加入 whitespace-nowrap shrink-0 確保按鈕不被擠壓斷行 */}
-        <button 
-          onClick={() => navigate('Home', 'Main')}
-          className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
-        >
+        <button onClick={() => navigate('Home', 'Main')} className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest">
           ［返回大廳］
         </button>
       </div>
