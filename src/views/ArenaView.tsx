@@ -55,7 +55,8 @@ export default function ArenaView() {
           <h2 className="text-xl font-bold text-gray-300">{getArenaTitle()}</h2>
           <p className="text-2xs text-gray-500 mt-0.5">派遣最強的試驗體，在生死邊緣博取財富與名望。</p>
         </div>
-        <button onClick={() => navigate('Town', 'Main')} className="px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest">
+        {/* ★ 已加入 whitespace-nowrap shrink-0 確保按鈕不被擠壓斷行 */}
+        <button onClick={() => navigate('Town', 'Main')} className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest">
           ［返回城鎮］
         </button>
       </div>
