@@ -16,7 +16,6 @@ export default function InteractionView() {
   const navigate = useGameStore((state) => state.navigate);
   const processTurn = useGameStore((state) => state.processTurn);
   
-  // ★ 掛載道具系統
   const useItem = useGameStore((state) => state.useItem);
   const equipWeapon = useGameStore((state) => state.equipWeapon);
 
@@ -133,9 +132,15 @@ export default function InteractionView() {
               </div>
             )}
 
-            {/* ★ 新增裝備與道具介面 */}
             {activeTab === 'inventory' && (
               <div className="flex flex-col gap-3 animate-fade-in">
+                {/* ★ V2.3 負傷減半提醒 */}
+                {selectedSlave.isInjured && (
+                  <div className="text-xs text-red-400 font-bold bg-red-950/30 p-2.5 rounded border border-red-900/50 shadow-inner flex items-center tracking-widest mb-1">
+                    ⚠️ 該成員目前處於【負傷】狀態，體力恢復藥劑效果將衰減 50%。
+                  </div>
+                )}
+                
                 {selectedSlave.equipment?.weaponId && (
                    <div className="text-xs text-blue-400 font-bold bg-blue-950/30 p-2.5 rounded border border-blue-900/50 shadow-inner flex justify-between items-center tracking-widest">
                      目前武器裝備：{ITEMS_DATA[selectedSlave.equipment.weaponId]?.name}
