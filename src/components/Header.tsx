@@ -42,8 +42,7 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-gray-900 border-b border-gray-700 p-2 sm:p-3 flex flex-col md:flex-row justify-between items-center text-xs shadow-md z-10 gap-2 select-none pt-6 md:pt-3">
-      {/* 配合上方系統抽屜拉環，行動端增加一點上邊距 pt-6 */}
+    <header className="bg-gray-900 border-b border-gray-700 p-2 sm:p-3 pt-8 md:pt-4 flex flex-col md:flex-row justify-between items-center text-xs shadow-md z-10 gap-2 select-none">
       <div className="flex flex-wrap gap-2 sm:gap-4 items-center justify-center">
         <span className="text-gray-300 font-bold tracking-widest">
           第 <strong className="text-white">{day}</strong> 天 <span className="text-gray-600 mx-1">|</span> <strong className={timePhaseColor()}>{timePhase}</strong>
@@ -51,6 +50,7 @@ export default function Header() {
         <span className="text-gray-500">資金: <strong className="text-yellow-500 font-mono">{gold}</strong></span>
         <span className="text-gray-500">糧食: <strong className={food === 0 ? 'text-blood-red font-mono animate-pulse' : 'text-green-500 font-mono'}>{food}</strong></span>
         <span className="text-gray-500">威望: <strong className="text-blue-400 font-mono">{prestige}</strong></span>
+        {/* 新增：行動力顯示區塊 */}
         <span className="text-gray-500 border-l border-gray-700 pl-2 sm:pl-4">
           行動力: <strong className={actionPoints < 10 ? 'text-red-500 font-mono animate-pulse' : 'text-blue-400 font-mono'}>{actionPoints}/50</strong>
         </span>
