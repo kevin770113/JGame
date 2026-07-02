@@ -7,8 +7,9 @@ import DispatchView from './views/DispatchView';
 import MapView from './views/MapView';
 import InteractionView from './views/InteractionView';
 import ArenaView from './views/ArenaView';
+import AbyssView from './views/AbyssView'; // ★ 引入深淵塔
 import LoginView from './views/LoginView';
-import QuestPanel from './components/QuestPanel'; // ★ 引入任務面板
+import QuestPanel from './components/QuestPanel';
 import { useGameStore } from './store/useGameStore';
 import { supabase } from './services/supabaseClient';
 import { Slave } from './types';
@@ -50,10 +51,7 @@ function App() {
       }
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, [triggerBackgroundMarketRefresh, loadProfileFromCloud]);
 
   const getDynamicBackground = () => {
@@ -85,6 +83,15 @@ function App() {
                 <button onClick={() => navigate('Town', 'Market')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"><span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［訪問地下商隊］</span><span className="text-xs text-gray-500 font-normal">引進與變現血統資產</span></button>
                 <button onClick={() => navigate('Town', 'Tavern')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"><span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［前往深淵酒館］</span><span className="text-xs text-gray-500 font-normal">查閱地區懸賞與傳說委託</span></button>
                 <button onClick={() => navigate('Town', 'Arena')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"><span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［前往角鬥場］</span><span className="text-xs text-gray-500 font-normal">參與血腥競技與死鬥</span></button>
+                
+                {/* ★ 僅在皇城開放深淵之塔 */}
+                {location === 'Capital' && (
+                  <button onClick={() => navigate('Town', 'Abyss')} className="py-4 bg-purple-900/20 hover:bg-purple-900/40 border border-purple-800/50 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group mt-1">
+                     <span className="flex items-center gap-2 text-purple-400 group-hover:text-purple-300 tracking-widest">［挑戰深淵之塔］</span>
+                     <span className="text-xs text-purple-600 font-normal">無盡階梯與古代英靈</span>
+                  </button>
+                )}
+
                 <button onClick={() => navigate('Home', 'Main')} className="py-3 bg-blood-red/20 hover:bg-blood-red/30 border border-blood-red/50 text-red-400 font-bold rounded-lg text-center transition-colors shadow mt-2 tracking-widest">［返回安全據點］</button>
               </div>
             </div>
@@ -92,6 +99,7 @@ function App() {
         case 'Market': return <MarketView />;
         case 'Tavern': return <DispatchView />;
         case 'Arena': return <ArenaView />; 
+        case 'Abyss': return <AbyssView />; // ★ 加入深淵路由
         default: return <BaseView />;
       }
     }
@@ -112,8 +120,6 @@ function App() {
       <div className="absolute inset-0 bg-black/40 z-0 pointer-events-none"></div>
       
       <div className="shrink-0 z-20 shadow-md bg-gray-900 relative"><Header /></div>
-
-      {/* ★ 懸浮卷軸任務面板 */}
       <QuestPanel />
 
       <div className="flex-1 flex overflow-hidden relative z-10">
