@@ -22,7 +22,6 @@ export interface DynamicEvent {
   reward: { gold: number; prestige: number; item?: string };
 }
 
-// ★ 新增全局視窗介面
 export interface GlobalModal {
   title: string;
   message: string;
@@ -55,7 +54,7 @@ export const getAbyssEnemy = (floor: number) => {
 };
 
 export interface GameStore {
-  player: Player;
+  player: Player & { shopStock: Record<string, number> }; // ★ 新增商店庫存
   slaves: Slave[];
   marketSlaves: Slave[];
   isMarketGenerating: boolean;
@@ -65,10 +64,9 @@ export interface GameStore {
   dailyMissions: Mission[];
   activeDispatches: ActiveDispatch[];
   activeEvent: DynamicEvent | null; 
-  globalModal: GlobalModal | null; // ★ 掛載全局視窗
+  globalModal: GlobalModal | null; 
 
   setGlobalModal: (modal: GlobalModal | null) => void;
-
   syncProfileToCloud: () => Promise<void>;
   loadProfileFromCloud: () => Promise<void>;
   consumeIdentity: () => Promise<{name: string, story: string}>;
@@ -134,6 +132,7 @@ const storage: StateStorage = {
 };
 
 const TIME_PHASES: TimePhase[] = ['早上', '中午', '下午', '晚上', '深夜'];
+const DEFAULT_SHOP_STOCK = { 'potion_heal_small': 5, 'weapon_iron_sword': 1 }; // ★ 每日預設庫存
 
 export const useGameStore = create<GameStore>()(
   persist(
@@ -141,7 +140,7 @@ export const useGameStore = create<GameStore>()(
       player: { 
         day: 1, timePhase: '早上', gold: 99999, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 9999, actionPoints: 50, lastApUpdateTime: Date.now(),
         deviceId: '', unlockedFacilities: [], usedIdentityIds: [],
-        inventory: {}, quests: {}, abyssFloor: 1 
+        inventory: {}, quests: {}, abyssFloor: 1, shopStock: { ...DEFAULT_SHOP_STOCK }
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
       activeEvent: null,
@@ -166,12 +165,7 @@ export const useGameStore = create<GameStore>()(
 
          if (updated) {
             set({ player: { ...state.player, quests: newQuests, gold: state.player.gold + addG, prestige: state.player.prestige + addP } });
-            // ★ 取代系統 alert，改用深淵風格視窗
-            get().setGlobalModal({ 
-              title: '［系統提示］任務完成！', 
-              message: `獲得資金: ${addG}\n獲得威望: ${addP}`, 
-              isConfirm: false 
-            });
+            get().setGlobalModal({ title: '［系統提示］任務完成！', message: `獲得資金: ${addG}\n獲得威望: ${addP}`, isConfirm: false });
             get().syncProfileToCloud();
          }
       },
@@ -182,7 +176,7 @@ export const useGameStore = create<GameStore>()(
         const state = get(); const p = state.player;
         await supabase.from('profiles').upsert({
           id: session.user.id, day: p.day, gold: p.gold, food: p.food, action_points: p.actionPoints, prestige: p.prestige, unlocked_facilities: p.unlockedFacilities,
-          save_data: { usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent }
+          save_data: { usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent }
         });
       },
 
@@ -193,14 +187,25 @@ export const useGameStore = create<GameStore>()(
         if (error || !data) return;
         const sData = data.save_data || {};
         set((state) => ({
-          player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor },
+          player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor, shopStock: sData.shopStock || state.player.shopStock },
           slaves: sData.slaves || state.slaves, marketSlaves: sData.marketSlaves || state.marketSlaves, activeDispatches: sData.activeDispatches || state.activeDispatches, activeEvent: sData.activeEvent || state.activeEvent
         }));
       },
 
+      // ★ 購買物品時同步扣除庫存
       buyItem: (itemId) => set(state => {
         const item = ITEMS_DATA[itemId];
-        if (item && state.player.gold >= item.price) return { player: { ...state.player, gold: state.player.gold - item.price, inventory: { ...state.player.inventory, [itemId]: (state.player.inventory[itemId] || 0) + 1 } } };
+        const stock = state.player.shopStock[itemId] || 0;
+        if (item && state.player.gold >= item.price && stock > 0) {
+            return { 
+                player: { 
+                    ...state.player, 
+                    gold: state.player.gold - item.price, 
+                    inventory: { ...state.player.inventory, [itemId]: (state.player.inventory[itemId] || 0) + 1 },
+                    shopStock: { ...state.player.shopStock, [itemId]: stock - 1 }
+                } 
+            };
+        }
         return state;
       }),
 
@@ -314,7 +319,13 @@ export const useGameStore = create<GameStore>()(
 
         const overpopulation = Math.max(0, slaves.length - player.maxSlaveCapacity);
         const newDirtiness = Math.min(100, player.roomDirtiness + Math.ceil(slaves.length * (player.location === 'Capital' ? 1 : player.location === 'NeutralHub' ? 1.5 : 2)) + Math.pow(overpopulation, 2) * 5);
-        set({ player: { ...player, day: nextDay, timePhase: nextPhase, roomDirtiness: newDirtiness, actionPoints: newAp, lastApUpdateTime: newApUpdateTime } });
+        
+        let newShopStock = { ...player.shopStock };
+        if (triggerDailySettlement) {
+            newShopStock = { ...DEFAULT_SHOP_STOCK }; // ★ 每日結算重置商店庫存
+        }
+
+        set({ player: { ...player, day: nextDay, timePhase: nextPhase, roomDirtiness: newDirtiness, actionPoints: newAp, lastApUpdateTime: newApUpdateTime, shopStock: newShopStock } });
 
         const newDispatches: ActiveDispatch[] = []; let earnedGold = 0; let earnedPrestige = 0;
         activeDispatches.forEach(dispatch => {
@@ -364,6 +375,14 @@ export const useGameStore = create<GameStore>()(
         if (!slave || !npc || state.player.actionPoints < 1) return null;
 
         const logs: CombatLog[] = []; logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system' });
+
+        // ★ 加入開場種族天賦宣告
+        if (slave.race === '精靈') logs.push({ round: 0, message: `［種族天賦］${slave.name} 觸發了【風之眷顧】，身形如風，速度獲得大幅提升！`, type: 'skill' });
+        if (slave.race === '半獸人') logs.push({ round: 0, message: `［種族天賦］${slave.name} 點燃了【狂熱戰血】，放棄防禦以換取更具破壞力的攻擊！`, type: 'skill' });
+        if (slave.race === '矮人') logs.push({ round: 0, message: `［種族天賦］${slave.name} 展現了【堅岩體魄】，肌肉宛如磐石般堅不可摧！`, type: 'skill' });
+        if (slave.race === '龍族') logs.push({ round: 0, message: `［種族天賦］${slave.name} 釋放了【真龍威壓】，全屬性獲得增幅，令對手不寒而慄！`, type: 'skill' });
+        if (slave.race === '人類') logs.push({ round: 0, message: `［種族天賦］${slave.name} 懷抱著【絕境意志】，處於瀕死狀態時將爆發驚人的潛能。`, type: 'skill' });
+        if (slave.race === '不死族') logs.push({ round: 0, message: `［種族天賦］${slave.name} 散發著死氣，【枯骨不朽】將使其能汲取敵人的生命力。`, type: 'skill' });
 
         let weaponAtk = 0; if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
 
@@ -425,6 +444,14 @@ export const useGameStore = create<GameStore>()(
         logs.push({ round: 0, message: `［系統］${slave.name} 踏入深淵第 ${floor} 階，迎戰 ${enemy.name}。`, type: 'system' });
         logs.push({ round: 0, message: `「${enemy.quote}」`, type: 'system' });
 
+        // ★ 加入開場種族天賦宣告
+        if (slave.race === '精靈') logs.push({ round: 0, message: `［種族天賦］${slave.name} 觸發了【風之眷顧】，身形如風，速度獲得大幅提升！`, type: 'skill' });
+        if (slave.race === '半獸人') logs.push({ round: 0, message: `［種族天賦］${slave.name} 點燃了【狂熱戰血】，放棄防禦以換取更具破壞力的攻擊！`, type: 'skill' });
+        if (slave.race === '矮人') logs.push({ round: 0, message: `［種族天賦］${slave.name} 展現了【堅岩體魄】，肌肉宛如磐石般堅不可摧！`, type: 'skill' });
+        if (slave.race === '龍族') logs.push({ round: 0, message: `［種族天賦］${slave.name} 釋放了【真龍威壓】，全屬性獲得增幅，令對手不寒而慄！`, type: 'skill' });
+        if (slave.race === '人類') logs.push({ round: 0, message: `［種族天賦］${slave.name} 懷抱著【絕境意志】，處於瀕死狀態時將爆發驚人的潛能。`, type: 'skill' });
+        if (slave.race === '不死族') logs.push({ round: 0, message: `［種族天賦］${slave.name} 散發著死氣，【枯骨不朽】將使其能汲取敵人的生命力。`, type: 'skill' });
+
         let weaponAtk = 0; if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
 
         let sHpMax = Math.floor(slave.primaryStats.endurance * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
@@ -481,6 +508,6 @@ export const useGameStore = create<GameStore>()(
         get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
       }
     }),
-    { name: 'dark-fantasy-save-v16', storage: createJSONStorage(() => storage) }
+    { name: 'dark-fantasy-save-v17', storage: createJSONStorage(() => storage) }
   )
 );
