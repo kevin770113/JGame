@@ -8,6 +8,9 @@ export default function ArenaView() {
   const navigate = useGameStore((state) => state.navigate);
   const executeArenaBattle = useGameStore((state) => state.executeArenaBattle);
   
+  // ★ 引入全局視窗控制器
+  const setGlobalModal = useGameStore((state) => state.setGlobalModal);
+  
   const slaves = useGameStore((state) => state.slaves);
   const actionPoints = useGameStore((state) => state.player.actionPoints);
 
@@ -27,8 +30,16 @@ export default function ArenaView() {
     if (!targetNPC || !selectedFighterId) return;
     const fighter = slaves.find(s => s.id === selectedFighterId);
     if (!fighter) return;
-    if (actionPoints < 1) { alert('［警告］行動力不足。'); return; }
-    if (fighter.conditionStats.stamina < 20) { alert('［警告］該成員體力嚴重透支，無法上場。'); return; }
+    
+    // ★ 改用深淵風格視窗
+    if (actionPoints < 1) { 
+      setGlobalModal({ title: '［系統警告］', message: '目前行動力不足。', isConfirm: false }); 
+      return; 
+    }
+    if (fighter.conditionStats.stamina < 20) { 
+      setGlobalModal({ title: '［系統警告］', message: '該成員體力嚴重透支，強行上陣必定暴斃。', isConfirm: false }); 
+      return; 
+    }
 
     const result = executeArenaBattle(selectedFighterId, targetNPC.id);
     if (result) setCombatResult({ logs: result.logs, isWin: result.isWin, npcName: targetNPC.name });
@@ -55,7 +66,6 @@ export default function ArenaView() {
           <h2 className="text-xl font-bold text-gray-300">{getArenaTitle()}</h2>
           <p className="text-2xs text-gray-500 mt-0.5">派遣最強的試驗體，在生死邊緣博取財富與名望。</p>
         </div>
-        {/* ★ 已加入 whitespace-nowrap shrink-0 確保按鈕不被擠壓斷行 */}
         <button onClick={() => navigate('Town', 'Main')} className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest">
           ［返回城鎮］
         </button>
