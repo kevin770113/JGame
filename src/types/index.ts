@@ -9,6 +9,9 @@ export type Location = 'Frontlines' | 'NeutralHub' | 'Capital';
 
 export type ActivityStatus = '閒置' | '外派中' | '特訓中';
 
+// ★ V2.4 新增系統抽屜的全域互斥型別
+export type ActiveWindow = 'quest' | 'roster' | 'system' | null;
+
 export interface Skills {
   combat: number;
   housework: number;
@@ -46,8 +49,8 @@ export interface Slave {
   equipment?: {
     weaponId?: string;
   };
-  combatRecord: { wins: number; losses: number; }; // ★ V2.3 新增戰鬥紀錄
-  isInjured: boolean; // ★ V2.3 新增負傷標記
+  combatRecord: { wins: number; losses: number; };
+  isInjured: boolean;
 }
 
 export interface Player {
