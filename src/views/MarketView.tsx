@@ -21,9 +21,10 @@ export default function MarketView() {
   const buyItem = useGameStore((state) => state.buyItem);
   const activeEvent = useGameStore((state) => state.activeEvent);
   const fulfillEvent = useGameStore((state) => state.fulfillEvent);
-  
-  // ★ 引入任務觸發器
   const triggerQuest = useGameStore((state) => state.triggerQuest);
+  
+  // ★ 引入全局視窗控制器
+  const setGlobalModal = useGameStore((state) => state.setGlobalModal);
 
   const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'arena' | 'shop'>('buy');
   const [selectedFighterId, setSelectedFighterId] = useState<string>('');
@@ -32,7 +33,6 @@ export default function MarketView() {
 
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  // ★ 玩家第一次進入市場時，觸發「深淵的初啼」任務
   useEffect(() => {
     triggerQuest('q_first_blood');
   }, [triggerQuest]);
@@ -48,20 +48,29 @@ export default function MarketView() {
   const calculateBuyPrice = (slave: Slave) => 150 + Math.floor((slave.primaryStats.combat + slave.primaryStats.endurance + slave.primaryStats.intelligence + slave.primaryStats.obedience) * 3.5) + ((slave.skills?.combat || 1) + (slave.skills?.housework || 1) + (slave.skills?.survival || 1)) * 150;
   const calculateSellPrice = (slave: Slave) => 50 + Math.floor((slave.primaryStats.combat + slave.primaryStats.endurance + slave.primaryStats.intelligence + slave.primaryStats.obedience) * 1.5) + ((slave.skills?.combat || 1) + (slave.skills?.housework || 1) + (slave.skills?.survival || 1)) * 200;
 
+  // ★ 拔除預設 alert，改用深淵視窗
   const handleBuy = (slave: Slave, price: number) => {
-    if (isFull) { alert('［警告］據點已達人口上限。'); return; }
+    if (isFull) { setGlobalModal({ title: '［系統警告］', message: '據點已達人口上限，無法容納新的血脈。', isConfirm: false }); return; }
     if (gold >= price) { deductGold(price); addSlave(slave); useGameStore.setState((state) => ({ marketSlaves: state.marketSlaves.filter(s => s.id !== slave.id) })); } 
-    else { alert('［警告］資金不足。'); }
+    else { setGlobalModal({ title: '［系統警告］', message: '持有的資金不足以支付商隊報價。', isConfirm: false }); }
   };
 
-  const handleSell = (slave: Slave, price: number) => { if (confirm(`是否確定以 ${price} 資金拋售 ${slave.name}？`)) sellSlave(slave.id); };
+  // ★ 拔除預設 confirm，改用深淵確認視窗
+  const handleSell = (slave: Slave, price: number) => { 
+    setGlobalModal({
+      title: '［黑市交易確認］',
+      message: `是否確定將代號【${slave.name}】拋售至黑市？\n此舉將為您換取 ${price} 資金，但成員將永遠消失。`,
+      isConfirm: true,
+      action: () => sellSlave(slave.id)
+    });
+  };
 
   const startBattle = () => {
     if (!targetNPC || !selectedFighterId) return;
     const fighter = slaves.find(s => s.id === selectedFighterId);
     if (!fighter) return;
-    if (actionPoints < 1) { alert('［警告］行動力不足。'); return; }
-    if (fighter.conditionStats.stamina < 20) { alert('［警告］該成員體力嚴重透支，無法上場。'); return; }
+    if (actionPoints < 1) { setGlobalModal({ title: '［系統警告］', message: '目前行動力不足。', isConfirm: false }); return; }
+    if (fighter.conditionStats.stamina < 20) { setGlobalModal({ title: '［系統警告］', message: '該成員體力嚴重透支，強行上陣必定暴斃。', isConfirm: false }); return; }
 
     const result = executeArenaBattle(selectedFighterId, targetNPC.id);
     if (result) setCombatResult({ logs: result.logs, isWin: result.isWin, npcName: targetNPC.name });
@@ -102,8 +111,13 @@ export default function MarketView() {
               </div>
               <button onClick={() => {
                  if (!eventSlaveId) return;
-                 if (fulfillEvent(eventSlaveId)) { alert('［結算］交易成功！獲取高額報酬。'); setEventSlaveId(''); }
-                 else alert('［拒絕］該成員不符合權貴的嚴苛要求！');
+                 // ★ 改用深淵視窗
+                 if (fulfillEvent(eventSlaveId)) { 
+                   setGlobalModal({ title: '［交易完成］', message: '已滿足權貴要求，成功獲取高額報酬！', isConfirm: false }); 
+                   setEventSlaveId(''); 
+                 } else {
+                   setGlobalModal({ title: '［拒絕交易］', message: '該名成員的素質不符合權貴的嚴苛要求！', isConfirm: false });
+                 }
               }} className="px-4 bg-yellow-900/50 hover:bg-yellow-800 border border-yellow-700 text-yellow-400 font-bold rounded text-xs transition-colors shrink-0 tracking-widest shadow">
                  ［交付交易］
               </button>
@@ -215,8 +229,13 @@ export default function MarketView() {
                     <p className="text-xs text-gray-500">{item.desc}</p>
                  </div>
                  <button onClick={() => {
-                    if (gold >= item.price) { buyItem(id); alert(`［購入］獲得 ${item.name}。`); }
-                    else alert('［拒絕］資金不足。');
+                    // ★ 改用深淵視窗
+                    if (gold >= item.price) { 
+                      buyItem(id); 
+                      setGlobalModal({ title: '［購入成功］', message: `已成功引進 ${item.name} 入庫。`, isConfirm: false }); 
+                    } else {
+                      setGlobalModal({ title: '［系統警告］', message: '持有的資金不足。', isConfirm: false });
+                    }
                  }} className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-700 rounded font-bold text-xs shrink-0 tracking-widest shadow transition-colors">
                    <span className="text-yellow-600 font-mono">${item.price}</span> ［購買］
                  </button>
