@@ -17,7 +17,7 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
   };
 
   const handleSelect = (slave: Slave) => {
-    setActiveWindow(null); // 🟢 點擊自動收納名冊，防畫面擁擠
+    setActiveWindow(null); 
     onSelectSlave(slave);
   };
 
@@ -81,20 +81,27 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
                     </span>
                   </div>
 
-                  {/* 第三行：狀態燈號 / 體力 / 壓力數值外顯 */}
-                  <div className="text-2xs flex items-center gap-3 mt-1 border-t border-gray-800/60 pt-2 w-full">
-                    <span className="flex items-center gap-1">
+                  {/* 第三行：狀態燈號 / 體力 / 壓力數值外顯 / 戰鬥紀錄 */}
+                  <div className="text-2xs flex items-center gap-2.5 mt-1 border-t border-gray-800/60 pt-2 w-full overflow-x-auto scrollbar-none whitespace-nowrap">
+                    <span className="flex items-center gap-1 shrink-0">
                       <span className={`w-1.5 h-1.5 rounded-full ${
-                        slave.activityStatus === '閒置' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
+                        slave.isInjured ? 'bg-red-600 animate-pulse' : slave.activityStatus === '閒置' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
                       }`} />
-                      <span className={slave.activityStatus !== '閒置' ? 'text-yellow-500 font-bold' : 'text-gray-500'}>
-                        {slave.activityStatus}
+                      <span className={slave.isInjured ? 'text-red-500 font-bold' : slave.activityStatus !== '閒置' ? 'text-yellow-500 font-bold' : 'text-gray-500'}>
+                        {slave.isInjured ? '負傷' : slave.activityStatus}
                       </span>
+                      {slave.isInjured && (
+                        <span className="px-1 bg-red-950 border border-red-700 text-red-400 font-extrabold rounded text-3xs scale-90 animate-pulse">
+                          負傷
+                        </span>
+                      )}
                     </span>
-                    <span className="text-gray-700">｜</span>
-                    <span className="text-green-400 font-mono font-bold">體 {slave.conditionStats.stamina}</span>
-                    <span className="text-gray-700">｜</span>
-                    <span className="text-yellow-600 font-mono font-bold">壓 {slave.conditionStats.stress}</span>
+                    <span className="text-gray-700 shrink-0">｜</span>
+                    <span className="text-green-400 font-mono font-bold shrink-0">體 {slave.conditionStats.stamina}</span>
+                    <span className="text-gray-700 shrink-0">｜</span>
+                    <span className="text-yellow-600 font-mono font-bold shrink-0">壓 {slave.conditionStats.stress}</span>
+                    <span className="text-gray-700 shrink-0">｜</span>
+                    <span className="text-blue-400 font-mono font-bold shrink-0">⚔️ 勝 {slave.combatRecord?.wins || 0}/敗 {slave.combatRecord?.losses || 0}</span>
                   </div>
                 </button>
               ))}
