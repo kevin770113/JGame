@@ -7,6 +7,10 @@ export default function AbyssView() {
   const { actionPoints, abyssFloor } = useGameStore((state) => state.player);
   const navigate = useGameStore((state) => state.navigate);
   const executeAbyssBattle = useGameStore((state) => state.executeAbyssBattle);
+  
+  // ★ 引入全局視窗控制器
+  const setGlobalModal = useGameStore((state) => state.setGlobalModal);
+  
   const slaves = useGameStore((state) => state.slaves);
 
   const [selectedFighterId, setSelectedFighterId] = useState<string>('');
@@ -24,8 +28,16 @@ export default function AbyssView() {
     if (!selectedFighterId) return;
     const fighter = slaves.find(s => s.id === selectedFighterId);
     if (!fighter) return;
-    if (actionPoints < 1) { alert('［警告］行動力不足。'); return; }
-    if (fighter.conditionStats.stamina < 30) { alert('［警告］深淵極度消耗體力，該成員體力不足 30，強行進入將會暴斃。'); return; }
+    
+    // ★ 改用深淵風格視窗
+    if (actionPoints < 1) { 
+      setGlobalModal({ title: '［系統警告］', message: '目前行動力不足。', isConfirm: false }); 
+      return; 
+    }
+    if (fighter.conditionStats.stamina < 30) { 
+      setGlobalModal({ title: '［系統警告］', message: '深淵極度消耗體力，該成員體力不足 30，強行進入將會暴斃。', isConfirm: false }); 
+      return; 
+    }
 
     const result = executeAbyssBattle(selectedFighterId);
     if (result) setCombatResult({ logs: result.logs, isWin: result.isWin });
