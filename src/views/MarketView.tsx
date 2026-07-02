@@ -18,10 +18,12 @@ export default function MarketView() {
   const isMarketGenerating = useGameStore((state) => state.isMarketGenerating);
   const actionPoints = useGameStore((state) => state.player.actionPoints);
 
-  // ★ 新增系統函式
   const buyItem = useGameStore((state) => state.buyItem);
   const activeEvent = useGameStore((state) => state.activeEvent);
   const fulfillEvent = useGameStore((state) => state.fulfillEvent);
+  
+  // ★ 引入任務觸發器
+  const triggerQuest = useGameStore((state) => state.triggerQuest);
 
   const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'arena' | 'shop'>('buy');
   const [selectedFighterId, setSelectedFighterId] = useState<string>('');
@@ -29,6 +31,11 @@ export default function MarketView() {
   const [combatResult, setCombatResult] = useState<{ logs: CombatLog[], isWin: boolean, npcName: string } | null>(null);
 
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  // ★ 玩家第一次進入市場時，觸發「深淵的初啼」任務
+  useEffect(() => {
+    triggerQuest('q_first_blood');
+  }, [triggerQuest]);
 
   useEffect(() => {
     if (combatResult) logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -83,7 +90,6 @@ export default function MarketView() {
         </button>
       </div>
 
-      {/* ★ 動態事件橫幅 */}
       {activeEvent && (
         <div className="bg-yellow-950/40 border border-yellow-800 rounded p-3 mb-2 animate-fade-in shadow-lg">
            <h3 className="text-sm font-bold text-yellow-500 mb-1 tracking-widest flex items-center gap-2">
@@ -198,7 +204,6 @@ export default function MarketView() {
         </div>
       )}
 
-      {/* ★ 新增道具黑市 */}
       {activeTab === 'shop' && (
         <div className="flex flex-col gap-4 animate-fade-in">
           <p className="text-xs text-gray-400 italic border-l-2 border-purple-500 pl-2">「這裡流通著帝國明令禁止的特種物資與軍械。」</p>
