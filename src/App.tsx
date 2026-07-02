@@ -11,7 +11,7 @@ import AbyssView from './views/AbyssView';
 import LoginView from './views/LoginView';
 import QuestPanel from './components/QuestPanel';
 import SlavePanel from './components/SlavePanel'; 
-import SystemPanel from './components/SystemPanel'; // ★ V2.4 引入系統抽屜
+import SystemPanel from './components/SystemPanel';
 import { useGameStore } from './store/useGameStore';
 import { supabase } from './services/supabaseClient';
 import { Slave } from './types';
@@ -27,6 +27,7 @@ function App() {
   
   const triggerBackgroundMarketRefresh = useGameStore((state) => state.triggerBackgroundMarketRefresh);
   const loadProfileFromCloud = useGameStore((state) => state.loadProfileFromCloud);
+  const _hasHydrated = useGameStore((state) => state._hasHydrated); // ★ V2.4 取得水合鎖狀態
 
   const globalModal = useGameStore((state) => state.globalModal);
   const setGlobalModal = useGameStore((state) => state.setGlobalModal);
@@ -36,30 +37,55 @@ function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   useEffect(() => {
+    // ★ V2.4 水合鎖：如果本地 IndexedDB 還沒讀完，絕對禁止任何雲端操作與市場檢查！
+    if (!_hasHydrated) return;
+
     let mounted = true;
-    const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (mounted) setSession(session);
-      if (session) {
+    let hasFiredInit = false; // ★ 雙重觸發阻斷器
+
+    const handleAuthAndSync = async (sessionData: any) => {
+      if (hasFiredInit) return;
+      hasFiredInit = true; // 鎖住，確保啟動時的雲端比對只做一次
+      
+      if (sessionData) {
         await loadProfileFromCloud();
-        if (useGameStore.getState().marketSlaves.length === 0) triggerBackgroundMarketRefresh();
+        // 必須在雲端與本地存檔皆整併完成後，才進行市場檢查，消滅洗牌 Bug
+        if (useGameStore.getState().marketSlaves.length === 0) {
+          triggerBackgroundMarketRefresh();
+        }
       }
       if (mounted) setIsAuthChecking(false);
     };
+
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) {
+        setSession(session);
+        await handleAuthAndSync(session);
+      }
+    };
     initSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (mounted) setSession(session);
       if (session) {
-        // ★ V2.4 無論是 INITIAL 或是 TOKEN_REFRESH，一律呼叫拉取。
-        // 由 useGameStore 底層的版號比對去負責防禦並攔截舊檔，徹底根絕回溯！
-        await loadProfileFromCloud();
-        if (useGameStore.getState().marketSlaves.length === 0) triggerBackgroundMarketRefresh();
+        if (event === 'INITIAL_SESSION') {
+          await handleAuthAndSync(session);
+        } else {
+          // 針對 APP 切換喚醒 (TOKEN_REFRESHED) 或重新登入 (SIGNED_IN)
+          // 由底層 loadProfileFromCloud 的「版號比對網」去負責攔截舊檔
+          await loadProfileFromCloud();
+          if (useGameStore.getState().marketSlaves.length === 0) {
+            triggerBackgroundMarketRefresh();
+          }
+        }
+      } else {
+        if (mounted) setIsAuthChecking(false);
       }
     });
 
     return () => { mounted = false; subscription.unsubscribe(); };
-  }, [triggerBackgroundMarketRefresh, loadProfileFromCloud]);
+  }, [_hasHydrated, loadProfileFromCloud, triggerBackgroundMarketRefresh]);
 
   const getDynamicBackground = () => {
     const sceneKey = currentScene.toLowerCase();
@@ -111,6 +137,8 @@ function App() {
     }
   };
 
+  // ★ V2.4 水合過渡與連線畫面
+  if (!_hasHydrated) return <div className="w-full h-screen bg-dark-bg flex items-center justify-center text-gray-600 font-bold tracking-widest animate-pulse">［讀取本地記憶中...］</div>;
   if (isAuthChecking) return <div className="w-full h-screen bg-dark-bg flex items-center justify-center text-gray-400 font-bold tracking-widest animate-pulse">［連線深淵印記中...］</div>;
   if (!session) return <LoginView />;
 
@@ -120,7 +148,6 @@ function App() {
       
       <div className="shrink-0 z-20 shadow-md bg-gray-900 relative"><Header /></div>
       
-      {/* ★ V2.4 三大互斥視窗 */}
       <SystemPanel /> 
       <QuestPanel />
       <SlavePanel onSelectSlave={setActiveSlave} />
