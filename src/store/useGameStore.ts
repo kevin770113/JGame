@@ -38,7 +38,7 @@ export interface GameStore {
   currentSubView: SubView;
   dailyMissions: Mission[];
   activeDispatches: ActiveDispatch[];
-  activeEvent: DynamicEvent | null; // ★ V2.0 動態事件
+  activeEvent: DynamicEvent | null; 
 
   syncProfileToCloud: () => Promise<void>;
   loadProfileFromCloud: () => Promise<void>;
@@ -65,6 +65,10 @@ export interface GameStore {
   useItem: (itemId: string, slaveId: string) => void;
   equipWeapon: (itemId: string, slaveId: string) => void;
   fulfillEvent: (slaveId: string) => boolean;
+
+  // ★ 任務追蹤引擎
+  triggerQuest: (questId: string) => void;
+  checkQuestCompletion: () => void;
 }
 
 const generateDailyMissions = (): Mission[] => {
@@ -109,12 +113,44 @@ export const useGameStore = create<GameStore>()(
       player: { 
         day: 1, timePhase: '早上', gold: 99999, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 9999, actionPoints: 50, lastApUpdateTime: Date.now(),
         deviceId: '', unlockedFacilities: [], usedIdentityIds: [],
-        inventory: {}, quests: {}, abyssFloor: 1 // ★ V2.0 擴充設定
+        inventory: {}, quests: {}, abyssFloor: 1 
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
       activeEvent: null,
 
-      // ★ V2.0 完美雲端同步
+      // ★ 任務引擎實作
+      triggerQuest: (questId) => set(state => {
+        if (!state.player.quests[questId]) {
+           const newQuests = { ...state.player.quests, [questId]: 'active' as const };
+           setTimeout(() => get().syncProfileToCloud(), 100); // 確保觸發後上雲
+           return { player: { ...state.player, quests: newQuests } };
+        }
+        return state;
+      }),
+
+      checkQuestCompletion: () => {
+         const state = get();
+         let updated = false;
+         const newQuests = { ...state.player.quests };
+         let addG = 0; let addP = 0;
+
+         if (newQuests['q_first_blood'] === 'active' && state.slaves.length > 0) {
+            newQuests['q_first_blood'] = 'completed'; addG += 2000; addP += 50; updated = true;
+         }
+         if (newQuests['q_first_fusion'] === 'active' && state.slaves.some(s => s.parents)) {
+            newQuests['q_first_fusion'] = 'completed'; addP += 100; updated = true;
+         }
+         if (newQuests['q_enter_hub'] === 'active' && (state.player.location === 'NeutralHub' || state.player.location === 'Capital')) {
+            newQuests['q_enter_hub'] = 'completed'; addG += 5000; addP += 200; updated = true;
+         }
+
+         if (updated) {
+            set({ player: { ...state.player, quests: newQuests, gold: state.player.gold + addG, prestige: state.player.prestige + addP } });
+            alert(`［系統提示］任務完成！\n獲得資金: ${addG}\n獲得威望: ${addP}`);
+            get().syncProfileToCloud();
+         }
+      },
+
       syncProfileToCloud: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -207,7 +243,6 @@ export const useGameStore = create<GameStore>()(
         const state = get(); const evt = state.activeEvent; const slave = state.slaves.find(s => s.id === slaveId);
         if (!evt || !slave || slave.activityStatus !== '閒置') return false;
         
-        // 嚴格審核條件
         if (evt.reqRace && slave.race !== evt.reqRace) return false;
         if (evt.reqGender && slave.gender !== evt.reqGender) return false;
         if (evt.reqStat && evt.reqStat.key === 'obedience' && slave.primaryStats.obedience < evt.reqStat.val) return false;
@@ -270,10 +305,16 @@ export const useGameStore = create<GameStore>()(
       addFood: (amount) => set((state) => ({ player: { ...state.player, food: state.player.food + amount } })),
       deductFood: (amount) => set((state) => ({ player: { ...state.player, food: Math.max(0, state.player.food - amount) } })),
       addPrestige: (amount) => set((state) => ({ player: { ...state.player, prestige: state.player.prestige + amount } })),
-      changeLocation: (loc) => set((state) => { let capacity = 5; if (loc === 'NeutralHub') capacity = 10; if (loc === 'Capital') capacity = 20; return { player: { ...state.player, location: loc, maxSlaveCapacity: capacity } }; }),
+      changeLocation: (loc) => {
+          set((state) => { let capacity = 5; if (loc === 'NeutralHub') capacity = 10; if (loc === 'Capital') capacity = 20; return { player: { ...state.player, location: loc, maxSlaveCapacity: capacity } }; });
+          get().checkQuestCompletion();
+      },
       navigate: (scene, subView) => set({ currentScene: scene, currentSubView: subView }),
       cleanRoom: () => set((state) => { if (state.player.gold >= 50) return { player: { ...state.player, gold: state.player.gold - 50, roomDirtiness: Math.max(0, state.player.roomDirtiness - 40) } }; return state; }),
-      addSlave: (slave) => set((state) => ({ slaves: [...state.slaves, slave] })),
+      addSlave: (slave) => {
+          set((state) => ({ slaves: [...state.slaves, slave] }));
+          get().checkQuestCompletion();
+      },
       updateSlave: (id, updates) => set((state) => ({ slaves: state.slaves.map(s => s.id === id ? { ...s, ...updates, conditionStats: { ...s.conditionStats, ...(updates.conditionStats || {}) } } : s) })),
       sellSlave: (slaveId) => set((state) => {
         const slave = state.slaves.find(s => s.id === slaveId);
@@ -363,7 +404,6 @@ export const useGameStore = create<GameStore>()(
             get().updateSlave(slave.id, { conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion } });
           });
 
-          // ★ 隨機事件引擎骰點
           let nextEvent = null;
           if (get().player.location === 'NeutralHub' && Math.random() < 0.4) {
             nextEvent = { id: 'evt1', type: 'merchant', desc: '【地頭蛇老張】急需一名服從度達 60 的女性半獸人。', reqRace: '半獸人', reqGender: 'Female', reqStat: { key: 'obedience', val: 60 }, reward: { gold: 12000, prestige: 20, item: 'potion_heal_small' } } as const;
@@ -386,7 +426,6 @@ export const useGameStore = create<GameStore>()(
         const logs: CombatLog[] = [];
         logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system' });
 
-        // ★ 裝備武器加成
         let weaponAtk = 0;
         if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) {
             weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
@@ -475,6 +514,6 @@ export const useGameStore = create<GameStore>()(
         return { logs, isWin };
       }
     }),
-    { name: 'dark-fantasy-save-v14', storage: createJSONStorage(() => storage) }
+    { name: 'dark-fantasy-save-v15', storage: createJSONStorage(() => storage) }
   )
 );
