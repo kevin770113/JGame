@@ -54,7 +54,7 @@ export const getAbyssEnemy = (floor: number) => {
 };
 
 export interface GameStore {
-  player: Player & { shopStock: Record<string, number> }; // ★ 新增商店庫存
+  player: Player & { shopStock: Record<string, number> }; 
   slaves: Slave[];
   marketSlaves: Slave[];
   isMarketGenerating: boolean;
@@ -65,7 +65,9 @@ export interface GameStore {
   activeDispatches: ActiveDispatch[];
   activeEvent: DynamicEvent | null; 
   globalModal: GlobalModal | null; 
+  activeWindow: 'quest' | 'roster' | null; // ★ V2.2 全局互斥視窗鎖
 
+  setActiveWindow: (win: 'quest' | 'roster' | null) => void;
   setGlobalModal: (modal: GlobalModal | null) => void;
   syncProfileToCloud: () => Promise<void>;
   loadProfileFromCloud: () => Promise<void>;
@@ -132,7 +134,7 @@ const storage: StateStorage = {
 };
 
 const TIME_PHASES: TimePhase[] = ['早上', '中午', '下午', '晚上', '深夜'];
-const DEFAULT_SHOP_STOCK = { 'potion_heal_small': 5, 'weapon_iron_sword': 1 }; // ★ 每日預設庫存
+const DEFAULT_SHOP_STOCK = { 'potion_heal_small': 5, 'weapon_iron_sword': 1 }; 
 
 export const useGameStore = create<GameStore>()(
   persist(
@@ -143,9 +145,9 @@ export const useGameStore = create<GameStore>()(
         inventory: {}, quests: {}, abyssFloor: 1, shopStock: { ...DEFAULT_SHOP_STOCK }
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
-      activeEvent: null,
-      globalModal: null,
+      activeEvent: null, globalModal: null, activeWindow: null,
 
+      setActiveWindow: (win) => set({ activeWindow: win }),
       setGlobalModal: (modal) => set({ globalModal: modal }),
 
       triggerQuest: (questId) => set(state => {
@@ -157,15 +159,26 @@ export const useGameStore = create<GameStore>()(
         return state;
       }),
 
+      // ★ V2.2 任務具名明確化提示
       checkQuestCompletion: () => {
-         const state = get(); let updated = false; const newQuests = { ...state.player.quests }; let addG = 0; let addP = 0;
-         if (newQuests['q_first_blood'] === 'active' && state.slaves.length > 0) { newQuests['q_first_blood'] = 'completed'; addG += 2000; addP += 50; updated = true; }
-         if (newQuests['q_first_fusion'] === 'active' && state.slaves.some(s => s.parents)) { newQuests['q_first_fusion'] = 'completed'; addP += 100; updated = true; }
-         if (newQuests['q_enter_hub'] === 'active' && (state.player.location === 'NeutralHub' || state.player.location === 'Capital')) { newQuests['q_enter_hub'] = 'completed'; addG += 5000; addP += 200; updated = true; }
+         const state = get(); let updated = false; const newQuests = { ...state.player.quests }; let title = ''; let msg = ''; let addG = 0; let addP = 0;
+         
+         if (newQuests['q_first_blood'] === 'active' && state.slaves.length > 0) { 
+            newQuests['q_first_blood'] = 'completed'; addG = 2000; addP = 50; updated = true;
+            title = '［任務達成］【深淵的初啼】'; msg = `引進了第一名試驗體，商會基礎規模確立。\n\n獲得報酬：\n資金 +2,000\n威望 +50`;
+         }
+         else if (newQuests['q_first_fusion'] === 'active' && state.slaves.some(s => s.parents)) { 
+            newQuests['q_first_fusion'] = 'completed'; addG = 0; addP = 100; updated = true;
+            title = '［任務達成］【禁忌的鍊金術】'; msg = `成功在密室融合出全新的生命血脈！\n\n獲得報酬：\n威望 +100`;
+         }
+         else if (newQuests['q_enter_hub'] === 'active' && (state.player.location === 'NeutralHub' || state.player.location === 'Capital')) { 
+            newQuests['q_enter_hub'] = 'completed'; addG = 5000; addP = 200; updated = true;
+            title = '［任務達成］【踏入灰色地帶】'; msg = `成功突破邊境，將據點正式喬遷擴展！\n\n獲得報酬：\n資金 +5,000\n威望 +200`;
+         }
 
          if (updated) {
             set({ player: { ...state.player, quests: newQuests, gold: state.player.gold + addG, prestige: state.player.prestige + addP } });
-            get().setGlobalModal({ title: '［系統提示］任務完成！', message: `獲得資金: ${addG}\n獲得威望: ${addP}`, isConfirm: false });
+            get().setGlobalModal({ title, message: msg, isConfirm: false });
             get().syncProfileToCloud();
          }
       },
@@ -192,19 +205,10 @@ export const useGameStore = create<GameStore>()(
         }));
       },
 
-      // ★ 購買物品時同步扣除庫存
       buyItem: (itemId) => set(state => {
-        const item = ITEMS_DATA[itemId];
-        const stock = state.player.shopStock[itemId] || 0;
+        const item = ITEMS_DATA[itemId]; const stock = state.player.shopStock[itemId] || 0;
         if (item && state.player.gold >= item.price && stock > 0) {
-            return { 
-                player: { 
-                    ...state.player, 
-                    gold: state.player.gold - item.price, 
-                    inventory: { ...state.player.inventory, [itemId]: (state.player.inventory[itemId] || 0) + 1 },
-                    shopStock: { ...state.player.shopStock, [itemId]: stock - 1 }
-                } 
-            };
+            return { player: { ...state.player, gold: state.player.gold - item.price, inventory: { ...state.player.inventory, [itemId]: (state.player.inventory[itemId] || 0) + 1 }, shopStock: { ...state.player.shopStock, [itemId]: stock - 1 } } };
         }
         return state;
       }),
@@ -321,9 +325,7 @@ export const useGameStore = create<GameStore>()(
         const newDirtiness = Math.min(100, player.roomDirtiness + Math.ceil(slaves.length * (player.location === 'Capital' ? 1 : player.location === 'NeutralHub' ? 1.5 : 2)) + Math.pow(overpopulation, 2) * 5);
         
         let newShopStock = { ...player.shopStock };
-        if (triggerDailySettlement) {
-            newShopStock = { ...DEFAULT_SHOP_STOCK }; // ★ 每日結算重置商店庫存
-        }
+        if (triggerDailySettlement) { newShopStock = { ...DEFAULT_SHOP_STOCK }; }
 
         set({ player: { ...player, day: nextDay, timePhase: nextPhase, roomDirtiness: newDirtiness, actionPoints: newAp, lastApUpdateTime: newApUpdateTime, shopStock: newShopStock } });
 
@@ -376,13 +378,12 @@ export const useGameStore = create<GameStore>()(
 
         const logs: CombatLog[] = []; logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system' });
 
-        // ★ 加入開場種族天賦宣告
-        if (slave.race === '精靈') logs.push({ round: 0, message: `［種族天賦］${slave.name} 觸發了【風之眷顧】，身形如風，速度獲得大幅提升！`, type: 'skill' });
-        if (slave.race === '半獸人') logs.push({ round: 0, message: `［種族天賦］${slave.name} 點燃了【狂熱戰血】，放棄防禦以換取更具破壞力的攻擊！`, type: 'skill' });
-        if (slave.race === '矮人') logs.push({ round: 0, message: `［種族天賦］${slave.name} 展現了【堅岩體魄】，肌肉宛如磐石般堅不可摧！`, type: 'skill' });
-        if (slave.race === '龍族') logs.push({ round: 0, message: `［種族天賦］${slave.name} 釋放了【真龍威壓】，全屬性獲得增幅，令對手不寒而慄！`, type: 'skill' });
-        if (slave.race === '人類') logs.push({ round: 0, message: `［種族天賦］${slave.name} 懷抱著【絕境意志】，處於瀕死狀態時將爆發驚人的潛能。`, type: 'skill' });
-        if (slave.race === '不死族') logs.push({ round: 0, message: `［種族天賦］${slave.name} 散發著死氣，【枯骨不朽】將使其能汲取敵人的生命力。`, type: 'skill' });
+        if (slave.race === '精靈') logs.push({ round: 0, message: `［風之眷顧］${slave.name} 身形如風奪得先手，首擊傷害大幅增幅！`, type: 'skill' });
+        if (slave.race === '半獸人') logs.push({ round: 0, message: `［狂熱戰血］${slave.name} 點燃了怒火，放棄防禦以換取更具破壞力的重擊！`, type: 'skill' });
+        if (slave.race === '矮人') logs.push({ round: 0, message: `［堅岩體魄］${slave.name} 展現了北地體格，肌肉宛如磐石般堅不可摧！`, type: 'skill' });
+        if (slave.race === '龍族') logs.push({ round: 0, message: `［真龍威壓］${slave.name} 釋放了上位威壓，全屬性增幅並獲得巨額減傷！`, type: 'skill' });
+        if (slave.race === '人類') logs.push({ round: 0, message: `［絕境意志］${slave.name} 懷抱求生潛能，瀕死狀態下攻擊力將大幅爆發。`, type: 'skill' });
+        if (slave.race === '不死族') logs.push({ round: 0, message: `［枯骨不朽］${slave.name} 散發著死氣，其攻擊能精準汲取敵人的生命力。`, type: 'skill' });
 
         let weaponAtk = 0; if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
 
@@ -411,9 +412,18 @@ export const useGameStore = create<GameStore>()(
             if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal' }); } }
           };
           const npcAction = () => {
-            if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); if (slave.race === '矮人') dmg = Math.max(1, dmg - 5);
+            if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); 
+            // ★ 矮人受擊時獨立播報減傷
+            if (slave.race === '矮人') { 
+              dmg = Math.max(1, dmg - 5); 
+              logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill' });
+            }
             dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; logs.push({ round, message: `${npc.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
-            if (slave.race === '半獸人') orcStack++;
+            // ★ 半獸人受擊時獨立播報憤怒疊加
+            if (slave.race === '半獸人') {
+              orcStack++;
+              logs.push({ round, message: `［天賦狂暴］${slave.name} 的【狂熱戰血】受到痛覺刺激，怒氣加劇（當前層數: ${orcStack}，額外增傷: +${Math.min(30, orcStack * 3)}%）！`, type: 'skill' });
+            }
           };
           if (isSlaveFirst) { slaveAction(); npcAction(); } else { npcAction(); slaveAction(); }
           round++;
@@ -437,20 +447,18 @@ export const useGameStore = create<GameStore>()(
         const state = get(); const slave = state.slaves.find(s => s.id === slaveId);
         if (!slave || state.player.actionPoints < 1) return null;
 
-        const floor = state.player.abyssFloor;
-        const enemy = getAbyssEnemy(floor);
+        const floor = state.player.abyssFloor; const enemy = getAbyssEnemy(floor);
         const logs: CombatLog[] = [];
 
         logs.push({ round: 0, message: `［系統］${slave.name} 踏入深淵第 ${floor} 階，迎戰 ${enemy.name}。`, type: 'system' });
         logs.push({ round: 0, message: `「${enemy.quote}」`, type: 'system' });
 
-        // ★ 加入開場種族天賦宣告
-        if (slave.race === '精靈') logs.push({ round: 0, message: `［種族天賦］${slave.name} 觸發了【風之眷顧】，身形如風，速度獲得大幅提升！`, type: 'skill' });
-        if (slave.race === '半獸人') logs.push({ round: 0, message: `［種族天賦］${slave.name} 點燃了【狂熱戰血】，放棄防禦以換取更具破壞力的攻擊！`, type: 'skill' });
-        if (slave.race === '矮人') logs.push({ round: 0, message: `［種族天賦］${slave.name} 展現了【堅岩體魄】，肌肉宛如磐石般堅不可摧！`, type: 'skill' });
-        if (slave.race === '龍族') logs.push({ round: 0, message: `［種族天賦］${slave.name} 釋放了【真龍威壓】，全屬性獲得增幅，令對手不寒而慄！`, type: 'skill' });
-        if (slave.race === '人類') logs.push({ round: 0, message: `［種族天賦］${slave.name} 懷抱著【絕境意志】，處於瀕死狀態時將爆發驚人的潛能。`, type: 'skill' });
-        if (slave.race === '不死族') logs.push({ round: 0, message: `［種族天賦］${slave.name} 散發著死氣，【枯骨不朽】將使其能汲取敵人的生命力。`, type: 'skill' });
+        if (slave.race === '精靈') logs.push({ round: 0, message: `［風之眷顧］${slave.name} 身形如風奪得先手，首擊傷害大幅增幅！`, type: 'skill' });
+        if (slave.race === '半獸人') logs.push({ round: 0, message: `［狂熱戰血］${slave.name} 點燃了怒火，放棄防禦以換取更具破壞力的重擊！`, type: 'skill' });
+        if (slave.race === '矮人') logs.push({ round: 0, message: `［堅岩體魄］${slave.name} 展現了北地體格，肌肉宛如磐石般堅不可摧！`, type: 'skill' });
+        if (slave.race === '龍族') logs.push({ round: 0, message: `［真龍威壓］${slave.name} 釋放了上位威壓，全屬性增幅並獲得巨額減傷！`, type: 'skill' });
+        if (slave.race === '人類') logs.push({ round: 0, message: `［絕境意志］${slave.name} 懷抱求生潛能，瀕死狀態下攻擊力將大幅爆發。`, type: 'skill' });
+        if (slave.race === '不死族') logs.push({ round: 0, message: `［枯骨不朽］${slave.name} 散發著死氣，其攻擊能精準汲取敵人的生命力。`, type: 'skill' });
 
         let weaponAtk = 0; if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
 
@@ -479,9 +487,18 @@ export const useGameStore = create<GameStore>()(
             if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal' }); } }
           };
           const npcAction = () => {
-            if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); if (slave.race === '矮人') dmg = Math.max(1, dmg - 5);
+            if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); 
+            // ★ 矮人受擊時獨立播報減傷
+            if (slave.race === '矮人') { 
+              dmg = Math.max(1, dmg - 5); 
+              logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill' });
+            }
             dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; logs.push({ round, message: `${enemy.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
-            if (slave.race === '半獸人') orcStack++;
+            // ★ 半獸人受擊時獨立播報憤怒加成
+            if (slave.race === '半獸人') {
+              orcStack++;
+              logs.push({ round, message: `［天賦層數］${slave.name} 承受攻擊，痛苦激發狂暴，傷害額外提升！`, type: 'skill' });
+            }
           };
           if (isSlaveFirst) { slaveAction(); npcAction(); } else { npcAction(); slaveAction(); }
           round++;
@@ -492,8 +509,7 @@ export const useGameStore = create<GameStore>()(
         
         set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
         if (isWin) {
-          get().addGold(enemy.rewardGold);
-          if (enemy.rewardPrestige > 0) get().addPrestige(enemy.rewardPrestige);
+          get().addGold(enemy.rewardGold); if (enemy.rewardPrestige > 0) get().addPrestige(enemy.rewardPrestige);
           set((s) => ({ player: { ...s.player, abyssFloor: s.player.abyssFloor + 1 } }));
         }
 
