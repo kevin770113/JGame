@@ -39,6 +39,7 @@ function App() {
     const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (mounted) setSession(session);
+      // 初次載入 APP 時，允許下載存檔
       if (session) {
         await loadProfileFromCloud();
         if (useGameStore.getState().marketSlaves.length === 0) triggerBackgroundMarketRefresh();
@@ -47,9 +48,12 @@ function App() {
     };
     initSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // ★ V2.4 阻斷回溯機制：防禦性雲端讀取 (Smart Hydration)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
-      if (session) {
+      // 只有當玩家剛開啟遊戲 (INITIAL_SESSION) 或進行登入 (SIGNED_IN) 時，才允許下載雲端存檔覆蓋本地
+      // 堅決拒絕手機背景喚醒造成的憑證刷新 (TOKEN_REFRESHED) 去觸發舊檔下載，藉此徹底消滅回溯 Bug！
+      if (session && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
         await loadProfileFromCloud();
         if (useGameStore.getState().marketSlaves.length === 0) triggerBackgroundMarketRefresh();
       }
@@ -138,7 +142,6 @@ function App() {
                 <div className="flex flex-wrap gap-2 mt-1.5">
                   <span className="text-xs text-gray-300 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-700">種族：{activeSlave.race}</span>
                   <span className={`text-xs px-2.5 py-0.5 rounded border ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-700 text-gray-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-500 font-bold'}`}>狀態：{activeSlave.activityStatus}</span>
-                  {/* ★ V2.3 詳細資訊面板新增負傷標籤與戰績數據外顯 */}
                   {activeSlave.isInjured && <span className="text-xs px-2.5 py-0.5 bg-red-950 border border-red-700 text-red-400 font-extrabold rounded animate-pulse">［負傷狀態］</span>}
                   <span className="text-xs text-gray-400 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-800 font-mono flex items-center gap-1">⚔️ 勝 {activeSlave.combatRecord?.wins || 0} / 敗 {activeSlave.combatRecord?.losses || 0}</span>
                 </div>
