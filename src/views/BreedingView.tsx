@@ -16,7 +16,6 @@ export default function BreedingView() {
   const [betaId, setBetaId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' | 'loading' } | null>(null);
 
-  // ★ 玩家第一次進入血統密室，觸發「禁忌的鍊金術」任務
   useEffect(() => {
     triggerQuest('q_first_fusion');
   }, [triggerQuest]);
@@ -91,7 +90,9 @@ export default function BreedingView() {
       conditionStats: { stamina: 100, stress: 0, rebellion: 0 },
       traits: [],
       backgroundStory: `［密室誕生］${fatherName} 與 ${motherName} ${genderSuffix}。${aiData.story}`,
-      parents: { fatherId: p1.gender === 'Male' ? p1.id : p2.id, motherId: p1.gender === 'Female' ? p1.id : p2.id }
+      parents: { fatherId: p1.gender === 'Male' ? p1.id : p2.id, motherId: p1.gender === 'Female' ? p1.id : p2.id },
+      combatRecord: { wins: 0, losses: 0 }, // ★ V2.3 初始化戰鬥紀錄
+      isInjured: false // ★ V2.3 初始化負傷狀態
     };
 
     addSlave(newChild);
@@ -102,10 +103,28 @@ export default function BreedingView() {
 
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
   
-  const slaveOptions: Option[] = idleSlaves.map(s => ({
+  // ★ V2.3 動態防呆篩選邏輯
+  const alphaSlave = slaves.find(s => s.id === alphaId);
+
+  const alphaOptions: Option[] = idleSlaves.map(s => ({
     value: s.id,
-    label: `${s.name} (種族: ${s.race})`
+    label: `${s.name} (種族: ${s.race} | 性別: ${s.gender === 'Male' ? '♂' : '♀'})`
   }));
+
+  const betaOptions: Option[] = idleSlaves.map(s => {
+    let isDisabled = false;
+    let disabledReason = '';
+    if (alphaSlave) {
+      if (s.id === alphaSlave.id) { isDisabled = true; disabledReason = ' (已選)'; }
+      else if (s.race !== alphaSlave.race) { isDisabled = true; disabledReason = ' (基因排斥)'; }
+      else if (s.gender === alphaSlave.gender) { isDisabled = true; disabledReason = ' (性別相同)'; }
+    }
+    return {
+      value: s.id,
+      label: `${s.name} (種族: ${s.race} | 性別: ${s.gender === 'Male' ? '♂' : '♀'})${disabledReason}`,
+      disabled: isDisabled
+    };
+  });
 
   const isLoading = sysMessage?.type === 'loading';
 
@@ -128,23 +147,26 @@ export default function BreedingView() {
 
         <div className="flex flex-col gap-1.5 mt-2">
           <label className="text-xs text-gray-400 font-bold tracking-widest">［注入試驗體 Alpha］</label>
-          <CustomSelect options={slaveOptions} value={alphaId} onChange={setAlphaId} focusColor="gray" />
+          {/* 選擇 Alpha 時，清空 Beta */}
+          <CustomSelect options={alphaOptions} value={alphaId} onChange={(val) => { setAlphaId(val); setBetaId(''); }} focusColor="gray" />
         </div>
 
         <div className="flex flex-col gap-1.5 relative z-40">
           <label className="text-xs text-gray-400 font-bold tracking-widest">［注入試驗體 Beta］</label>
-          <CustomSelect options={slaveOptions} value={betaId} onChange={setBetaId} focusColor="gray" />
+          <CustomSelect options={betaOptions} value={betaId} onChange={setBetaId} focusColor="gray" />
         </div>
 
         <button 
           onClick={handleBreed}
-          disabled={isLoading || isFull}
+          disabled={isLoading || isFull || !alphaId || !betaId}
           className={`mt-4 font-bold py-3 rounded text-xs tracking-widest border transition-colors shadow ${
             isFull
               ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
               : isLoading 
                 ? 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed animate-pulse'
-                : 'bg-blood-red/20 hover:bg-blood-red/40 text-red-400 border-red-900/50'
+                : (!alphaId || !betaId)
+                  ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                  : 'bg-blood-red/20 hover:bg-blood-red/40 text-red-400 border-red-900/50'
           }`}
         >
           {isFull ? '［據點人口已滿］' : isLoading ? '［血統融合運算中...］' : '［啟動融合陣列］'}
