@@ -8,6 +8,7 @@ import MapView from './views/MapView';
 import InteractionView from './views/InteractionView';
 import ArenaView from './views/ArenaView';
 import LoginView from './views/LoginView';
+import QuestPanel from './components/QuestPanel'; // ★ 引入任務面板
 import { useGameStore } from './store/useGameStore';
 import { supabase } from './services/supabaseClient';
 import { Slave } from './types';
@@ -34,7 +35,7 @@ function App() {
       const { data: { session } } = await supabase.auth.getSession();
       if (mounted) setSession(session);
       if (session) {
-        await loadProfileFromCloud(); // ★ 確保最新進度已覆蓋本地
+        await loadProfileFromCloud();
         if (useGameStore.getState().marketSlaves.length === 0) triggerBackgroundMarketRefresh();
       }
       if (mounted) setIsAuthChecking(false);
@@ -109,7 +110,11 @@ function App() {
   return (
     <div className="absolute inset-0 flex flex-col bg-dark-bg text-gray-200 overflow-hidden select-none transition-all duration-700" style={{backgroundImage: `url(${getDynamicBackground()})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat'}}>
       <div className="absolute inset-0 bg-black/40 z-0 pointer-events-none"></div>
+      
       <div className="shrink-0 z-20 shadow-md bg-gray-900 relative"><Header /></div>
+
+      {/* ★ 懸浮卷軸任務面板 */}
+      <QuestPanel />
 
       <div className="flex-1 flex overflow-hidden relative z-10">
         <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center z-10 overscroll-contain">
