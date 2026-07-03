@@ -6,19 +6,16 @@ export default function CombatTheater() {
   const activeCombat = useGameStore((state) => state.activeCombat);
   const setActiveCombat = useGameStore((state) => state.setActiveCombat);
 
-  // 播放器狀態
   const [currentFrame, setCurrentFrame] = useState(0);
   const [displayedLogs, setDisplayedLogs] = useState<CombatLog[]>([]);
   const [isFinished, setIsFinished] = useState(false);
   
-  // 動態血條與視覺狀態
   const [slaveHp, setSlaveHp] = useState(0);
   const [npcHp, setNpcHp] = useState(0);
   const [activeEffect, setActiveEffect] = useState<'none' | 'slave-hit' | 'npc-hit' | 'slave-skill'>('none');
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // 初始化影帶
   useEffect(() => {
     if (activeCombat) {
       setCurrentFrame(0);
@@ -30,7 +27,6 @@ export default function CombatTheater() {
     }
   }, [activeCombat]);
 
-  // 播放器引擎 (Playback Engine)
   useEffect(() => {
     if (!activeCombat || isFinished) return;
 
@@ -38,35 +34,28 @@ export default function CombatTheater() {
       if (currentFrame < activeCombat.logs.length) {
         const log = activeCombat.logs[currentFrame];
         
-        // 更新推播日誌
         setDisplayedLogs(prev => [...prev, log]);
         
-        // 更新動態血條
         if (log.sHp !== undefined) setSlaveHp(log.sHp);
         if (log.nHp !== undefined) setNpcHp(log.nHp);
 
-        // 觸發視覺特效震動
         if (log.type === 'damage') {
-          // 若這回合是奴隸發動攻擊，則 npc 挨打
           if (log.message.includes(activeCombat.slaveName + ' 發動攻擊')) setActiveEffect('npc-hit');
           else setActiveEffect('slave-hit');
         } else if (log.type === 'skill') {
           setActiveEffect('slave-skill');
         }
 
-        // 短暫重置特效以利下回合觸發
         setTimeout(() => setActiveEffect('none'), 300);
-
         setCurrentFrame(prev => prev + 1);
       } else {
         setIsFinished(true);
       }
-    }, 1000); // 這裡設定每個回合的頓點時間 (1000ms = 1秒)
+    }, 1000); 
 
     return () => clearTimeout(timer);
   }, [activeCombat, currentFrame, isFinished]);
 
-  // 日誌自動捲動到底部
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [displayedLogs]);
@@ -88,22 +77,21 @@ export default function CombatTheater() {
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-fade-in overflow-hidden select-none font-mono">
-      {/* 頂部：生死天平 (血條區) */}
-      <div className="bg-gray-950 border-b-2 border-blood-red/50 p-4 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)] relative z-10">
-        <div className="text-center mb-4">
-          <span className="text-red-600 font-black tracking-[0.3em] text-xl drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]">
+      {/* ★ V2.6 擴大頂部舞台比例與加入安全防護區段 (pt-12) */}
+      <div className="bg-gray-950 border-b-2 border-blood-red/50 pt-12 pb-8 px-4 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)] relative z-10 min-h-[35vh] md:min-h-[40vh] flex flex-col justify-center">
+        <div className="text-center mb-6">
+          <span className="text-red-600 font-black tracking-[0.3em] text-xl md:text-2xl drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]">
             {activeCombat.isAbyss ? '【 深 淵 死 鬥 】' : '【 角 鬥 廝 殺 】'}
           </span>
         </div>
         
-        <div className="flex justify-between items-center gap-4 max-w-4xl mx-auto">
-          {/* 左側我方 */}
-          <div className={`flex-1 flex flex-col gap-1 transition-transform duration-75 ${activeEffect === 'slave-hit' ? 'translate-x-[-10px] md:translate-x-[-20px]' : activeEffect === 'slave-skill' ? 'scale-105' : ''}`}>
+        <div className="flex justify-between items-center gap-4 max-w-4xl mx-auto w-full">
+          <div className={`flex-1 flex flex-col gap-2 transition-transform duration-75 ${activeEffect === 'slave-hit' ? 'translate-x-[-10px] md:translate-x-[-20px]' : activeEffect === 'slave-skill' ? 'scale-105' : ''}`}>
             <div className="flex justify-between items-end">
-              <span className="text-blue-400 font-bold text-sm md:text-lg tracking-widest truncate">{activeCombat.slaveName}</span>
-              <span className="text-gray-400 text-xs font-bold">{slaveHp} / {activeCombat.slaveMaxHp}</span>
+              <span className="text-blue-400 font-bold text-base md:text-xl tracking-widest truncate max-w-[60%]">{activeCombat.slaveName}</span>
+              <span className="text-gray-400 text-sm md:text-base font-bold">{slaveHp} / {activeCombat.slaveMaxHp}</span>
             </div>
-            <div className="w-full h-4 bg-gray-900 border border-gray-700 rounded-sm overflow-hidden relative">
+            <div className="w-full h-5 md:h-6 bg-gray-900 border border-gray-700 rounded-sm overflow-hidden relative">
               <div 
                 className={`h-full transition-all duration-500 ease-out ${slaveHpPercent < 30 ? 'bg-red-600 animate-pulse' : 'bg-blue-600'}`}
                 style={{ width: `${slaveHpPercent}%` }}
@@ -112,18 +100,16 @@ export default function CombatTheater() {
             </div>
           </div>
 
-          {/* 中央 VS */}
-          <div className="shrink-0 flex flex-col items-center justify-center w-12">
-            <span className="text-gray-600 font-black italic text-2xl">VS</span>
+          <div className="shrink-0 flex flex-col items-center justify-center w-12 md:w-16">
+            <span className="text-gray-600 font-black italic text-3xl md:text-4xl">VS</span>
           </div>
 
-          {/* 右側敵方 */}
-          <div className={`flex-1 flex flex-col gap-1 transition-transform duration-75 ${activeEffect === 'npc-hit' ? 'translate-x-[10px] md:translate-x-[20px]' : ''}`}>
+          <div className={`flex-1 flex flex-col gap-2 transition-transform duration-75 ${activeEffect === 'npc-hit' ? 'translate-x-[10px] md:translate-x-[20px]' : ''}`}>
             <div className="flex justify-between items-end flex-row-reverse">
-              <span className="text-red-400 font-bold text-sm md:text-lg tracking-widest truncate">{activeCombat.npcName}</span>
-              <span className="text-gray-400 text-xs font-bold">{npcHp} / {activeCombat.npcMaxHp}</span>
+              <span className="text-red-400 font-bold text-base md:text-xl tracking-widest truncate max-w-[60%]">{activeCombat.npcName}</span>
+              <span className="text-gray-400 text-sm md:text-base font-bold">{npcHp} / {activeCombat.npcMaxHp}</span>
             </div>
-            <div className="w-full h-4 bg-gray-900 border border-gray-700 rounded-sm overflow-hidden relative rotate-180">
+            <div className="w-full h-5 md:h-6 bg-gray-900 border border-gray-700 rounded-sm overflow-hidden relative rotate-180">
               <div 
                 className="h-full bg-red-800 transition-all duration-500 ease-out"
                 style={{ width: `${npcHpPercent}%` }}
@@ -134,14 +120,14 @@ export default function CombatTheater() {
         </div>
       </div>
 
-      {/* 中部：觀測終端 (日誌推播區) */}
-      <div className="flex-1 bg-[url('https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/bg-abyss-capital.webp')] bg-cover bg-center bg-no-repeat relative">
+      {/* ★ V2.6 優化漸層遮罩，讓日誌隱入黑暗更自然 */}
+      <div className="flex-1 bg-[url('https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/bg-abyss-capital.webp')] bg-cover bg-center bg-no-repeat relative overflow-hidden">
         <div className="absolute inset-0 bg-black/85 backdrop-blur-sm"></div>
-        <div className="absolute inset-0 flex flex-col p-4 md:p-8 overflow-y-auto scrollbar-none" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' }}>
-          <div className="flex flex-col gap-3 max-w-3xl mx-auto w-full pt-10 pb-20">
+        <div className="absolute inset-0 flex flex-col p-4 md:p-8 overflow-y-auto scrollbar-none" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 90%, transparent)' }}>
+          <div className="flex flex-col gap-4 max-w-3xl mx-auto w-full pt-16 pb-24">
             {displayedLogs.map((log, idx) => (
               <div key={idx} className={`animate-slide-up text-sm md:text-base leading-relaxed ${getLogColor(log.type)}`}>
-                <span className="text-gray-600 mr-3 text-xs opacity-70">[{log.round > 0 ? `回合 ${String(log.round).padStart(2, '0')}` : '系統'}]</span>
+                <span className="text-gray-600 mr-3 text-xs md:text-sm opacity-70">[{log.round > 0 ? `回合 ${String(log.round).padStart(2, '0')}` : '系統'}]</span>
                 <span dangerouslySetInnerHTML={{ __html: log.message.replace(activeCombat.slaveName, `<strong class="text-blue-300">${activeCombat.slaveName}</strong>`).replace(activeCombat.npcName, `<strong class="text-red-400">${activeCombat.npcName}</strong>`) }} />
               </div>
             ))}
@@ -150,7 +136,6 @@ export default function CombatTheater() {
         </div>
       </div>
 
-      {/* 底部結算按鈕 (播放完畢才顯示) */}
       <div className={`bg-gray-950 p-4 border-t border-gray-800 flex justify-center items-center transition-all duration-1000 ${isFinished ? 'h-32 opacity-100 translate-y-0' : 'h-0 opacity-0 translate-y-full overflow-hidden p-0'}`}>
         {isFinished && (
           <div className="flex flex-col items-center gap-3 w-full max-w-md animate-fade-in">
