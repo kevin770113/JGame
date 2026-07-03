@@ -49,7 +49,6 @@ function App() {
       
       if (sessionData) {
         await loadProfileFromCloud();
-        // ★ V2.6.1 修正：只有在「市場為空」且「版號為 0 (純新手)」時，才允許初始自動補貨
         if (useGameStore.getState().marketSlaves.length === 0 && useGameStore.getState().localSaveVersion === 0) {
           triggerBackgroundMarketRefresh();
         }
@@ -73,7 +72,6 @@ function App() {
           await handleAuthAndSync(session);
         } else {
           await loadProfileFromCloud();
-          // ★ V2.6.1 修正：攔截老玩家買光奴隸後的自動刷新，嚴格驗證版號
           if (useGameStore.getState().marketSlaves.length === 0 && useGameStore.getState().localSaveVersion === 0) {
             triggerBackgroundMarketRefresh();
           }
@@ -161,10 +159,10 @@ function App() {
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
           <div className="w-full max-w-2xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setActiveSlave(null)} className="absolute top-2 right-3 text-gray-400 hover:text-white text-sm font-bold transition-colors z-20">［關閉］</button>
-            <div className="w-full sm:w-1/3 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[180px] sm:min-h-[380px] relative overflow-hidden group"><div className="absolute inset-0 bg-gray-800/10 group-hover:bg-gray-800/30 transition-colors"></div><span className="text-gray-600 text-xs italic tracking-widest z-10">［立繪預留區］</span></div>
+            <div className="w-full sm:w-1/3 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[180px] sm:min-h-[380px] relative overflow-hidden group shrink-0"><div className="absolute inset-0 bg-gray-800/10 group-hover:bg-gray-800/30 transition-colors"></div><span className="text-gray-600 text-xs italic tracking-widest z-10">［立繪預留區］</span></div>
             
             <div className="w-full sm:w-2/3 flex flex-col gap-4 overflow-y-auto max-h-[60vh] sm:max-h-[70vh] pr-1 scrollbar-none">
-              <div>
+              <div className="shrink-0">
                 <h3 className="text-xl font-bold text-gray-200 flex items-center gap-2">{activeSlave.name}<span className={`text-sm ${activeSlave.gender === 'Male' ? 'text-blue-400' : 'text-pink-400'}`}>[{activeSlave.gender === 'Male' ? '男' : '女'}]</span></h3>
                 <div className="flex flex-wrap gap-2 mt-1.5">
                   <span className="text-xs text-gray-300 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-700">種族：{activeSlave.race}</span>
@@ -179,7 +177,8 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-sm bg-gray-950 p-3 rounded border border-gray-800 relative overflow-hidden">
+              {/* ★ 加入 shrink-0 強制不被壓縮，讓裁切的屬性完整顯現 */}
+              <div className="grid grid-cols-2 gap-3 text-sm bg-gray-950 p-3 rounded border border-gray-800 relative overflow-hidden shrink-0">
                 {(activeSlave.faintTurns || 0) > 0 && <div className="absolute inset-0 bg-gray-950/60 z-10 pointer-events-none"></div>}
 
                 <div className="flex flex-col gap-1.5 border-r border-gray-800 pr-3 z-20">
@@ -238,7 +237,7 @@ function App() {
                 </div>
               </div>
               
-              <div className="flex flex-col gap-2 bg-gray-950 p-3 rounded border border-gray-800 text-sm shadow-inner">
+              <div className="flex flex-col gap-2 bg-gray-950 p-3 rounded border border-gray-800 text-sm shadow-inner shrink-0">
                 <div className="flex flex-col gap-1 border-b border-gray-800 pb-2">
                   <span className="text-xs text-gray-400 font-bold tracking-widest">［血脈被動］</span>
                   <span className="text-yellow-500 text-xs leading-relaxed font-bold">
@@ -260,12 +259,12 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 shrink-0">
                   <div className="flex flex-col gap-0.5"><div className="flex justify-between text-3xs text-gray-400 font-bold"><span>體力</span><span className="font-mono">{activeSlave.conditionStats.stamina}/100</span></div><div className="w-full h-1.5 bg-gray-950 rounded overflow-hidden border border-gray-800"><div className="bg-green-600 h-full" style={{ width: `${activeSlave.conditionStats.stamina}%` }}></div></div></div>
                   <div className="flex flex-col gap-0.5"><div className="flex justify-between text-3xs text-gray-400 font-bold"><span>壓力</span><span className="font-mono">{activeSlave.conditionStats.stress}/100</span></div><div className="w-full h-1.5 bg-gray-950 rounded overflow-hidden border border-gray-800"><div className="bg-yellow-600 h-full" style={{ width: `${activeSlave.conditionStats.stress}%` }}></div></div></div>
                   <div className="flex flex-col gap-0.5"><div className="flex justify-between text-3xs text-gray-400 font-bold"><span>反抗</span><span className="font-mono">{activeSlave.conditionStats.rebellion}/100</span></div><div className="w-full h-1.5 bg-gray-950 rounded overflow-hidden border border-gray-800"><div className="bg-blood-red h-full" style={{ width: `${activeSlave.conditionStats.rebellion}%` }}></div></div></div>
               </div>
-              <div className="text-xs text-gray-300 italic bg-gray-950 p-3 rounded border-l-2 border-blood-red bg-gray-950/40 leading-relaxed max-h-32">［檔案紀錄］{activeSlave.backgroundStory}</div>
+              <div className="text-xs text-gray-300 italic bg-gray-950 p-3 rounded border-l-2 border-blood-red bg-gray-950/40 leading-relaxed shrink-0">［檔案紀錄］{activeSlave.backgroundStory}</div>
             </div>
           </div>
         </div>
