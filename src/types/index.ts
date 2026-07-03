@@ -9,6 +9,9 @@ export type Location = 'Frontlines' | 'NeutralHub' | 'Capital';
 
 export type ActivityStatus = '閒置' | '外派中' | '特訓中';
 
+// ★ V2.6 新增職位型別
+export type Role = 'none' | 'maid' | 'security';
+
 export type ActiveWindow = 'quest' | 'roster' | 'system' | null;
 
 export interface Skills {
@@ -36,6 +39,8 @@ export interface Slave {
   race: Race;
   gender: Gender;
   activityStatus: ActivityStatus;
+  role: Role;            // ★ V2.6 據點職務
+  faintTurns: number;    // ★ V2.6 昏厥剩餘回合數
   skills: Skills;
   primaryStats: PrimaryStats;
   conditionStats: ConditionStats;
@@ -82,17 +87,15 @@ export interface ArenaNPC {
   rewardPrestige: number;
 }
 
-// ★ V2.5 擴充戰鬥日誌 (支援動態血條與傷害數字)
 export interface CombatLog {
   round: number;
   message: string;
   type: 'info' | 'damage' | 'heal' | 'skill' | 'system';
-  sHp?: number;     // 該動作後我方剩餘血量
-  nHp?: number;     // 該動作後敵方剩餘血量
-  damage?: number;  // 該動作的傷害/補血量
+  sHp?: number;
+  nHp?: number;
+  damage?: number;
 }
 
-// ★ V2.5 新增戰鬥影帶封裝格式
 export interface CombatPlaybackData {
   slaveId: string;
   slaveName: string;
