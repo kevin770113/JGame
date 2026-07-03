@@ -21,10 +21,9 @@ export default function InteractionView() {
   const equipWeapon = useGameStore((state) => state.equipWeapon);
   const appointRole = useGameStore((state) => state.appointRole);
 
-  // V2.7 任務與 3D 輪播專用狀態
   const [currentTask, setCurrentTask] = useState<TaskType>('none');
   const [carouselIndex, setCarouselIndex] = useState<number>(0);
-  const [selectedItemId, setSelectedItemId] = useState<string>(''); // 道具裝備分流用
+  const [selectedItemId, setSelectedItemId] = useState<string>('');
 
   const [currentQuote, setCurrentQuote] = useState<string>('［等待傳喚中...］');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -32,8 +31,10 @@ export default function InteractionView() {
 
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
   const activeSlave = idleSlaves[carouselIndex];
+  
+  // ★ 修復：補回針對當前中央選定者的昏厥狀態判定
+  const isFainted = activeSlave ? (activeSlave.faintTurns || 0) > 0 : false;
 
-  // 切換任務或換人時重置日誌
   useEffect(() => {
     setSysMessage(null);
     if (currentTask === 'dialogue') {
