@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { ITEMS_DATA } from '../utils/gameData';
+import { Slave } from '../types';
 
 interface ConfirmModalData {
   title: string;
@@ -32,7 +33,6 @@ export default function InteractionView() {
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
   const activeSlave = idleSlaves[carouselIndex];
   
-  // ★ 修復：補回針對當前中央選定者的昏厥狀態判定
   const isFainted = activeSlave ? (activeSlave.faintTurns || 0) > 0 : false;
 
   useEffect(() => {
@@ -89,9 +89,24 @@ export default function InteractionView() {
     const newDirtiness = Math.max(0, roomDirtiness - cleanPower);
     const newStamina = Math.max(0, activeSlave.conditionStats.stamina - 15);
 
+    let updates: Partial<Slave> = {
+      conditionStats: { ...activeSlave.conditionStats, stamina: newStamina }
+    };
+    let msg = `［結算］${activeSlave.name} 執行了環境整理。髒亂度大幅下降。`;
+    let msgType: 'success' | 'error' = 'success';
+
+    // ★ V2.7.1 修正：扣除體力後，當場判定是否昏厥
+    if (newStamina <= 0) {
+      updates.faintTurns = 5;
+      updates.primaryStats = { ...activeSlave.primaryStats, obedience: Math.max(0, activeSlave.primaryStats.obedience - 5) };
+      updates.conditionStats!.stress = Math.min(100, activeSlave.conditionStats.stress + 15);
+      msg = `［嚴重警告］${activeSlave.name} 執行打掃後體力徹底透支，當場倒地陷入昏厥！`;
+      msgType = 'error';
+    }
+
     useGameStore.setState((state) => ({ player: { ...state.player, roomDirtiness: newDirtiness } }));
-    updateSlave(activeSlave.id, { conditionStats: { ...activeSlave.conditionStats, stamina: newStamina } });
-    setSysMessage({ text: `［結算］${activeSlave.name} 執行了環境整理。髒亂度大幅下降。`, type: 'success' });
+    updateSlave(activeSlave.id, updates);
+    setSysMessage({ text: msg, type: msgType });
   };
 
   const executeTrain = (skillType: 'combat' | 'housework' | 'survival') => {
@@ -115,12 +130,29 @@ export default function InteractionView() {
     }
 
     deductGold(costGold);
-    updateSlave(activeSlave.id, {
+    const newStamina = Math.max(0, activeSlave.conditionStats.stamina - costStamina);
+    const newStress = Math.min(100, activeSlave.conditionStats.stress + 10);
+
+    let updates: Partial<Slave> = {
       skills: { ...activeSlave.skills, [skillType]: currentLevel + 1 },
-      conditionStats: { ...activeSlave.conditionStats, stamina: activeSlave.conditionStats.stamina - costStamina, stress: Math.min(100, activeSlave.conditionStats.stress + 10) }
-    });
+      conditionStats: { ...activeSlave.conditionStats, stamina: newStamina, stress: newStress }
+    };
+
     const skillName = skillType === 'combat' ? '戰鬥專精' : skillType === 'housework' ? '內政管家' : '生存本能';
-    setSysMessage({ text: `［突破］殘酷特訓結束。${activeSlave.name} 的【${skillName}】已提升至 Lv.${currentLevel + 1}。`, type: 'success' });
+    let msg = `［突破］殘酷特訓結束。${activeSlave.name} 的【${skillName}】已提升至 Lv.${currentLevel + 1}。`;
+    let msgType: 'success' | 'error' = 'success';
+
+    // ★ V2.7.1 修正：扣除體力後，當場判定是否昏厥
+    if (newStamina <= 0) {
+      updates.faintTurns = 5;
+      updates.primaryStats = { ...activeSlave.primaryStats, obedience: Math.max(0, activeSlave.primaryStats.obedience - 5) };
+      updates.conditionStats!.stress = Math.min(100, newStress + 15);
+      msg = `［嚴重警告］殘酷特訓使 ${activeSlave.name} 體力徹底透支，當場倒地陷入昏厥！【${skillName}】提升至 Lv.${currentLevel + 1}。`;
+      msgType = 'error';
+    }
+
+    updateSlave(activeSlave.id, updates);
+    setSysMessage({ text: msg, type: msgType });
   };
 
   const prevCarousel = () => {
@@ -160,23 +192,23 @@ export default function InteractionView() {
       {currentTask === 'none' && (
         <div className="grid grid-cols-1 gap-3 mt-2 animate-fade-in w-full max-w-md mx-auto">
           <button onClick={() => setCurrentTask('dialogue')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg text-left px-5 flex justify-between items-center group transition-all shadow-md active:scale-98">
-            <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［🗣️ 深淵對話］</span>
+            <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［深淵對話］</span>
             <span className="text-3xs text-gray-500 font-normal">探聽精神思緒狀態</span>
           </button>
           <button onClick={() => setCurrentTask('clean')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg text-left px-5 flex justify-between items-center group transition-all shadow-md active:scale-98">
-            <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［🧹 內政指派］</span>
+            <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［內政指派］</span>
             <span className="text-3xs text-gray-500 font-normal">手動進行大廳環境整頓</span>
           </button>
           <button onClick={() => setCurrentTask('train')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg text-left px-5 flex justify-between items-center group transition-all shadow-md active:scale-98">
-            <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［🏋️ 殘酷特訓］</span>
+            <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［殘酷特訓］</span>
             <span className="text-3xs text-gray-500 font-normal">消耗資金永久突破技能層級</span>
           </button>
           <button onClick={() => setCurrentTask('inventory')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg text-left px-5 flex justify-between items-center group transition-all shadow-md active:scale-98">
-            <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［🎒 道具裝備］</span>
+            <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［道具裝備］</span>
             <span className="text-3xs text-gray-500 font-normal">賞賜魔藥恢復或更替兵刃</span>
           </button>
           <button onClick={() => setCurrentTask('role')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg text-left px-5 flex justify-between items-center group transition-all shadow-md active:scale-98">
-            <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［⚙️ 職務任免］</span>
+            <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［職務任免］</span>
             <span className="text-3xs text-gray-500 font-normal">指派高級保全與管家女僕</span>
           </button>
         </div>
@@ -246,7 +278,7 @@ export default function InteractionView() {
                       {isSlaveFainted && isCenter && (
                         <div className="absolute inset-0 bg-gray-950/90 z-40 flex flex-col items-center justify-center p-3 text-center backdrop-blur-xs rounded-xl">
                           <span className="text-red-500 font-black tracking-widest text-2xs animate-pulse border border-red-900/60 bg-red-950/40 px-2 py-1 rounded">
-                            ［⚠️ 昏厥鎖死］
+                            ［昏厥鎖死］
                           </span>
                           <p className="text-3xs text-gray-500 mt-2 leading-relaxed">
                             大腦休克。尚需 <strong className="text-gray-300 font-mono">{slave.faintTurns}</strong> 個時段甦醒。
@@ -339,10 +371,10 @@ export default function InteractionView() {
               {/* 手機直覺左右切換擋板 */}
               <div className="flex gap-10 mt-3 z-30 shrink-0">
                 <button onClick={prevCarousel} className="px-4 py-1.5 bg-gray-900 border border-gray-700 rounded text-xs font-bold text-gray-400 hover:text-white transition-colors active:scale-95 shadow">
-                  🡰 傳喚上一位
+                  〈 傳喚上一位
                 </button>
                 <button onClick={nextCarousel} className="px-4 py-1.5 bg-gray-900 border border-gray-700 rounded text-xs font-bold text-gray-400 hover:text-white transition-colors active:scale-95 shadow">
-                  傳喚下一位 🡲
+                  傳喚下一位 〉
                 </button>
               </div>
 
@@ -368,7 +400,7 @@ export default function InteractionView() {
                       <div className="text-2xs text-gray-500 leading-relaxed bg-gray-900/60 p-3 rounded border border-gray-800">
                         當前據點環境總髒亂度：<strong className={roomDirtiness > 50 ? 'text-yellow-500' : 'text-green-500'}>{roomDirtiness}%</strong><br/>
                         下達此命令將強制消耗該成員 <strong className="text-red-400">15 點體力</strong>。<br/>
-                        <span className="text-yellow-600 font-bold block mt-1">⚠️ 消耗 1 點行動力並推進 1 個時段。</span>
+                        <span className="text-yellow-600 font-bold block mt-1">［注意］消耗 1 點行動力並推進 1 個時段。</span>
                       </div>
                       <button disabled={isFainted} onClick={() => requestTimeSkipAction('下令整頓大廳環境', executeClean)} className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 font-bold text-xs tracking-widest rounded transition-colors disabled:opacity-50">
                         ［下令立即整頓環境］
@@ -380,7 +412,7 @@ export default function InteractionView() {
                   {currentTask === 'train' && (
                     <div className="flex flex-col gap-2">
                       <div className="text-2xs text-yellow-600 font-bold bg-gray-900/60 p-2.5 rounded border border-gray-800 mb-1 tracking-wider leading-relaxed">
-                        ⚠️ 每次特訓消耗資金: 500、體力: 40、壓力增加: 10。<br/>
+                        ［警告］每次特訓消耗資金: 500、體力: 40、壓力增加: 10。<br/>
                         <span className="text-purple-400 font-normal">強制消耗 1 點全域行動力並推進 1 個時段。</span>
                       </div>
                       <div className="grid grid-cols-1 gap-1.5">
@@ -419,7 +451,6 @@ export default function InteractionView() {
                             equipWeapon(selectedItemId, activeSlave.id);
                             setSysMessage({ text: `［系統］${activeSlave.name} 已成功武裝 ${item.name}。`, type: 'success' });
                           }
-                          // 物品數量用盡則自動彈回重選
                           if ((inventory[selectedItemId] || 0) <= 1) {
                             setSelectedItemId('');
                           }
@@ -444,7 +475,7 @@ export default function InteractionView() {
                               : 'bg-gray-800 text-gray-400 border-gray-600 hover:bg-gray-700'
                           }`}
                         >
-                          {activeSlave.role === 'maid' ? '✓ 解除內務職稱' : '任用為內務傭人'}
+                          {activeSlave.role === 'maid' ? '［解除內務傭人］' : '［任用為內務傭人］'}
                         </button>
                         <button
                           disabled={isFainted}
@@ -455,7 +486,7 @@ export default function InteractionView() {
                               : 'bg-gray-800 text-gray-400 border-gray-600 hover:bg-gray-700'
                           }`}
                         >
-                          {activeSlave.role === 'security' ? '✓ 解除保全職稱' : '任用為商會保全'}
+                          {activeSlave.role === 'security' ? '［解除商會保全］' : '［任用為商會保全］'}
                         </button>
                       </div>
                     </div>
