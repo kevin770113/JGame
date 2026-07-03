@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import localforage from 'localforage';
-import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, ArenaNPC, CombatLog, ActiveWindow } from '../types';
+import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, ArenaNPC, CombatLog, ActiveWindow, CombatPlaybackData } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
 import { fetchIdentityBatch } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
@@ -68,12 +68,15 @@ export interface GameStore {
   activeWindow: ActiveWindow | null; 
   isSaving: boolean; 
   localSaveVersion: number; 
-  _hasHydrated: boolean; // ★ V2.4 水合鎖狀態
+  _hasHydrated: boolean;
+  activeCombat: CombatPlaybackData | null; // ★ V2.5 當前播放中的戰鬥影帶
 
   setActiveWindow: (win: ActiveWindow | null) => void;
   setGlobalModal: (modal: GlobalModal | null) => void;
   setIsSaving: (val: boolean) => void; 
-  setHasHydrated: (val: boolean) => void; // ★ V2.4 觸發水合解鎖
+  setHasHydrated: (val: boolean) => void;
+  setActiveCombat: (combat: CombatPlaybackData | null) => void; // ★ V2.5
+  
   syncProfileToCloud: () => Promise<void>;
   loadProfileFromCloud: (forceLoad?: boolean) => Promise<void>; 
   consumeIdentity: () => Promise<{name: string, story: string}>;
@@ -153,11 +156,13 @@ export const useGameStore = create<GameStore>()(
       },
       currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
       activeEvent: null, globalModal: null, activeWindow: null, isSaving: false, localSaveVersion: 0, _hasHydrated: false,
+      activeCombat: null, // ★ V2.5 初始化
 
       setActiveWindow: (win) => set({ activeWindow: win }),
       setGlobalModal: (modal) => set({ globalModal: modal }),
       setIsSaving: (val) => set({ isSaving: val }),
       setHasHydrated: (val) => set({ _hasHydrated: val }),
+      setActiveCombat: (combat) => set({ activeCombat: combat }), // ★ V2.5
 
       triggerQuest: (questId) => set(state => {
         if (!state.player.quests[questId]) {
@@ -201,13 +206,11 @@ export const useGameStore = create<GameStore>()(
          }
       },
 
-      // ★ V2.4 寫入版號防護網
       syncProfileToCloud: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         set({ isSaving: true });
         
-        // 每次存檔時，本地版號 +1
         const newVersion = (get().localSaveVersion || 0) + 1;
         set({ localSaveVersion: newVersion });
 
@@ -221,7 +224,6 @@ export const useGameStore = create<GameStore>()(
         set({ isSaving: false });
       },
 
-      // ★ V2.4 拔除版號 0 陷阱，絕對信任本地
       loadProfileFromCloud: async (forceLoad = false) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -232,7 +234,6 @@ export const useGameStore = create<GameStore>()(
         const cloudVersion = sData.localSaveVersion || 0;
         const currentLocalVersion = get().localSaveVersion || 0;
 
-        // 若不是玩家按下的強制讀取，只要雲端版號沒有「嚴格大於」本地版號，就絕對信任本地並攔截！
         if (!forceLoad && cloudVersion <= currentLocalVersion) {
            console.log(`［防禦網啟動］雲端版號 (v${cloudVersion}) <= 本地版號 (v${currentLocalVersion})，絕對信任本地資料，攔截覆蓋。`);
            return; 
@@ -447,18 +448,10 @@ export const useGameStore = create<GameStore>()(
         get().syncProfileToCloud();
       },
 
+      // ★ V2.5 戰鬥結算重構與影帶錄製 (Arena)
       executeArenaBattle: (slaveId, npcId) => {
         const state = get(); const slave = state.slaves.find(s => s.id === slaveId); const npc = ARENA_NPCS.find(n => n.id === npcId);
         if (!slave || !npc || state.player.actionPoints < 1) return null;
-
-        const logs: CombatLog[] = []; logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system' });
-
-        if (slave.race === '精靈') logs.push({ round: 0, message: `［風之眷顧］${slave.name} 身形如風奪得先手，首擊傷害大幅增幅！`, type: 'skill' });
-        if (slave.race === '半獸人') logs.push({ round: 0, message: `［狂熱戰血］${slave.name} 點燃了怒火，放棄防禦以換取更具破壞力的重擊！`, type: 'skill' });
-        if (slave.race === '矮人') logs.push({ round: 0, message: `［堅岩體魄］${slave.name} 展現了北地體格，肌肉宛如磐石般堅不可摧！`, type: 'skill' });
-        if (slave.race === '龍族') logs.push({ round: 0, message: `［真龍威壓］${slave.name} 釋放了上位威壓，全屬性增幅並獲得巨額減傷！`, type: 'skill' });
-        if (slave.race === '人類') logs.push({ round: 0, message: `［絕境意志］${slave.name} 懷抱求生潛能，瀕死狀態下攻擊力將大幅爆發。`, type: 'skill' });
-        if (slave.race === '不死族') logs.push({ round: 0, message: `［枯骨不朽］${slave.name} 散發著死氣，其攻擊能精準汲取敵人的生命力。`, type: 'skill' });
 
         let weaponAtk = 0; if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
 
@@ -471,26 +464,40 @@ export const useGameStore = create<GameStore>()(
         if (slave.race === '矮人') { sHpMax = Math.floor(sHpMax * 1.2); sHp = Math.floor(sHp * 1.2); sDef = Math.floor(sDef * 1.15); }
         if (slave.race === '龍族') { sAtk = Math.floor(sAtk * 1.1); sDef = Math.floor(sDef * 1.1); sSpd = Math.floor(sSpd * 1.1); sDmgReduc += 0.2; }
 
-        let nHp = npc.stats.hp; const nAtk = npc.stats.attack; const nDef = npc.stats.defense; const nSpd = npc.stats.speed;
+        let nHp = npc.stats.hp; const nHpMax = npc.stats.hp; const nAtk = npc.stats.attack; const nDef = npc.stats.defense; const nSpd = npc.stats.speed;
+
+        const logs: CombatLog[] = []; 
+        logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system', sHp, nHp });
+
+        if (slave.race === '精靈') logs.push({ round: 0, message: `［風之眷顧］${slave.name} 身形如風奪得先手，首擊傷害大幅增幅！`, type: 'skill', sHp, nHp });
+        if (slave.race === '半獸人') logs.push({ round: 0, message: `［狂熱戰血］${slave.name} 點燃了怒火，放棄防禦以換取更具破壞力的重擊！`, type: 'skill', sHp, nHp });
+        if (slave.race === '矮人') logs.push({ round: 0, message: `［堅岩體魄］${slave.name} 展現了北地體格，肌肉宛如磐石般堅不可摧！`, type: 'skill', sHp, nHp });
+        if (slave.race === '龍族') logs.push({ round: 0, message: `［真龍威壓］${slave.name} 釋放了上位威壓，全屬性增幅並獲得巨額減傷！`, type: 'skill', sHp, nHp });
+        if (slave.race === '人類') logs.push({ round: 0, message: `［絕境意志］${slave.name} 懷抱求生潛能，瀕死狀態下攻擊力將大幅爆發。`, type: 'skill', sHp, nHp });
+        if (slave.race === '不死族') logs.push({ round: 0, message: `［枯骨不朽］${slave.name} 散發著死氣，其攻擊能精準汲取敵人的生命力。`, type: 'skill', sHp, nHp });
+
         let round = 1; let orcStack = 0; let humanUnstoppable = false;
 
         while (sHp > 0 && nHp > 0 && round <= 50) {
           const isSlaveFirst = sSpd >= nSpd;
           const slaveAction = () => {
             if (sHp <= 0) return; let atkPower = sAtk; let dmgMulti = sDmgMulti;
-            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill' }); }
+            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp }); }
             if (humanUnstoppable) atkPower = Math.floor(atkPower * 1.25);
             if (slave.race === '精靈' && isSlaveFirst) dmgMulti += 0.15;
             if (slave.race === '半獸人') dmgMulti += Math.min(0.3, orcStack * 0.03);
             let dmg = Math.floor(Math.max(1, atkPower - nDef) * dmgMulti); nHp -= dmg;
-            logs.push({ round, message: `${slave.name} 發動攻擊，對 ${npc.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
-            if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal' }); } }
+            nHp = Math.max(0, nHp);
+            logs.push({ round, message: `${slave.name} 發動攻擊，對 ${npc.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
+            if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal', sHp, nHp, damage: heal }); } }
           };
           const npcAction = () => {
             if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); 
-            if (slave.race === '矮人') { dmg = Math.max(1, dmg - 5); logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill' }); }
-            dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; logs.push({ round, message: `${npc.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
-            if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦狂暴］${slave.name} 的【狂熱戰血】受到痛覺刺激，怒氣加劇（當前層數: ${orcStack}，額外增傷: +${Math.min(30, orcStack * 3)}%）！`, type: 'skill' }); }
+            if (slave.race === '矮人') { dmg = Math.max(1, dmg - 5); logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill', sHp, nHp }); }
+            dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; 
+            sHp = Math.max(0, sHp);
+            logs.push({ round, message: `${npc.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
+            if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦狂暴］${slave.name} 的【狂熱戰血】受到痛覺刺激，怒氣加劇（當前層數: ${orcStack}，額外增傷: +${Math.min(30, orcStack * 3)}%）！`, type: 'skill', sHp, nHp }); }
           };
           if (isSlaveFirst) { slaveAction(); npcAction(); } else { npcAction(); slaveAction(); }
           round++;
@@ -504,7 +511,7 @@ export const useGameStore = create<GameStore>()(
 
         if (isWin) {
           newWins++;
-          logs.push({ round: round - 1, message: `［結算］${slave.name} 屹立到了最後，取得勝利。`, type: 'system' });
+          logs.push({ round: round - 1, message: `［結算］${slave.name} 屹立到了最後，取得勝利。`, type: 'system', sHp, nHp });
           get().addGold(npc.rewardGold); if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige);
 
           const netWins = newWins - newLosses;
@@ -513,13 +520,13 @@ export const useGameStore = create<GameStore>()(
             const picked = pool[Math.floor(Math.random() * pool.length)];
             slave.primaryStats[picked] = Math.min(100, slave.primaryStats[picked] + 1);
             const nameMap = { combat: '武力', endurance: '體質', intelligence: '智力' };
-            logs.push({ round: round - 1, message: `⚡ 歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill' });
+            logs.push({ round: round - 1, message: `⚡ 歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill', sHp, nHp });
           }
         } else {
           newLosses++;
           newStamina = 0; 
           isInjuredNow = true; 
-          logs.push({ round: round - 1, message: `［結算］${slave.name} 遭受重創倒地，體力徹底耗盡並陷入【負傷】狀態！`, type: 'system' });
+          logs.push({ round: round - 1, message: `［結算］${slave.name} 遭受重創倒地，體力徹底耗盡並陷入【負傷】狀態！`, type: 'system', sHp, nHp });
         }
 
         set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
@@ -531,25 +538,25 @@ export const useGameStore = create<GameStore>()(
         }
 
         get().updateSlave(slave.id, { combatRecord: { wins: newWins, losses: newLosses }, isInjured: isInjuredNow, conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion }, primaryStats: slave.primaryStats });
+        
+        // ★ V2.5 封裝戰鬥影帶，準備交給前台播放器
+        const playbackData: CombatPlaybackData = {
+           slaveId: slave.id, slaveName: slave.name, slaveMaxHp: sHpMax,
+           npcName: npc.name, npcMaxHp: nHpMax, logs, isWin,
+           rewardGold: isWin ? npc.rewardGold : 0, rewardPrestige: isWin ? npc.rewardPrestige : 0, isAbyss: false
+        };
+        set({ activeCombat: playbackData });
+
         get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
       },
 
+      // ★ V2.5 戰鬥結算重構與影帶錄製 (Abyss)
       executeAbyssBattle: (slaveId) => {
         const state = get(); const slave = state.slaves.find(s => s.id === slaveId);
         if (!slave || state.player.actionPoints < 1) return null;
 
         const floor = state.player.abyssFloor; const enemy = getAbyssEnemy(floor);
         const logs: CombatLog[] = [];
-
-        logs.push({ round: 0, message: `［系統］${slave.name} 踏入深淵第 ${floor} 階，迎戰 ${enemy.name}。`, type: 'system' });
-        logs.push({ round: 0, message: `「${enemy.quote}」`, type: 'system' });
-
-        if (slave.race === '精靈') logs.push({ round: 0, message: `［風之眷顧］${slave.name} 身形如風奪得先手，首擊傷害大幅增幅！`, type: 'skill' });
-        if (slave.race === '半獸人') logs.push({ round: 0, message: `［狂熱戰血］${slave.name} 點燃了怒火，放棄防禦以換取更具破壞力的重擊！`, type: 'skill' });
-        if (slave.race === '矮人') logs.push({ round: 0, message: `［堅岩體魄］${slave.name} 展現了北地體格，肌肉宛如磐石般堅不可摧！`, type: 'skill' });
-        if (slave.race === '龍族') logs.push({ round: 0, message: `［真龍威壓］${slave.name} 釋放了上位威壓，全屬性增幅並獲得巨額減傷！`, type: 'skill' });
-        if (slave.race === '人類') logs.push({ round: 0, message: `［絕境意志］${slave.name} 懷抱求生潛能，瀕死狀態下攻擊力將大幅爆發。`, type: 'skill' });
-        if (slave.race === '不死族') logs.push({ round: 0, message: `［枯骨不朽］${slave.name} 散發著死氣，其攻擊能精準汲取敵人的生命力。`, type: 'skill' });
 
         let weaponAtk = 0; if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
 
@@ -562,26 +569,40 @@ export const useGameStore = create<GameStore>()(
         if (slave.race === '矮人') { sHpMax = Math.floor(sHpMax * 1.2); sHp = Math.floor(sHp * 1.2); sDef = Math.floor(sDef * 1.15); }
         if (slave.race === '龍族') { sAtk = Math.floor(sAtk * 1.1); sDef = Math.floor(sDef * 1.1); sSpd = Math.floor(sSpd * 1.1); sDmgReduc += 0.2; }
 
-        let nHp = enemy.stats.hp; const nAtk = enemy.stats.attack; const nDef = enemy.stats.defense; const nSpd = enemy.stats.speed;
+        let nHp = enemy.stats.hp; const nHpMax = enemy.stats.hp; const nAtk = enemy.stats.attack; const nDef = enemy.stats.defense; const nSpd = enemy.stats.speed;
+
+        logs.push({ round: 0, message: `［系統］${slave.name} 踏入深淵第 ${floor} 階，迎戰 ${enemy.name}。`, type: 'system', sHp, nHp });
+        logs.push({ round: 0, message: `「${enemy.quote}」`, type: 'system', sHp, nHp });
+
+        if (slave.race === '精靈') logs.push({ round: 0, message: `［風之眷顧］${slave.name} 身形如風奪得先手，首擊傷害大幅增幅！`, type: 'skill', sHp, nHp });
+        if (slave.race === '半獸人') logs.push({ round: 0, message: `［狂熱戰血］${slave.name} 點燃了怒火，放棄防禦以換取更具破壞力的重擊！`, type: 'skill', sHp, nHp });
+        if (slave.race === '矮人') logs.push({ round: 0, message: `［堅岩體魄］${slave.name} 展現了北地體格，肌肉宛如磐石般堅不可摧！`, type: 'skill', sHp, nHp });
+        if (slave.race === '龍族') logs.push({ round: 0, message: `［真龍威壓］${slave.name} 釋放了上位威壓，全屬性增幅並獲得巨額減傷！`, type: 'skill', sHp, nHp });
+        if (slave.race === '人類') logs.push({ round: 0, message: `［絕境意志］${slave.name} 懷抱求生潛能，瀕死狀態下攻擊力將大幅爆發。`, type: 'skill', sHp, nHp });
+        if (slave.race === '不死族') logs.push({ round: 0, message: `［枯骨不朽］${slave.name} 散發著死氣，其攻擊能精準汲取敵人的生命力。`, type: 'skill', sHp, nHp });
+
         let round = 1; let orcStack = 0; let humanUnstoppable = false;
 
         while (sHp > 0 && nHp > 0 && round <= 50) {
           const isSlaveFirst = sSpd >= nSpd;
           const slaveAction = () => {
             if (sHp <= 0) return; let atkPower = sAtk; let dmgMulti = sDmgMulti;
-            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill' }); }
+            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp }); }
             if (humanUnstoppable) atkPower = Math.floor(atkPower * 1.25);
             if (slave.race === '精靈' && isSlaveFirst) dmgMulti += 0.15;
             if (slave.race === '半獸人') dmgMulti += Math.min(0.3, orcStack * 0.03);
             let dmg = Math.floor(Math.max(1, atkPower - nDef) * dmgMulti); nHp -= dmg;
-            logs.push({ round, message: `${slave.name} 發動攻擊，對 ${enemy.name} 造成 ${dmg} 點傷害。`, type: 'damage' });
-            if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal' }); } }
+            nHp = Math.max(0, nHp);
+            logs.push({ round, message: `${slave.name} 發動攻擊，對 ${enemy.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
+            if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal', sHp, nHp, damage: heal }); } }
           };
           const npcAction = () => {
             if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); 
-            if (slave.race === '矮人') { dmg = Math.max(1, dmg - 5); logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill' }); }
-            dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; logs.push({ round, message: `${enemy.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害.`, type: 'damage' });
-            if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦層數］${slave.name} 承受攻擊，痛苦激發狂暴，傷害額外提升！`, type: 'skill' }); }
+            if (slave.race === '矮人') { dmg = Math.max(1, dmg - 5); logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill', sHp, nHp }); }
+            dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; 
+            sHp = Math.max(0, sHp);
+            logs.push({ round, message: `${enemy.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害.`, type: 'damage', sHp, nHp, damage: dmg });
+            if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦層數］${slave.name} 承受攻擊，痛苦激發狂暴，傷害額外提升！`, type: 'skill', sHp, nHp }); }
           };
           if (isSlaveFirst) { slaveAction(); npcAction(); } else { npcAction(); slaveAction(); }
           round++;
@@ -595,7 +616,7 @@ export const useGameStore = create<GameStore>()(
 
         if (isWin) {
           newWins++;
-          logs.push({ round: round - 1, message: `［結算］${slave.name} 擊潰了深淵的阻礙，成功晉級！`, type: 'system' });
+          logs.push({ round: round - 1, message: `［結算］${slave.name} 擊潰了深淵的阻礙，成功晉級！`, type: 'system', sHp, nHp });
           get().addGold(enemy.rewardGold); if (enemy.rewardPrestige > 0) get().addPrestige(enemy.rewardPrestige);
           set((s) => ({ player: { ...s.player, abyssFloor: s.player.abyssFloor + 1 } }));
 
@@ -605,13 +626,13 @@ export const useGameStore = create<GameStore>()(
             const picked = pool[Math.floor(Math.random() * pool.length)];
             slave.primaryStats[picked] = Math.min(100, slave.primaryStats[picked] + 1);
             const nameMap = { combat: '武力', endurance: '體質', intelligence: '智力' };
-            logs.push({ round: round - 1, message: `⚡ 歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill' });
+            logs.push({ round: round - 1, message: `⚡ 歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill', sHp, nHp });
           }
         } else {
           newLosses++;
           newStamina = 0; 
           isInjuredNow = true; 
-          logs.push({ round: round - 1, message: `［結算］${slave.name} 不支倒地，被深淵無情吞噬並陷入【負傷】狀態！`, type: 'system' });
+          logs.push({ round: round - 1, message: `［結算］${slave.name} 不支倒地，被深淵無情吞噬並陷入【負傷】狀態！`, type: 'system', sHp, nHp });
         }
 
         set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
@@ -623,13 +644,21 @@ export const useGameStore = create<GameStore>()(
         }
 
         get().updateSlave(slave.id, { combatRecord: { wins: newWins, losses: newLosses }, isInjured: isInjuredNow, conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion }, primaryStats: slave.primaryStats });
+        
+        // ★ V2.5 封裝戰鬥影帶，準備交給前台播放器
+        const playbackData: CombatPlaybackData = {
+           slaveId: slave.id, slaveName: slave.name, slaveMaxHp: sHpMax,
+           npcName: enemy.name, npcMaxHp: nHpMax, logs, isWin,
+           rewardGold: isWin ? enemy.rewardGold : 0, rewardPrestige: isWin ? enemy.rewardPrestige : 0, isAbyss: true
+        };
+        set({ activeCombat: playbackData });
+
         get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
       }
     }),
     { 
       name: 'dark-fantasy-save-v18', 
       storage: createJSONStorage(() => storage),
-      // ★ V2.4 水合鎖防護：本地 IndexedDB 讀取完畢後解開 _hasHydrated 鎖
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);
