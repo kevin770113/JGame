@@ -80,6 +80,8 @@ export default function BreedingView() {
       race: childRace,
       gender: childGender,
       activityStatus: '閒置',
+      role: 'none',
+      faintTurns: 0,
       skills: { combat: 1, housework: 1, survival: 1 },
       primaryStats: {
         combat: calcStat(p1.primaryStats.combat, p2.primaryStats.combat),
