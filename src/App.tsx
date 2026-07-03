@@ -12,7 +12,7 @@ import LoginView from './views/LoginView';
 import QuestPanel from './components/QuestPanel';
 import SlavePanel from './components/SlavePanel'; 
 import SystemPanel from './components/SystemPanel';
-import CombatTheater from './components/CombatTheater'; // ★ V2.5 引入深淵死鬥劇場
+import CombatTheater from './components/CombatTheater';
 import { useGameStore } from './store/useGameStore';
 import { supabase } from './services/supabaseClient';
 import { Slave } from './types';
@@ -147,7 +147,7 @@ function App() {
       <SystemPanel /> 
       <QuestPanel />
       <SlavePanel onSelectSlave={setActiveSlave} />
-      <CombatTheater /> {/* ★ V2.5 掛載死鬥劇場播放器 */}
+      <CombatTheater /> 
 
       <div className="flex-1 flex overflow-hidden relative z-10">
         <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center z-10 overscroll-contain">
@@ -155,6 +155,7 @@ function App() {
         </main>
       </div>
 
+      {/* ★ V2.6 試驗體細節面板更新 */}
       {activeSlave && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
           <div className="w-full max-w-2xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
@@ -167,13 +168,73 @@ function App() {
                 <div className="flex flex-wrap gap-2 mt-1.5">
                   <span className="text-xs text-gray-300 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-700">種族：{activeSlave.race}</span>
                   <span className={`text-xs px-2.5 py-0.5 rounded border ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-700 text-gray-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-500 font-bold'}`}>狀態：{activeSlave.activityStatus}</span>
+                  
+                  {activeSlave.role === 'maid' && <span className="text-xs px-2.5 py-0.5 bg-blue-900/30 border border-blue-700 text-blue-400 font-bold rounded">職位：內務傭人</span>}
+                  {activeSlave.role === 'security' && <span className="text-xs px-2.5 py-0.5 bg-purple-900/30 border border-purple-700 text-purple-400 font-bold rounded">職位：商會保全</span>}
+                  {(activeSlave.faintTurns || 0) > 0 && <span className="text-xs px-2.5 py-0.5 bg-gray-800 border border-gray-500 text-gray-300 font-extrabold rounded">昏厥中 ({activeSlave.faintTurns} 回合)</span>}
                   {activeSlave.isInjured && <span className="text-xs px-2.5 py-0.5 bg-red-950 border border-red-700 text-red-400 font-extrabold rounded animate-pulse">［負傷狀態］</span>}
+                  
                   <span className="text-xs text-gray-400 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-800 font-mono flex items-center gap-1">⚔️ 勝 {activeSlave.combatRecord?.wins || 0} / 敗 {activeSlave.combatRecord?.losses || 0}</span>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-sm bg-gray-950 p-3 rounded border border-gray-800">
-                <div className="flex flex-col gap-1.5 border-r border-gray-800 pr-3"><div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-1 mb-1 tracking-widest">［天賦屬性］</div><div className="flex justify-between"><span className="text-gray-500">武力:</span> <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.combat}</span></div><div className="flex justify-between"><span className="text-gray-500">體質:</span> <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.endurance}</span></div><div className="flex justify-between"><span className="text-gray-500">智力:</span> <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.intelligence}</span></div><div className="flex justify-between"><span className="text-gray-500">服從:</span> <span className={activeSlave.primaryStats.obedience < 20 ? 'text-red-400 font-bold' : 'text-gray-200 font-mono'}>{activeSlave.primaryStats.obedience}</span></div></div>
-                <div className="flex flex-col gap-1.5 pl-1"><div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-1 mb-1 tracking-widest">［掌握技能］</div><div className="flex justify-between"><span className="text-gray-500">戰鬥:</span> <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.combat || 1}</span></div><div className="flex justify-between"><span className="text-gray-500">管家:</span> <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.housework || 1}</span></div><div className="flex justify-between"><span className="text-gray-500">生存:</span> <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.survival || 1}</span></div></div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm bg-gray-950 p-3 rounded border border-gray-800 relative overflow-hidden">
+                {(activeSlave.faintTurns || 0) > 0 && <div className="absolute inset-0 bg-gray-950/60 z-10 pointer-events-none"></div>}
+
+                <div className="flex flex-col gap-1.5 border-r border-gray-800 pr-3 z-20">
+                  <div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-1 mb-1 tracking-widest">［天賦屬性］</div>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">武力:</span> 
+                    {activeSlave.isInjured ? 
+                      <span><span className="text-red-500 font-mono font-bold">{Math.floor(activeSlave.primaryStats.combat * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.primaryStats.combat})</span></span> 
+                      : <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.combat}</span>}
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">體質:</span> 
+                    {activeSlave.isInjured ? 
+                      <span><span className="text-red-500 font-mono font-bold">{Math.floor(activeSlave.primaryStats.endurance * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.primaryStats.endurance})</span></span> 
+                      : <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.endurance}</span>}
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">智力:</span> 
+                    {activeSlave.isInjured ? 
+                      <span><span className="text-red-500 font-mono font-bold">{Math.floor(activeSlave.primaryStats.intelligence * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.primaryStats.intelligence})</span></span> 
+                      : <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.intelligence}</span>}
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">服從:</span> 
+                    <span className={activeSlave.primaryStats.obedience < 20 ? 'text-red-400 font-bold' : 'text-gray-200 font-mono'}>{activeSlave.primaryStats.obedience}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 pl-1 z-20">
+                  <div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-1 mb-1 tracking-widest">［掌握技能］</div>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">戰鬥:</span> 
+                    {activeSlave.isInjured ? 
+                      <span><span className="text-red-500 font-mono font-bold">Lv.{Math.floor((activeSlave.skills?.combat || 1) * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.skills?.combat || 1})</span></span> 
+                      : <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.combat || 1}</span>}
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">管家:</span> 
+                    {activeSlave.isInjured ? 
+                      <span><span className="text-red-500 font-mono font-bold">Lv.{Math.floor((activeSlave.skills?.housework || 1) * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.skills?.housework || 1})</span></span> 
+                      : <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.housework || 1}</span>}
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">生存:</span> 
+                    {activeSlave.isInjured ? 
+                      <span><span className="text-red-500 font-mono font-bold">Lv.{Math.floor((activeSlave.skills?.survival || 1) * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.skills?.survival || 1})</span></span> 
+                      : <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.survival || 1}</span>}
+                  </div>
+                </div>
               </div>
               
               <div className="flex flex-col gap-2 bg-gray-950 p-3 rounded border border-gray-800 text-sm shadow-inner">
