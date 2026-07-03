@@ -1,27 +1,17 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useGameStore, ARENA_NPCS } from '../store/useGameStore';
 import CustomSelect, { Option } from '../components/CustomSelect';
-import { CombatLog } from '../types';
 
 export default function ArenaView() {
   const { location } = useGameStore((state) => state.player);
   const navigate = useGameStore((state) => state.navigate);
   const executeArenaBattle = useGameStore((state) => state.executeArenaBattle);
   
-  // ★ 引入全局視窗控制器
   const setGlobalModal = useGameStore((state) => state.setGlobalModal);
-  
   const slaves = useGameStore((state) => state.slaves);
   const actionPoints = useGameStore((state) => state.player.actionPoints);
 
   const [selectedFighterId, setSelectedFighterId] = useState<string>('');
-  const [combatResult, setCombatResult] = useState<{ logs: CombatLog[], isWin: boolean, npcName: string } | null>(null);
-
-  const logEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (combatResult) logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [combatResult]);
 
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
   const targetNPC = ARENA_NPCS.find(n => n.location === location);
@@ -31,7 +21,6 @@ export default function ArenaView() {
     const fighter = slaves.find(s => s.id === selectedFighterId);
     if (!fighter) return;
     
-    // ★ 改用深淵風格視窗
     if (actionPoints < 1) { 
       setGlobalModal({ title: '［系統警告］', message: '目前行動力不足。', isConfirm: false }); 
       return; 
@@ -41,8 +30,8 @@ export default function ArenaView() {
       return; 
     }
 
-    const result = executeArenaBattle(selectedFighterId, targetNPC.id);
-    if (result) setCombatResult({ logs: result.logs, isWin: result.isWin, npcName: targetNPC.name });
+    // ★ V2.5 呼叫底層函數錄製影帶，劇場將自動接管畫面
+    executeArenaBattle(selectedFighterId, targetNPC.id);
   };
 
   const getArenaTitle = () => {
@@ -72,22 +61,7 @@ export default function ArenaView() {
       </div>
 
       <div className="flex flex-col gap-5 mt-2">
-        {combatResult ? (
-          <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 flex flex-col gap-4">
-             <h3 className={`text-lg font-bold tracking-widest text-center ${combatResult.isWin ? 'text-yellow-500' : 'text-red-600'}`}>
-               {combatResult.isWin ? '［競技勝利］' : '［競技戰敗］'}
-             </h3>
-             <div className="bg-gray-950 p-3 rounded border border-gray-800 h-64 overflow-y-auto font-mono text-xs flex flex-col gap-2 scrollbar-none">
-               {combatResult.logs.map((log, idx) => (
-                 <div key={idx} className={`${log.type === 'system' ? 'text-gray-500 italic border-b border-gray-900 pb-1' : log.type === 'skill' ? 'text-yellow-400 font-bold' : log.type === 'heal' ? 'text-green-400' : log.type === 'damage' ? 'text-red-400' : 'text-gray-300'}`}>
-                   {log.round > 0 && <span className="text-gray-600 mr-2">R{log.round}</span>}{log.message}
-                 </div>
-               ))}
-               <div ref={logEndRef} />
-             </div>
-             <button onClick={() => setCombatResult(null)} className="w-full py-2.5 bg-gray-800 text-gray-300 border border-gray-600 rounded font-bold text-xs tracking-widest">［清理賽場並離開］</button>
-          </div>
-        ) : targetNPC ? (
+        {targetNPC ? (
           <>
             <div className="bg-gray-900 p-4 rounded-lg border border-gray-700 shadow-md">
               <h3 className="text-lg font-bold text-yellow-600 tracking-widest mb-1">【{targetNPC.name}】</h3>
