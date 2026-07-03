@@ -49,7 +49,8 @@ function App() {
       
       if (sessionData) {
         await loadProfileFromCloud();
-        if (useGameStore.getState().marketSlaves.length === 0) {
+        // ★ V2.6.1 修正：只有在「市場為空」且「版號為 0 (純新手)」時，才允許初始自動補貨
+        if (useGameStore.getState().marketSlaves.length === 0 && useGameStore.getState().localSaveVersion === 0) {
           triggerBackgroundMarketRefresh();
         }
       }
@@ -72,7 +73,8 @@ function App() {
           await handleAuthAndSync(session);
         } else {
           await loadProfileFromCloud();
-          if (useGameStore.getState().marketSlaves.length === 0) {
+          // ★ V2.6.1 修正：攔截老玩家買光奴隸後的自動刷新，嚴格驗證版號
+          if (useGameStore.getState().marketSlaves.length === 0 && useGameStore.getState().localSaveVersion === 0) {
             triggerBackgroundMarketRefresh();
           }
         }
@@ -155,7 +157,6 @@ function App() {
         </main>
       </div>
 
-      {/* ★ V2.6 試驗體細節面板更新 */}
       {activeSlave && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
           <div className="w-full max-w-2xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
