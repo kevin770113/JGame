@@ -78,10 +78,18 @@ export default function CombatTheater() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-fade-in overflow-hidden select-none font-mono">
+    <div className="fixed inset-0 z-[100] bg-black bg-[url('https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/bg-abyss-capital.webp')] bg-cover bg-center bg-no-repeat flex flex-col animate-fade-in overflow-hidden select-none font-mono">
       
-      {/* 頂部舞台區域 */}
-      <div className="bg-gray-950 border-b-2 border-blood-red/50 pt-6 pb-6 px-4 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)] relative z-10 min-h-[25vh] md:min-h-[30vh] flex flex-col justify-center">
+      {/* 1. 基礎環境暗度 */}
+      <div className="absolute inset-0 bg-black/50 z-0 pointer-events-none"></div>
+
+      {/* 2. 全域底層呼吸燈 (z-0) - 完全滿版 */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className={`absolute inset-0 transform-gpu will-change-opacity transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(220,20,20,0.6)_100%)] ${!isFinished ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
+      </div>
+
+      {/* 3. 頂部毛玻璃舞台 (z-10) */}
+      <div className="bg-gray-950/60 backdrop-blur-md border-b-2 border-blood-red/50 pt-6 pb-6 px-4 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)] relative z-10 min-h-[25vh] md:min-h-[30vh] flex flex-col justify-center">
         <div className="text-center mb-6">
           <span className="text-red-600 font-black tracking-[0.3em] text-xl md:text-2xl drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]">
             {activeCombat.isAbyss ? '【深淵死鬥】' : '【角鬥廝殺】'}
@@ -123,34 +131,27 @@ export default function CombatTheater() {
         </div>
       </div>
 
-      {/* 中央主展演區 */}
-      <div className="flex-1 bg-[url('https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/bg-abyss-capital.webp')] bg-cover bg-center bg-no-repeat relative overflow-hidden">
+      {/* 4. 中央主展演區 (z-10) */}
+      <div className="flex-1 relative overflow-hidden z-10 flex flex-col">
         
-        {/* z-0 黑底遮罩：確保日誌清晰 */}
-        <div className="absolute inset-0 bg-black/85 backdrop-blur-sm z-0"></div>
+        {/* 日誌區專屬護眼黑底，完美壓制紅光避免染色文字 (50% + 70% = 85% 總黑度) */}
+        <div className="absolute inset-0 bg-black/70 z-0 pointer-events-none"></div>
         
-        {/* ★ V2.7.3 羽化遮罩父容器：包裹所有特效與日誌，讓光芒也能柔和融入黑暗 */}
+        {/* 羽化遮罩父容器 */}
         <div 
           className="absolute inset-0 z-10"
           style={{ 
-            maskImage: 'linear-gradient(to bottom, transparent, black 12%, black 90%, transparent)',
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 12%, black 90%, transparent)' 
+            maskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' 
           }}
         >
-          {/* ★ z-10 光影特效層 (獨立圖層常駐，利用 opacity-0/100 切換，絕對不卡頓不跳閃) */}
+          {/* 勝利與失敗底光 */}
           <div className="absolute inset-0 pointer-events-none z-10">
-            
-            {/* 1. 戰鬥中：全螢幕邊緣深紅呼吸燈 (利用 radial-gradient 製作暗角) */}
-            <div className={`absolute inset-0 transform-gpu will-change-opacity transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_50%,_rgba(220,38,38,0.35)_100%)] ${!isFinished ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
-
-            {/* 2. 結束時：勝利暗金底光 (明亮色階 yellow-500/30) */}
-            <div className={`absolute bottom-0 left-0 right-0 h-[70%] transform-gpu will-change-opacity transition-opacity duration-1000 ease-in-out bg-gradient-to-t from-yellow-500/30 to-transparent ${isFinished && activeCombat.isWin ? 'opacity-100' : 'opacity-0'}`}></div>
-
-            {/* 3. 結束時：失敗腥紅底光 (明亮色階 red-600/30) */}
-            <div className={`absolute bottom-0 left-0 right-0 h-[70%] transform-gpu will-change-opacity transition-opacity duration-1000 ease-in-out bg-gradient-to-t from-red-600/30 to-transparent ${isFinished && !activeCombat.isWin ? 'opacity-100' : 'opacity-0'}`}></div>
+            <div className={`absolute bottom-0 left-0 right-0 h-[70%] transform-gpu will-change-opacity transition-opacity duration-1000 ease-in-out bg-gradient-to-t from-yellow-500/40 to-transparent ${isFinished && activeCombat.isWin ? 'opacity-100' : 'opacity-0'}`}></div>
+            <div className={`absolute bottom-0 left-0 right-0 h-[70%] transform-gpu will-change-opacity transition-opacity duration-1000 ease-in-out bg-gradient-to-t from-red-600/40 to-transparent ${isFinished && !activeCombat.isWin ? 'opacity-100' : 'opacity-0'}`}></div>
           </div>
 
-          {/* ★ z-20 戰鬥日誌層 (獨立滾動，與特效層平行，保證文字不被染色且清晰可見) */}
+          {/* 戰鬥日誌層 */}
           <div 
             ref={scrollContainerRef}
             className="absolute inset-0 overflow-y-auto scrollbar-none z-20 p-4 md:p-8"
@@ -167,8 +168,8 @@ export default function CombatTheater() {
         </div>
       </div>
 
-      {/* 結算面板 (墊高防誤觸) */}
-      <div className={`bg-gray-950 px-4 pt-4 pb-12 border-t border-gray-800 flex justify-center items-center transition-all duration-1000 ${isFinished ? 'h-40 md:h-44 opacity-100 translate-y-0' : 'h-0 opacity-0 translate-y-full overflow-hidden p-0'}`}>
+      {/* 5. 結算面板 (z-20) */}
+      <div className={`bg-gray-950/90 backdrop-blur-md px-4 pt-4 pb-12 border-t border-gray-800 relative z-20 flex justify-center items-center transition-all duration-1000 ${isFinished ? 'h-40 md:h-44 opacity-100 translate-y-0' : 'h-0 opacity-0 translate-y-full overflow-hidden p-0'}`}>
         {isFinished && (
           <div className="flex flex-col items-center gap-3 w-full max-w-md animate-fade-in mt-2">
             <div className={`text-xl font-black tracking-[0.2em] drop-shadow-md ${activeCombat.isWin ? 'text-yellow-500' : 'text-red-600'}`}>
@@ -184,8 +185,8 @@ export default function CombatTheater() {
               onClick={() => setActiveCombat(null)}
               className={`w-full mt-2 py-3 rounded text-sm font-bold tracking-widest shadow-lg transition-transform active:scale-95 border ${
                 activeCombat.isWin 
-                  ? 'bg-yellow-900/30 hover:bg-yellow-900/50 text-yellow-500 border-yellow-700/50' 
-                  : 'bg-red-950/50 hover:bg-red-900/70 text-red-500 border-red-900'
+                  ? 'bg-yellow-900/40 hover:bg-yellow-900/60 text-yellow-500 border-yellow-700/50' 
+                  : 'bg-red-950/60 hover:bg-red-900/80 text-red-500 border-red-900'
               }`}
             >
               ［返回據點］
@@ -196,4 +197,3 @@ export default function CombatTheater() {
     </div>
   );
 }
-
