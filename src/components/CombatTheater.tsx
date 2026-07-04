@@ -14,7 +14,8 @@ export default function CombatTheater() {
   const [npcHp, setNpcHp] = useState(0);
   const [activeEffect, setActiveEffect] = useState<'none' | 'slave-hit' | 'npc-hit' | 'slave-skill'>('none');
 
-  const logsEndRef = useRef<HTMLDivElement>(null);
+  // ★ V2.7.2 改用容器內滑動控制，取代暴走的全域 scrollIntoView
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (activeCombat) {
@@ -56,8 +57,11 @@ export default function CombatTheater() {
     return () => clearTimeout(timer);
   }, [activeCombat, currentFrame, isFinished]);
 
+  // ★ V2.7.2 物理隔離滑動：只在容器內部更新滾動條，絕對不推動外層視窗
   useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
   }, [displayedLogs]);
 
   if (!activeCombat) return null;
@@ -77,17 +81,22 @@ export default function CombatTheater() {
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-fade-in overflow-hidden select-none font-mono">
-      {/* 壓縮頂部舞台比例與調整安全防護區段 */}
+      
+      {/* ★ V2.7.2 全螢幕戰鬥中邊緣深紅呼吸燈（不干擾文字，增強壓迫感） */}
+      {!isFinished && (
+        <div className="pointer-events-none fixed inset-0 z-50 shadow-[inset_0_0_80px_rgba(185,28,28,0.45)] animate-pulse mix-blend-color-dodge"></div>
+      )}
+
+      {/* 壓縮頂部舞台比例，釋放垂直空間 */}
       <div className="bg-gray-950 border-b-2 border-blood-red/50 pt-6 pb-6 px-4 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)] relative z-10 min-h-[25vh] md:min-h-[30vh] flex flex-col justify-center">
         <div className="text-center mb-6">
           <span className="text-red-600 font-black tracking-[0.3em] text-xl md:text-2xl drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]">
-            {activeCombat.isAbyss ? '【 深 淵 死 鬥 】' : '【 角 鬥 廝 殺 】'}
+            {activeCombat.isAbyss ? '【深淵死鬥】' : '【角鬥廝殺】'}
           </span>
         </div>
         
         <div className="flex justify-between items-center gap-4 max-w-4xl mx-auto w-full">
           <div className={`flex-1 flex flex-col gap-2 transition-transform duration-75 overflow-hidden ${activeEffect === 'slave-hit' ? 'translate-x-[-10px] md:translate-x-[-20px]' : activeEffect === 'slave-skill' ? 'scale-105' : ''}`}>
-            {/* 精準修復名字與血條跑位 (移除 max-w，加上 gap-3 與 shrink-0 whitespace-nowrap) */}
             <div className="flex justify-between items-end gap-3">
               <span className="text-blue-400 font-bold text-base md:text-xl tracking-widest truncate">{activeCombat.slaveName}</span>
               <span className="text-gray-400 text-sm md:text-base font-bold shrink-0 whitespace-nowrap">{slaveHp} / {activeCombat.slaveMaxHp}</span>
@@ -106,7 +115,6 @@ export default function CombatTheater() {
           </div>
 
           <div className={`flex-1 flex flex-col gap-2 transition-transform duration-75 overflow-hidden ${activeEffect === 'npc-hit' ? 'translate-x-[10px] md:translate-x-[20px]' : ''}`}>
-            {/* 精準修復名字與血條跑位 (右側同樣加上保護) */}
             <div className="flex justify-between items-end flex-row-reverse gap-3">
               <span className="text-red-400 font-bold text-base md:text-xl tracking-widest truncate">{activeCombat.npcName}</span>
               <span className="text-gray-400 text-sm md:text-base font-bold shrink-0 whitespace-nowrap">{npcHp} / {activeCombat.npcMaxHp}</span>
@@ -122,27 +130,41 @@ export default function CombatTheater() {
         </div>
       </div>
 
+      {/* 戰鬥日誌展演區 */}
       <div className="flex-1 bg-[url('https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/bg-abyss-capital.webp')] bg-cover bg-center bg-no-repeat relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/85 backdrop-blur-sm"></div>
-        <div className="absolute inset-0 flex flex-col p-4 md:p-8 overflow-y-auto scrollbar-none" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 90%, transparent)' }}>
-          <div className="flex flex-col gap-4 max-w-3xl mx-auto w-full pt-16 pb-24">
+        
+        {/* ★ V2.7.2 勝負底光過渡：勝利蔓延暗金底光，失敗湧現血紅死光 */}
+        <div className={`absolute inset-0 transition-colors duration-1000 ease-in-out backdrop-blur-sm ${
+          isFinished 
+            ? (activeCombat.isWin 
+                ? 'bg-gradient-to-t from-yellow-950/40 via-black/85 to-black/90' 
+                : 'bg-gradient-to-t from-red-950/50 via-black/85 to-black/90')
+            : 'bg-black/85'
+        }`}></div>
+        
+        {/* ★ 將 Ref 綁定在內層父容器，隔離滑動事件 */}
+        <div 
+          ref={scrollContainerRef}
+          className="absolute inset-0 flex flex-col p-4 md:p-8 overflow-y-auto scrollbar-none" 
+          style={{ maskImage: 'linear-gradient(to bottom, transparent, black 12%, black 90%, transparent)' }}
+        >
+          <div className="flex flex-col gap-4 max-w-3xl mx-auto w-full pt-12 pb-24">
             {displayedLogs.map((log, idx) => (
               <div key={idx} className={`animate-slide-up text-sm md:text-base leading-relaxed ${getLogColor(log.type)}`}>
                 <span className="text-gray-600 mr-3 text-xs md:text-sm opacity-70">[{log.round > 0 ? `回合 ${String(log.round).padStart(2, '0')}` : '系統'}]</span>
                 <span dangerouslySetInnerHTML={{ __html: log.message.replace(activeCombat.slaveName, `<strong class="text-blue-300">${activeCombat.slaveName}</strong>`).replace(activeCombat.npcName, `<strong class="text-red-400">${activeCombat.npcName}</strong>`) }} />
               </div>
             ))}
-            <div ref={logsEndRef} />
           </div>
         </div>
       </div>
 
-      {/* 墊高結算面板防誤觸 (h-40 md:h-44, pb-12) */}
+      {/* 墊高結算面板防誤觸 */}
       <div className={`bg-gray-950 px-4 pt-4 pb-12 border-t border-gray-800 flex justify-center items-center transition-all duration-1000 ${isFinished ? 'h-40 md:h-44 opacity-100 translate-y-0' : 'h-0 opacity-0 translate-y-full overflow-hidden p-0'}`}>
         {isFinished && (
           <div className="flex flex-col items-center gap-3 w-full max-w-md animate-fade-in mt-2">
             <div className={`text-xl font-black tracking-[0.2em] drop-shadow-md ${activeCombat.isWin ? 'text-yellow-500' : 'text-red-600'}`}>
-              {activeCombat.isWin ? '［ 討 伐 成 功 ］' : '［ 試 驗 體 倒 下 ］'}
+              {activeCombat.isWin ? '［討伐成功］' : '［試驗體倒下］'}
             </div>
             {activeCombat.isWin && (
               <div className="text-xs text-gray-400 flex gap-4">
@@ -158,7 +180,7 @@ export default function CombatTheater() {
                   : 'bg-red-950/50 hover:bg-red-900/70 text-red-500 border-red-900'
               }`}
             >
-              ［ 返 回 據 點 ］
+              ［返回據點］
             </button>
           </div>
         )}
