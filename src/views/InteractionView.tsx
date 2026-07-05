@@ -20,6 +20,7 @@ export default function InteractionView() {
   
   const useItem = useGameStore((state) => state.useItem);
   const equipWeapon = useGameStore((state) => state.equipWeapon);
+  const unequipWeapon = useGameStore((state) => state.unequipWeapon); // ★ V2.8.0 引入沒收武裝函數
   const appointRole = useGameStore((state) => state.appointRole);
 
   const [currentTask, setCurrentTask] = useState<TaskType>('none');
@@ -95,7 +96,6 @@ export default function InteractionView() {
     let msg = `［結算］${activeSlave.name} 執行了環境整理。髒亂度大幅下降。`;
     let msgType: 'success' | 'error' = 'success';
 
-    // ★ V2.7.1 修正：扣除體力後，當場判定是否昏厥
     if (newStamina <= 0) {
       updates.faintTurns = 5;
       updates.primaryStats = { ...activeSlave.primaryStats, obedience: Math.max(0, activeSlave.primaryStats.obedience - 5) };
@@ -142,7 +142,6 @@ export default function InteractionView() {
     let msg = `［突破］殘酷特訓結束。${activeSlave.name} 的【${skillName}】已提升至 Lv.${currentLevel + 1}。`;
     let msgType: 'success' | 'error' = 'success';
 
-    // ★ V2.7.1 修正：扣除體力後，當場判定是否昏厥
     if (newStamina <= 0) {
       updates.faintTurns = 5;
       updates.primaryStats = { ...activeSlave.primaryStats, obedience: Math.max(0, activeSlave.primaryStats.obedience - 5) };
@@ -214,35 +213,9 @@ export default function InteractionView() {
         </div>
       )}
 
-      {/* ==================== 道具分流：先選擇物資庫存 ==================== */}
-      {currentTask === 'inventory' && !selectedItemId && (
-        <div className="w-full max-w-md mx-auto bg-gray-900/80 p-4 border border-gray-700 rounded-lg shadow-xl animate-fade-in flex flex-col gap-3">
-          <div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-2 tracking-widest">［請先選取商會庫房資產］</div>
-          {Object.entries(inventory).length === 0 ? (
-            <div className="text-xs text-gray-500 text-center py-8">［商會庫房目前空無一物］</div>
-          ) : (
-            <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto pr-1 scrollbar-none">
-              {Object.entries(inventory).map(([itemId, qty]) => {
-                if (qty <= 0) return null;
-                const item = ITEMS_DATA[itemId];
-                if (!item) return null;
-                return (
-                  <div key={itemId} onClick={() => setSelectedItemId(itemId)} className="flex justify-between items-center bg-gray-950 p-3 border border-gray-800 rounded hover:border-gray-600 transition-colors cursor-pointer group">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-sm font-bold text-gray-200 group-hover:text-white">{item.name} <span className="text-xs text-gray-500 font-mono ml-1">x{qty}</span></span>
-                      <span className="text-2xs text-gray-500">{item.desc}</span>
-                    </div>
-                    <span className="text-3xs text-gray-500 font-bold tracking-widest shrink-0">［點擊選定］</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ==================== 第二/三層：3D Cover-Flow 立體卡片輪播 ==================== */}
-      {currentTask !== 'none' && (currentTask !== 'inventory' || selectedItemId) && (
+      {/* ★ V2.8.0 修改：只要選了任務，輪播就一定會出現，統一操作流程 */}
+      {currentTask !== 'none' && (
         <div className="w-full flex flex-col gap-5 mt-2 animate-fade-in">
           {idleSlaves.length === 0 ? (
             <div className="text-xs text-red-500 bg-red-950/20 p-4 border border-red-900/30 rounded text-center max-w-sm mx-auto">
@@ -432,33 +405,76 @@ export default function InteractionView() {
                     </div>
                   )}
 
-                  {/* D. 執行道具武器裝備 */}
-                  {currentTask === 'inventory' && selectedItemId && (
+                  {/* ★ D. 執行道具武器裝備 (V2.8.0 流程翻新：加入解除武裝與道具選擇面板) */}
+                  {currentTask === 'inventory' && (
                     <div className="flex flex-col gap-3">
-                      <div className="text-2xs text-gray-400 bg-gray-900/60 p-3 rounded border border-gray-800 flex justify-between items-center">
-                        <span>預備賞賜資產：<strong className="text-blue-400">{ITEMS_DATA[selectedItemId]?.name}</strong></span>
-                        <button onClick={() => setSelectedItemId('')} className="text-purple-400 underline font-bold active:scale-95">［重選道具］</button>
-                      </div>
-                      <button 
-                        disabled={isFainted}
-                        onClick={() => {
-                          const item = ITEMS_DATA[selectedItemId];
-                          if (!item) return;
-                          if (item.type === 'potion') {
-                            useItem(selectedItemId, activeSlave.id);
-                            setSysMessage({ text: `［系統］${activeSlave.name} 成功服下了 ${item.name}。`, type: 'success' });
-                          } else {
-                            equipWeapon(selectedItemId, activeSlave.id);
-                            setSysMessage({ text: `［系統］${activeSlave.name} 已成功武裝 ${item.name}。`, type: 'success' });
-                          }
-                          if ((inventory[selectedItemId] || 0) <= 1) {
-                            setSelectedItemId('');
-                          }
-                        }} 
-                        className="w-full py-2.5 bg-purple-900/20 border border-purple-800 text-purple-300 font-bold text-xs tracking-widest rounded transition-colors hover:bg-purple-900/30 disabled:opacity-50 shadow-sm"
-                      >
-                        {ITEMS_DATA[selectedItemId]?.type === 'potion' ? '［恩賜並命令服下藥劑］' : '［強力授權並完成武器裝備］'}
-                      </button>
+                      
+                      {/* 強制解除武裝按鈕 */}
+                      {activeSlave.equipment?.weaponId && (
+                        <button 
+                          disabled={isFainted}
+                          onClick={() => {
+                            unequipWeapon(activeSlave.id);
+                            setSysMessage({ text: `［系統］已沒收 ${activeSlave.name} 的武裝，剝奪信任導致服從度重挫 10 點。`, type: 'error' });
+                          }}
+                          className="w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900 text-red-500 font-bold text-xs tracking-widest rounded transition-colors disabled:opacity-50 shadow-sm"
+                        >
+                          ［強制解除目前武裝］
+                        </button>
+                      )}
+
+                      {!selectedItemId ? (
+                        <div className="bg-gray-900/60 p-2.5 rounded border border-gray-800 flex flex-col gap-2">
+                          <div className="text-3xs text-gray-500 font-bold border-b border-gray-800 pb-1 tracking-widest">［庫房資產清單］</div>
+                          {Object.entries(inventory).length === 0 ? (
+                            <div className="text-2xs text-gray-600 text-center py-4">［庫房目前空無一物］</div>
+                          ) : (
+                            <div className="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto pr-1 scrollbar-none">
+                              {Object.entries(inventory).map(([itemId, qty]) => {
+                                if (qty <= 0) return null;
+                                const item = ITEMS_DATA[itemId];
+                                if (!item) return null;
+                                return (
+                                  <div key={itemId} onClick={() => setSelectedItemId(itemId)} className="flex justify-between items-center bg-gray-950 p-2 border border-gray-800 rounded hover:border-gray-600 transition-colors cursor-pointer group">
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="text-xs font-bold text-gray-300 group-hover:text-white">{item.name} <span className="text-3xs text-gray-500 font-mono ml-1">x{qty}</span></span>
+                                      <span className="text-3xs text-gray-500">{item.desc}</span>
+                                    </div>
+                                    <span className="text-4xs text-purple-500/70 font-bold tracking-widest shrink-0 group-hover:text-purple-400">［選定］</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          <div className="text-2xs text-gray-400 bg-gray-900/60 p-3 rounded border border-gray-800 flex justify-between items-center">
+                            <span>預備賞賜：<strong className="text-blue-400">{ITEMS_DATA[selectedItemId]?.name}</strong></span>
+                            <button onClick={() => setSelectedItemId('')} className="text-purple-400 underline font-bold active:scale-95">［重選］</button>
+                          </div>
+                          <button 
+                            disabled={isFainted}
+                            onClick={() => {
+                              const item = ITEMS_DATA[selectedItemId];
+                              if (!item) return;
+                              if (item.type === 'potion') {
+                                useItem(selectedItemId, activeSlave.id);
+                                setSysMessage({ text: `［系統］${activeSlave.name} 成功服下了 ${item.name}。`, type: 'success' });
+                              } else {
+                                equipWeapon(selectedItemId, activeSlave.id);
+                                setSysMessage({ text: `［系統］${activeSlave.name} 已成功武裝 ${item.name}。獲得 10 點服從度加成。`, type: 'success' });
+                              }
+                              if ((inventory[selectedItemId] || 0) <= 1) {
+                                setSelectedItemId('');
+                              }
+                            }} 
+                            className="w-full py-2.5 bg-purple-900/20 border border-purple-800 text-purple-300 font-bold text-xs tracking-widest rounded transition-colors hover:bg-purple-900/30 disabled:opacity-50 shadow-sm"
+                          >
+                            {ITEMS_DATA[selectedItemId]?.type === 'potion' ? '［恩賜並命令服下藥劑］' : '［強力授權並完成武器裝備］'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
