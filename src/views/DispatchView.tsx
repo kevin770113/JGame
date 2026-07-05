@@ -47,11 +47,12 @@ export default function DispatchView() {
   };
 
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
+  // ★ V2.8.0 強化：下拉選單同步顯示目前服從度，方便玩家挑選需要洗服從的成員
   const slaveOptions: Option[] = idleSlaves.map(s => {
     const isExhausted = selectedMission ? s.conditionStats.stamina < selectedMission.staminaCost : false;
     return {
       value: s.id,
-      label: `${s.name} (體力: ${s.conditionStats.stamina}) ${isExhausted ? '［體力透支］' : ''}`,
+      label: `${s.name} (體力: ${s.conditionStats.stamina} | 服從: ${s.primaryStats.obedience}) ${isExhausted ? '［體力透支］' : ''}`,
       disabled: isExhausted
     };
   });
@@ -70,7 +71,6 @@ export default function DispatchView() {
           <h2 className="text-xl font-bold text-gray-300">深淵酒館</h2>
           <p className="text-xs text-gray-500 mt-1">充斥著劣質麥酒與血腥味的地下酒館。佈告欄上釘滿了以生命為籌碼的委託。</p>
         </div>
-        {/* ★ 加入 whitespace-nowrap shrink-0 確保按鈕不被擠壓斷行 */}
         <button 
           onClick={() => navigate('Town', 'Main')}
           className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
@@ -87,30 +87,44 @@ export default function DispatchView() {
         <div className="flex flex-col gap-3">
           <div className="text-xs text-gray-500 font-bold border-b border-gray-800 pb-1">［懸賞佈告欄］</div>
           <div className="flex flex-col gap-2">
-            {dailyMissions.map(m => (
-              <button
-                key={m.id}
-                onClick={() => { setSelectedMissionId(m.id); setSysMessage(null); }}
-                className={`text-left p-3 rounded border transition-all ${
-                  selectedMissionId === m.id 
-                    ? 'border-gray-400 bg-gray-800 shadow-md' 
-                    : 'border-gray-800 bg-gray-900 hover:bg-gray-800/80 opacity-80 hover:opacity-100'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-1.5">
-                  <span className={`text-2xs font-bold px-1.5 py-0.5 rounded border ${getRankStyle(m.rank)} tracking-widest`}>
-                    {m.rank}級委託
-                  </span>
-                  <span className="text-gray-400 text-xs font-mono">耗時: {m.requiredPhases} 時段</span>
-                </div>
-                <h4 className="text-sm font-bold text-gray-200">{m.title}</h4>
-                <div className="flex gap-4 mt-2 text-xs font-mono bg-gray-950 p-1.5 rounded border border-gray-800">
-                  <span className="text-yellow-600">賞金: {m.reward}</span>
-                  <span className="text-green-600">體力: -{m.staminaCost}</span>
-                  <span className="text-red-600">壓力: +{m.stressGain}</span>
-                </div>
-              </button>
-            ))}
+            {dailyMissions.map(m => {
+              // ★ V2.8.0 兼容舊存檔：若無機率屬性則預設為 100%
+              const successRate = m.successRate ?? 1.0;
+              const rateColor = successRate >= 1 ? 'text-green-500' : successRate >= 0.8 ? 'text-yellow-500' : 'text-red-500';
+
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => { setSelectedMissionId(m.id); setSysMessage(null); }}
+                  className={`text-left p-3 rounded border transition-all ${
+                    selectedMissionId === m.id 
+                      ? 'border-gray-400 bg-gray-800 shadow-md' 
+                      : 'border-gray-800 bg-gray-900 hover:bg-gray-800/80 opacity-80 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-1.5">
+                    <span className={`text-2xs font-bold px-1.5 py-0.5 rounded border ${getRankStyle(m.rank)} tracking-widest`}>
+                      {m.rank}級委託
+                    </span>
+                    <span className="text-gray-400 text-xs font-mono">耗時: {m.requiredPhases} 時段</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-200">{m.title}</h4>
+                  
+                  {/* ★ V2.8.0 介面升級：加入機率與服從度回報顯示 */}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-2 text-xs font-mono bg-gray-950 p-2 rounded border border-gray-800">
+                    <span className="text-yellow-600">賞金: {m.reward}</span>
+                    <span className="text-green-600">體力: -{m.staminaCost}</span>
+                    <span className="text-red-400">壓力: +{m.stressGain}</span>
+                    <span className={`font-bold ${rateColor}`}>
+                      成功率: {(successRate * 100).toFixed(0)}%
+                    </span>
+                    {(m.obedienceReward || 0) > 0 && (
+                      <span className="text-blue-400 font-bold">服從: +{m.obedienceReward}</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -119,7 +133,20 @@ export default function DispatchView() {
         <div className="bg-gray-900/80 p-4 rounded-lg border border-gray-700 flex flex-col gap-4 shadow-lg animate-slide-up mt-2">
           <div>
             <h3 className="text-sm font-bold text-white mb-1 border-l-2 border-blood-red pl-2">{selectedMission.title}</h3>
-            <p className="text-xs text-gray-400 leading-relaxed italic mt-2">「{selectedMission.description}」</p>
+            {/* ★ V2.8.0 血紅警告：若說明中包含「失敗懲罰」，將其獨立標紅加粗 */}
+            <div className="text-xs text-gray-400 leading-relaxed mt-2">
+              {selectedMission.description.includes('［失敗懲罰］') ? (
+                <>
+                  <p className="italic">「{selectedMission.description.split('［失敗懲罰］')[0]}」</p>
+                  <div className="mt-2 p-2 bg-red-950/30 border border-red-900/50 rounded">
+                    <span className="text-red-500 font-black tracking-widest block mb-0.5">［失敗懲罰］</span>
+                    <span className="text-red-400">{selectedMission.description.split('［失敗懲罰］')[1]}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="italic">「{selectedMission.description}」</p>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-gray-800">
