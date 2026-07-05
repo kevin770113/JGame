@@ -7,7 +7,6 @@ import { fetchIdentityBatch } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
 import { ITEMS_DATA, HEROES_DATA, QUESTS_DATA } from '../utils/gameData';
 
-// ★ V2.8.0 擴充：外派任務新增成功率與服從度獎勵定義
 export interface Mission {
   id: string; title: string; rank: '黃金' | '紫色' | '蔚藍' | '翠綠';
   requiredPhases: number; staminaCost: number; stressGain: number; reward: number; description: string;
@@ -106,14 +105,13 @@ export interface GameStore {
   buyItem: (itemId: string) => void;
   useItem: (itemId: string, slaveId: string) => void;
   equipWeapon: (itemId: string, slaveId: string) => void;
-  unequipWeapon: (slaveId: string) => void; // ★ V2.8.0 新增：沒收解除武裝函數
+  unequipWeapon: (slaveId: string) => void;
   fulfillEvent: (slaveId: string) => boolean;
 
   triggerQuest: (questId: string) => void;
   checkQuestCompletion: () => void;
 }
 
-// ★ V2.8.0 修正：任務生成注入成功率與服從加成，失敗警告明文化
 const generateDailyMissions = (): Mission[] => {
   const missions: Mission[] = [];
   const baseId = Date.now().toString(36);
@@ -313,14 +311,12 @@ export const useGameStore = create<GameStore>()(
         return state;
       }),
 
-      // ★ V2.8.0 修正：裝備武器附加 10 點服從度，若替換則先扣減防刷
       equipWeapon: (itemId, slaveId) => set(state => {
         const qty = state.player.inventory[itemId] || 0; const slave = state.slaves.find(s => s.id === slaveId);
         if (qty > 0 && slave && ITEMS_DATA[itemId].type === 'weapon') {
             const oldWeapon = slave.equipment?.weaponId; const newInv = { ...state.player.inventory, [itemId]: qty - 1 };
             if (oldWeapon) newInv[oldWeapon] = (newInv[oldWeapon] || 0) + 1; if (newInv[itemId] <= 0) delete newInv[itemId];
             
-            // 狀態附加計算：若本來就持有武器，換武器不重複增加；若本來空手，則一次性 +10
             const obedienceBonus = oldWeapon ? 0 : 10;
             const newObedience = Math.min(100, slave.primaryStats.obedience + obedienceBonus);
 
@@ -332,7 +328,6 @@ export const useGameStore = create<GameStore>()(
         return state;
       }),
 
-      // ★ V2.8.0 新增：沒收解除武裝，精準扣回 10 點服從度
       unequipWeapon: (slaveId) => set(state => {
         const slave = state.slaves.find(s => s.id === slaveId);
         if (slave && slave.equipment?.weaponId) {
@@ -472,14 +467,12 @@ export const useGameStore = create<GameStore>()(
         const newDispatches: ActiveDispatch[] = []; let earnedGold = 0; let earnedPrestige = 0;
         let dispatchLogs: string[] = [];
 
-        // ★ V2.8.0 修正：外派結算新增隨機判定與慘敗重挫懲罰
         activeDispatches.forEach(dispatch => {
           dispatch.remainingPhases -= 1;
           if (dispatch.remainingPhases <= 0) {
             let baseReward = dispatch.mission.reward;
             const slave = updatedSlaves.find(s => s.id === dispatch.slaveId);
             if (slave) {
-               // 執行機率判定
                const isSuccess = Math.random() < (dispatch.mission.successRate ?? 1.0);
 
                if (isSuccess) {
@@ -501,7 +494,6 @@ export const useGameStore = create<GameStore>()(
                  slave.conditionStats.stamina = finalStamina;
                  slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + dispatch.mission.stressGain);
                  
-                 // 成功完成獲得服從度加成
                  const obReward = dispatch.mission.obedienceReward || 0;
                  if (obReward > 0) {
                    slave.primaryStats.obedience = Math.min(100, slave.primaryStats.obedience + obReward);
@@ -520,7 +512,6 @@ export const useGameStore = create<GameStore>()(
                    slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 15);
                  }
                } else {
-                 // ★ V2.8.0 慘敗結算：獎勵歸零，體力重挫 40，壓力暴增 20
                  slave.conditionStats.stamina = Math.max(0, slave.conditionStats.stamina - 40);
                  slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 20);
                  slave.activityStatus = '閒置';
@@ -623,7 +614,6 @@ export const useGameStore = create<GameStore>()(
               if (overpopulation > 0) { newStress = Math.min(100, newStress + (overpopulation * 5)); const rebGain = Math.max(1, 3 - Math.floor(slave.primaryStats.obedience / 20)); newRebellion = Math.min(100, newRebellion + rebGain); }
             }
 
-            // ★ V2.8.0 修正：死士服從度高於或等於 80 時，每日反抗心自然代謝 -3
             if (slave.primaryStats.obedience >= 80) {
               newRebellion = Math.max(0, newRebellion - 3);
             }
@@ -729,8 +719,11 @@ export const useGameStore = create<GameStore>()(
           const isSlaveFirst = sSpd >= nSpd;
           const slaveAction = () => {
             if (sHp <= 0) return; let atkPower = sAtk; let dmgMulti = sDmgMulti;
-            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { CampUnstoppable(); }
-            function CampUnstoppable() { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp }); }
+            // ★ V2.8.0 修正：將常規函數改為內聯區塊，解除 TypeScript 的 TS18048 型別警告
+            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) {
+              humanUnstoppable = true; 
+              logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp });
+            }
             if (humanUnstoppable) atkPower = Math.floor(atkPower * 1.25);
             if (slave.race === '精靈' && isSlaveFirst) dmgMulti += 0.15;
             if (slave.race === '半獸人') dmgMulti += Math.min(0.3, orcStack * 0.03);
@@ -839,7 +832,11 @@ export const useGameStore = create<GameStore>()(
           const isSlaveFirst = sSpd >= nSpd;
           const slaveAction = () => {
             if (sHp <= 0) return; let atkPower = sAtk; let dmgMulti = sDmgMulti;
-            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp }); }
+            // ★ V2.8.0 修正：將常規函數改為內聯區塊，解除 TypeScript 的 TS18048 型別警告
+            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { 
+              humanUnstoppable = true; 
+              logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp }); 
+            }
             if (humanUnstoppable) atkPower = Math.floor(atkPower * 1.25);
             if (slave.race === '精靈' && isSlaveFirst) dmgMulti += 0.15;
             if (slave.race === '半獸人') dmgMulti += Math.min(0.3, orcStack * 0.03);
