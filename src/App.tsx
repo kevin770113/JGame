@@ -16,7 +16,7 @@ import CombatTheater from './components/CombatTheater';
 import { useGameStore } from './store/useGameStore';
 import { supabase } from './services/supabaseClient';
 import { Slave } from './types';
-import { ITEMS_DATA } from './utils/gameData';
+import { ITEMS_DATA, getSlavePortraitUrl } from './utils/gameData';
 
 const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 
@@ -158,8 +158,25 @@ function App() {
       {activeSlave && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
           <div className="w-full max-w-2xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setActiveSlave(null)} className="absolute top-2 right-3 text-gray-400 hover:text-white text-sm font-bold transition-colors z-20">［關閉］</button>
-            <div className="w-full sm:w-1/3 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[180px] sm:min-h-[380px] relative overflow-hidden group shrink-0"><div className="absolute inset-0 bg-gray-800/10 group-hover:bg-gray-800/30 transition-colors"></div><span className="text-gray-600 text-xs italic tracking-widest z-10">［立繪預留區］</span></div>
+            <button onClick={() => setActiveSlave(null)} className="absolute top-2 right-3 text-gray-400 hover:text-white text-sm font-bold transition-colors z-20 shadow-md bg-gray-950/80 px-2 rounded">［關閉］</button>
+            
+            {/* ★ V2.8.1 立繪渲染區塊：加入高度解放 (min-h-[240px]) 與鏡頭偏移 (object-[center_15%]) */}
+            <div className="w-full sm:w-1/3 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[240px] sm:min-h-[380px] relative overflow-hidden group shrink-0">
+              <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-0">
+                <span className="text-gray-700 text-3xl opacity-30">⛓️</span>
+              </div>
+              
+              <img 
+                src={getSlavePortraitUrl(activeSlave)} 
+                alt={activeSlave.name} 
+                className="absolute inset-0 w-full h-full object-cover object-[center_15%] z-0 animate-fade-in"
+                onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
+              />
+              
+              {/* 羽化邊緣漸層與 Hover 互動疊加 */}
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/20 to-transparent z-10 pointer-events-none"></div>
+              <div className="absolute inset-0 bg-gray-800/10 group-hover:bg-gray-800/30 transition-colors z-20 pointer-events-none"></div>
+            </div>
             
             <div className="w-full sm:w-2/3 flex flex-col gap-4 overflow-y-auto max-h-[60vh] sm:max-h-[70vh] pr-1 scrollbar-none">
               <div className="shrink-0">
@@ -177,7 +194,6 @@ function App() {
                 </div>
               </div>
 
-              {/* ★ 加入 shrink-0 強制不被壓縮，讓裁切的屬性完整顯現 */}
               <div className="grid grid-cols-2 gap-3 text-sm bg-gray-950 p-3 rounded border border-gray-800 relative overflow-hidden shrink-0">
                 {(activeSlave.faintTurns || 0) > 0 && <div className="absolute inset-0 bg-gray-950/60 z-10 pointer-events-none"></div>}
 
