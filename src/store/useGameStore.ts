@@ -7,9 +7,12 @@ import { fetchIdentityBatch } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
 import { ITEMS_DATA, HEROES_DATA, QUESTS_DATA } from '../utils/gameData';
 
+// ★ V2.8.0 擴充：外派任務新增成功率與服從度獎勵定義
 export interface Mission {
   id: string; title: string; rank: '黃金' | '紫色' | '蔚藍' | '翠綠';
   requiredPhases: number; staminaCost: number; stressGain: number; reward: number; description: string;
+  successRate: number; 
+  obedienceReward: number;
 }
 
 export interface ActiveDispatch {
@@ -103,12 +106,14 @@ export interface GameStore {
   buyItem: (itemId: string) => void;
   useItem: (itemId: string, slaveId: string) => void;
   equipWeapon: (itemId: string, slaveId: string) => void;
+  unequipWeapon: (slaveId: string) => void; // ★ V2.8.0 新增：沒收解除武裝函數
   fulfillEvent: (slaveId: string) => boolean;
 
   triggerQuest: (questId: string) => void;
   checkQuestCompletion: () => void;
 }
 
+// ★ V2.8.0 修正：任務生成注入成功率與服從加成，失敗警告明文化
 const generateDailyMissions = (): Mission[] => {
   const missions: Mission[] = [];
   const baseId = Date.now().toString(36);
@@ -116,10 +121,30 @@ const generateDailyMissions = (): Mission[] => {
   const targets = ['私掠物資', '深淵礦脈', '異端營地', '帝國商隊', '地下黑市', '古老遺跡'];
   const getName = () => `【${actions[Math.floor(Math.random() * actions.length)]}${targets[Math.floor(Math.random() * targets.length)]}】`;
 
-  for (let i = 0; i < Math.floor(Math.random() * 2) + 3; i++) missions.push({ id: `m-grn-${baseId}-${i}`, title: `［常規］${getName()}`, rank: '翠綠', requiredPhases: 1, staminaCost: 20, stressGain: 10, reward: 300 + Math.floor(Math.random() * 100), description: '骯髒的體力活。' });
-  for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) missions.push({ id: `m-blu-${baseId}-${i}`, title: `［進階］${getName()}`, rank: '蔚藍', requiredPhases: 2, staminaCost: 45, stressGain: 25, reward: 800 + Math.floor(Math.random() * 200), description: '危險差事。' });
-  if (Math.random() > 0.7) missions.push({ id: `m-pur-${baseId}`, title: `［特化］${getName()}`, rank: '紫色', requiredPhases: 2, staminaCost: 50, stressGain: 30, reward: 1200 + Math.floor(Math.random() * 300), description: '特化工作。' });
-  if (Math.random() > 0.8) missions.push({ id: `m-gld-${baseId}`, title: `［傳說］${getName()}`, rank: '黃金', requiredPhases: 5, staminaCost: 90, stressGain: 60, reward: 3500 + Math.floor(Math.random() * 1500), description: '死亡委託。' });
+  for (let i = 0; i < Math.floor(Math.random() * 2) + 3; i++) {
+    missions.push({ 
+      id: `m-grn-${baseId}-${i}`, title: `［常規］${getName()}`, rank: '翠綠', requiredPhases: 1, staminaCost: 20, stressGain: 10, reward: 300 + Math.floor(Math.random() * 100), 
+      description: '常規安全外派，勞動性質溫和。', successRate: 1.0, obedienceReward: 0 
+    });
+  }
+  for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
+    missions.push({ 
+      id: `m-blu-${baseId}-${i}`, title: `［進階］${getName()}`, rank: '蔚藍', requiredPhases: 2, staminaCost: 45, stressGain: 25, reward: 800 + Math.floor(Math.random() * 200), 
+      description: '危險差事。［失敗懲罰］若不幸失敗，酬金歸零，體力重挫 40 點，壓力暴增 20 點。', successRate: 0.8, obedienceReward: 2 
+    });
+  }
+  if (Math.random() > 0.7) {
+    missions.push({ 
+      id: `m-pur-${baseId}`, title: `［特化］${getName()}`, rank: '紫色', requiredPhases: 2, staminaCost: 50, stressGain: 30, reward: 1200 + Math.floor(Math.random() * 300), 
+      description: '特化高危工作。［失敗懲罰］若不幸失敗，酬金歸零，體力重挫 40 點，壓力暴增 20 點。', successRate: 0.6, obedienceReward: 5 
+    });
+  }
+  if (Math.random() > 0.8) {
+    missions.push({ 
+      id: `m-gld-${baseId}`, title: `［傳說］${getName()}`, rank: '黃金', requiredPhases: 5, staminaCost: 90, stressGain: 60, reward: 3500 + Math.floor(Math.random() * 1500), 
+      description: '死亡搏命委託。［失敗懲罰］若不幸失敗，酬金歸零，體力重挫 40 點，壓力暴增 20 點。', successRate: 0.6, obedienceReward: 5 
+    });
+  }
   return missions;
 };
 
@@ -288,12 +313,37 @@ export const useGameStore = create<GameStore>()(
         return state;
       }),
 
+      // ★ V2.8.0 修正：裝備武器附加 10 點服從度，若替換則先扣減防刷
       equipWeapon: (itemId, slaveId) => set(state => {
         const qty = state.player.inventory[itemId] || 0; const slave = state.slaves.find(s => s.id === slaveId);
         if (qty > 0 && slave && ITEMS_DATA[itemId].type === 'weapon') {
             const oldWeapon = slave.equipment?.weaponId; const newInv = { ...state.player.inventory, [itemId]: qty - 1 };
             if (oldWeapon) newInv[oldWeapon] = (newInv[oldWeapon] || 0) + 1; if (newInv[itemId] <= 0) delete newInv[itemId];
-            return { player: { ...state.player, inventory: newInv }, slaves: state.slaves.map(s => s.id === slaveId ? { ...s, equipment: { weaponId: itemId } } : s) };
+            
+            // 狀態附加計算：若本來就持有武器，換武器不重複增加；若本來空手，則一次性 +10
+            const obedienceBonus = oldWeapon ? 0 : 10;
+            const newObedience = Math.min(100, slave.primaryStats.obedience + obedienceBonus);
+
+            return { 
+              player: { ...state.player, inventory: newInv }, 
+              slaves: state.slaves.map(s => s.id === slaveId ? { ...s, equipment: { weaponId: itemId }, primaryStats: { ...s.primaryStats, obedience: newObedience } } : s) 
+            };
+        }
+        return state;
+      }),
+
+      // ★ V2.8.0 新增：沒收解除武裝，精準扣回 10 點服從度
+      unequipWeapon: (slaveId) => set(state => {
+        const slave = state.slaves.find(s => s.id === slaveId);
+        if (slave && slave.equipment?.weaponId) {
+          const oldWeapon = slave.equipment.weaponId;
+          const newInv = { ...state.player.inventory, [oldWeapon]: (state.player.inventory[oldWeapon] || 0) + 1 };
+          const newObedience = Math.max(0, slave.primaryStats.obedience - 10);
+          
+          return {
+            player: { ...state.player, inventory: newInv },
+            slaves: state.slaves.map(s => s.id === slaveId ? { ...s, equipment: undefined, primaryStats: { ...s.primaryStats, obedience: newObedience } } : s)
+          };
         }
         return state;
       }),
@@ -422,37 +472,65 @@ export const useGameStore = create<GameStore>()(
         const newDispatches: ActiveDispatch[] = []; let earnedGold = 0; let earnedPrestige = 0;
         let dispatchLogs: string[] = [];
 
+        // ★ V2.8.0 修正：外派結算新增隨機判定與慘敗重挫懲罰
         activeDispatches.forEach(dispatch => {
           dispatch.remainingPhases -= 1;
           if (dispatch.remainingPhases <= 0) {
             let baseReward = dispatch.mission.reward;
             const slave = updatedSlaves.find(s => s.id === dispatch.slaveId);
             if (slave) {
-               const intelligenceStat = slave.isInjured ? Math.floor(slave.primaryStats.intelligence * 0.5) : slave.primaryStats.intelligence;
-               const successChance = intelligenceStat / 200;
-               if (Math.random() < successChance) {
-                  baseReward = Math.floor(baseReward * 1.5);
-                  dispatchLogs.push(`［外派大成功］${slave.name} 憑藉智力完美規避風險，帶回額外 1.5 倍收益！`);
-               }
-               earnedGold += baseReward;
+               // 執行機率判定
+               const isSuccess = Math.random() < (dispatch.mission.successRate ?? 1.0);
 
-               let updatedSkills = { ...slave.skills };
-               if (dispatch.mission.rank === '紫色') {
-                 if (Math.random() > 0.5) earnedPrestige += Math.floor(Math.random() * 20) + 10;
-                 else { const keys = ['combat', 'housework', 'survival'] as const; const k = keys[Math.floor(Math.random() * keys.length)]; if (updatedSkills[k] < 10) updatedSkills[k] += 1; }
-               }
-               
-               const finalStamina = Math.max(0, slave.conditionStats.stamina - Math.max(10, dispatch.mission.staminaCost - ((slave.isInjured ? Math.floor(slave.skills.combat * 0.5) : slave.skills.combat) * 2)));
-               slave.conditionStats.stamina = finalStamina;
-               slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + dispatch.mission.stressGain);
-               slave.activityStatus = '閒置';
-               slave.skills = updatedSkills;
+               if (isSuccess) {
+                 const intelligenceStat = slave.isInjured ? Math.floor(slave.primaryStats.intelligence * 0.5) : slave.primaryStats.intelligence;
+                 const successChance = intelligenceStat / 200;
+                 if (Math.random() < successChance) {
+                    baseReward = Math.floor(baseReward * 1.5);
+                    dispatchLogs.push(`［外派大成功］${slave.name} 憑藉智力完美規避風險，帶回額外 1.5 倍收益！`);
+                 }
+                 earnedGold += baseReward;
 
-               if (finalStamina <= 0 && !slave.isInjured) {
-                 slave.conditionStats.stamina = 0;
-                 slave.faintTurns = 5;
-                 slave.primaryStats.obedience = Math.max(0, slave.primaryStats.obedience - 5);
-                 slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 15);
+                 let updatedSkills = { ...slave.skills };
+                 if (dispatch.mission.rank === '紫色') {
+                   if (Math.random() > 0.5) earnedPrestige += Math.floor(Math.random() * 20) + 10;
+                   else { const keys = ['combat', 'housework', 'survival'] as const; const k = keys[Math.floor(Math.random() * keys.length)]; if (updatedSkills[k] < 10) updatedSkills[k] += 1; }
+                 }
+                 
+                 const finalStamina = Math.max(0, slave.conditionStats.stamina - Math.max(10, dispatch.mission.staminaCost - ((slave.isInjured ? Math.floor(slave.skills.combat * 0.5) : slave.skills.combat) * 2)));
+                 slave.conditionStats.stamina = finalStamina;
+                 slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + dispatch.mission.stressGain);
+                 
+                 // 成功完成獲得服從度加成
+                 const obReward = dispatch.mission.obedienceReward || 0;
+                 if (obReward > 0) {
+                   slave.primaryStats.obedience = Math.min(100, slave.primaryStats.obedience + obReward);
+                   dispatchLogs.push(`［外派捷報］${slave.name} 順利完成 ${dispatch.mission.title}，服從度提升了 ${obReward} 點！`);
+                 } else {
+                   dispatchLogs.push(`［外派回報］${slave.name} 已安全完成 ${dispatch.mission.title} 並歸隊。`);
+                 }
+
+                 slave.activityStatus = '閒置';
+                 slave.skills = updatedSkills;
+
+                 if (finalStamina <= 0 && !slave.isInjured) {
+                   slave.conditionStats.stamina = 0;
+                   slave.faintTurns = 5;
+                   slave.primaryStats.obedience = Math.max(0, slave.primaryStats.obedience - 5);
+                   slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 15);
+                 }
+               } else {
+                 // ★ V2.8.0 慘敗結算：獎勵歸零，體力重挫 40，壓力暴增 20
+                 slave.conditionStats.stamina = Math.max(0, slave.conditionStats.stamina - 40);
+                 slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 20);
+                 slave.activityStatus = '閒置';
+                 dispatchLogs.push(`［外派慘敗］${slave.name} 在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫 40 點、壓力暴增 20 點！`);
+
+                 if (slave.conditionStats.stamina <= 0) {
+                   slave.faintTurns = 5;
+                   slave.primaryStats.obedience = Math.max(0, slave.primaryStats.obedience - 5);
+                   slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 15);
+                 }
                }
             }
           } else { newDispatches.push(dispatch); }
@@ -540,13 +618,16 @@ export const useGameStore = create<GameStore>()(
             let fTurns = slave.faintTurns || 0;
 
             if (isStarving) { newStress = Math.min(100, newStress + 20); newRebellion = Math.min(100, newRebellion + 10); } else {
-              // ★ V2.7.1 修正：加上 fTurns === 0 條件，徹底剝奪昏厥者的自然恢復權利
               if (slave.activityStatus === '閒置' && (slave.role === 'none' || !slave.role) && fTurns === 0) { newStamina = Math.min(100, newStamina + (newDirtiness > 50 ? 10 : 30)); if (overpopulation === 0) newStress = Math.max(0, newStress - 5); }
               if (newDirtiness > 80) { newStress = Math.min(100, newStress + 20); const rebGain = Math.max(1, 15 - Math.floor(slave.primaryStats.obedience / 10)); newRebellion = Math.min(100, newRebellion + rebGain); }
               if (overpopulation > 0) { newStress = Math.min(100, newStress + (overpopulation * 5)); const rebGain = Math.max(1, 3 - Math.floor(slave.primaryStats.obedience / 20)); newRebellion = Math.min(100, newRebellion + rebGain); }
             }
 
-            // 常規消耗體力歸零引發昏厥 (避免重複疊加，只在原本沒有昏厥時觸發)
+            // ★ V2.8.0 修正：死士服從度高於或等於 80 時，每日反抗心自然代謝 -3
+            if (slave.primaryStats.obedience >= 80) {
+              newRebellion = Math.max(0, newRebellion - 3);
+            }
+
             if (newStamina <= 0 && !slave.isInjured && fTurns === 0) {
               newStamina = 0;
               fTurns = 5;
@@ -592,7 +673,7 @@ export const useGameStore = create<GameStore>()(
           }
 
           if (dispatchLogs.length > 0 && escapedNames.length === 0 && suppressedNames.length === 0 && !maidFaintedThisNight) { 
-            setTimeout(() => { get().setGlobalModal({ title: '［外派成果回報］', message: dispatchLogs.join('\n'), isConfirm: false }); }, 250); 
+            setTimeout(() => { get().setGlobalModal({ title: '［商會經營成果回報］', message: dispatchLogs.join('\n'), isConfirm: false }); }, 250); 
           }
 
           let nextEvent = null;
@@ -648,7 +729,8 @@ export const useGameStore = create<GameStore>()(
           const isSlaveFirst = sSpd >= nSpd;
           const slaveAction = () => {
             if (sHp <= 0) return; let atkPower = sAtk; let dmgMulti = sDmgMulti;
-            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp }); }
+            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { CampUnstoppable(); }
+            function CampUnstoppable() { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp }); }
             if (humanUnstoppable) atkPower = Math.floor(atkPower * 1.25);
             if (slave.race === '精靈' && isSlaveFirst) dmgMulti += 0.15;
             if (slave.race === '半獸人') dmgMulti += Math.min(0.3, orcStack * 0.03);
