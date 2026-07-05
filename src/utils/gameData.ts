@@ -1,3 +1,5 @@
+import { Slave } from '../types';
+
 export type ItemType = 'potion' | 'weapon';
 
 export const HEROES_DATA = [
@@ -14,4 +16,27 @@ export const QUESTS_DATA = {
 export const ITEMS_DATA: Record<string, { name: string, type: ItemType, effect: any, price: number, desc: string }> = {
   'potion_heal_small': { name: '劣質恢復藥', type: 'potion', effect: { stamina: 30 }, price: 500, desc: '勉強能喝的紅藥水，恢復 30 體力。' },
   'weapon_iron_sword': { name: '精鋼長劍', type: 'weapon', effect: { attack: 10 }, price: 2000, desc: '標準的步兵武器，戰鬥時武力判定 +10。' },
+};
+
+// ★ V2.8.1 新增：立繪網址生成器 (使用 djb2 Hash 演算法確保唯一性與平均分配)
+export const getSlavePortraitUrl = (slave: Slave): string => {
+  const RACE_MAP: Record<string, string> = {
+    '人類': 'human',
+    '精靈': 'elf',
+    '半獸人': 'orc',
+    '矮人': 'dwarf',
+    '不死族': 'undead',
+    '龍族': 'dragon'
+  };
+
+  const raceKey = RACE_MAP[slave.race] || 'human';
+  const genderKey = slave.gender.toLowerCase();
+
+  let hash = 5381;
+  for (let i = 0; i < slave.id.length; i++) {
+    hash = ((hash << 5) + hash) + slave.id.charCodeAt(i);
+  }
+  
+  const index = (Math.abs(hash) % 3) + 1;
+  return `https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/portrait-${raceKey}-${genderKey}-${index}.webp`;
 };
