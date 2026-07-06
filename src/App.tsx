@@ -23,6 +23,7 @@ const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 // ★ V2.9.0 新增：動態 SVG 菱形雷達圖渲染引擎
 const renderRadar = (slave: Slave) => {
   const getP = (val: number, angleIndex: number, maxR = 40) => {
+     // 五個頂點：0(頂), 72(右上), 144(右下), 216(左下), 288(左上)
      const angle = (angleIndex * 72 - 90) * (Math.PI / 180);
      const r = (Math.min(100, Math.max(0, val)) / 100) * maxR;
      return `${60 + r * Math.cos(angle)},${60 + r * Math.sin(angle)}`;
@@ -204,7 +205,7 @@ function App() {
       
       <SystemPanel /> 
       <QuestPanel />
-      {/* ★ V2.9.0 修正：補回漏掉的 onSelectSlave 傳遞 */}
+      {/* ★ 確保這裡完整傳遞 onSelectSlave */}
       <SlavePanel onSelectSlave={setActiveSlave} />
       <CombatTheater /> 
 
