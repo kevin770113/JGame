@@ -1,0 +1,129 @@
+import { Slave, Race, Gender } from '../types';
+import { Mission, ArenaNPC } from '../types/storeTypes';
+import { HEROES_DATA } from './gameData';
+
+export const BASE_ARENA_NPCS: ArenaNPC[] = [
+  { id: 'npc-1', location: 'Frontlines', name: '地下狂徒', description: '滿身泥濘與血污的亡命之徒，毫無技巧可言。', stats: { combat: 30, endurance: 25, intelligence: 15, charisma: 5, luck: 10 }, rewardGold: 800, rewardPrestige: 0 },
+  { id: 'npc-2', location: 'NeutralHub', name: '鐵血角鬥士', description: '公會重金培育的職業鬥士，裝備精良且受過專業訓練。', stats: { combat: 60, endurance: 50, intelligence: 40, charisma: 40, luck: 30 }, rewardGold: 2500, rewardPrestige: 10 },
+  { id: 'npc-3', location: 'Capital', name: '皇家處刑者', description: '帝國皇室的殺人機器，專門用來粉碎挑戰者。', stats: { combat: 120, endurance: 80, intelligence: 70, charisma: 85, luck: 45 }, rewardGold: 6000, rewardPrestige: 50 }
+];
+
+export const generateArenaNPCs = (): ArenaNPC[] => {
+  return BASE_ARENA_NPCS.map(base => {
+    const rand = Math.random();
+    let prefix = '';
+    let stats = { ...base.stats };
+
+    if (rand < 0.33) {
+      prefix = '【狂暴的】';
+      stats.combat = Math.floor(stats.combat * 1.15);
+      stats.endurance = Math.floor(stats.endurance * 0.85);
+    } else if (rand < 0.66) {
+      prefix = '【鐵壁的】';
+      stats.endurance = Math.floor(stats.endurance * 1.20);
+      stats.combat = Math.floor(stats.combat * 0.90);
+      stats.intelligence = Math.floor(stats.intelligence * 0.90);
+    } else {
+      prefix = '【狡詐的】';
+      stats.luck += 15;
+      stats.intelligence = Math.floor(stats.intelligence * 1.10);
+      stats.endurance = Math.floor(stats.endurance * 0.85);
+    }
+
+    return { ...base, id: `${base.id}-${Date.now()}`, name: `${prefix}${base.name}`, stats };
+  });
+};
+
+export const getAbyssEnemy = (floor: number) => {
+  const boss = HEROES_DATA.find(h => h.floor === floor);
+  const multiplier = 1 + (floor - 1) * 0.05;
+  const linearFloor = Math.min(100, floor);
+  const intLuckScale = linearFloor / 100; 
+
+  if (boss) {
+    return {
+      name: boss.name, quote: boss.quote,
+      stats: { 
+        combat: Math.floor(boss.stats.combat * multiplier), 
+        endurance: Math.floor(boss.stats.endurance * multiplier), 
+        intelligence: Math.floor(boss.stats.intelligence + (100 - boss.stats.intelligence) * intLuckScale), 
+        charisma: Math.min(100, boss.stats.charisma + Math.floor(floor / 5) * 5),
+        luck: Math.floor(boss.stats.luck + (100 - boss.stats.luck) * intLuckScale)
+      },
+      rewardGold: boss.rewardGold, rewardPrestige: boss.rewardPrestige, isBoss: true
+    };
+  }
+  
+  const baseCombat = 35; const baseEndurance = 30;
+  const baseInt = 20; const baseLuck = 10;
+  const maxInt = 60; const maxLuck = 25; 
+
+  return {
+    name: `深淵衛士 (第 ${floor} 階)`, quote: '……',
+    stats: { 
+       combat: Math.floor(baseCombat * multiplier), 
+       endurance: Math.floor(baseEndurance * multiplier), 
+       intelligence: Math.floor(baseInt + (maxInt - baseInt) * intLuckScale), 
+       charisma: Math.min(80, 10 + Math.floor(floor / 5) * 5),
+       luck: Math.floor(baseLuck + (maxLuck - baseLuck) * intLuckScale)
+    },
+    rewardGold: 500 + floor * 150, rewardPrestige: Math.floor(floor / 2), isBoss: false
+  };
+};
+
+export const generateDailyMissions = (): Mission[] => {
+  const missions: Mission[] = [];
+  const baseId = Date.now().toString(36);
+  const actions = ['護送', '掠奪', '鎮壓', '搜刮', '暗殺', '勘探'];
+  const targets = ['私掠物資', '深淵礦脈', '異端營地', '帝國商隊', '地下黑市', '古老遺跡'];
+  const getName = () => `【${actions[Math.floor(Math.random() * actions.length)]}${targets[Math.floor(Math.random() * targets.length)]}】`;
+
+  for (let i = 0; i < Math.floor(Math.random() * 2) + 3; i++) {
+    missions.push({ 
+      id: `m-grn-${baseId}-${i}`, title: `［常規］${getName()}`, rank: '翠綠', requiredPhases: 1, staminaCost: 20, stressGain: 10, reward: 300 + Math.floor(Math.random() * 100), 
+      description: '常規安全外派，勞動性質溫和。', successRate: 1.0, obedienceReward: 0 
+    });
+  }
+  for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
+    missions.push({ 
+      id: `m-blu-${baseId}-${i}`, title: `［進階］${getName()}`, rank: '蔚藍', requiredPhases: 2, staminaCost: 45, stressGain: 25, reward: 800 + Math.floor(Math.random() * 200), 
+      description: '危險差事。［失敗懲罰］若不幸失敗，酬金歸零，體力重挫 40 點，壓力暴增 20 點。', successRate: 0.8, obedienceReward: 2 
+    });
+  }
+  if (Math.random() > 0.7) {
+    missions.push({ 
+      id: `m-pur-${baseId}`, title: `［特化］${getName()}`, rank: '紫色', requiredPhases: 2, staminaCost: 50, stressGain: 30, reward: 1200 + Math.floor(Math.random() * 300), 
+      description: '特化高危工作。［失敗懲罰］若不幸失敗，酬金歸零，體力重挫 40 點，壓力暴增 20 點。', successRate: 0.6, obedienceReward: 5 
+    });
+  }
+  if (Math.random() > 0.8) {
+    missions.push({ 
+      id: `m-gld-${baseId}`, title: `［傳說］${getName()}`, rank: '黃金', requiredPhases: 5, staminaCost: 90, stressGain: 60, reward: 3500 + Math.floor(Math.random() * 1500), 
+      description: '死亡搏命委託。［失敗懲罰］若不幸失敗，酬金歸零，體力重挫 40 點，壓力暴增 20 點。', successRate: 0.6, obedienceReward: 5 
+    });
+  }
+  return missions;
+};
+
+export const generateBaseMarketSlave = (idSuffix: string, identity: {name: string, story: string}): Slave => {
+  const races: Race[] = ['人類', '精靈', '半獸人', '矮人', '不死族', '龍族'];
+  const race = races[Math.floor(Math.random() * races.length)];
+  const gender: Gender = Math.random() > 0.5 ? 'Male' : 'Female';
+  return {
+    id: `market-${Date.now()}-${idSuffix}`, name: identity.name, race, gender, activityStatus: '閒置', role: 'none', faintTurns: 0,
+    skills: { combat: 1, housework: 1, survival: 1 },
+    primaryStats: { 
+      combat: Math.floor(Math.random() * 60) + 20, 
+      endurance: Math.floor(Math.random() * 60) + 20, 
+      intelligence: Math.floor(Math.random() * 60) + 20, 
+      obedience: Math.floor(Math.random() * 40) + 10,
+      charisma: Math.floor(Math.random() * 80) + 10,
+      luck: Math.floor(Math.random() * 80) + 10
+    },
+    conditionStats: { stamina: 100, stress: 0, rebellion: Math.floor(Math.random() * 20) },
+    traits: [], 
+    backgroundStory: "", 
+    combatRecord: { wins: 0, losses: 0 },
+    isInjured: false
+  };
+};
