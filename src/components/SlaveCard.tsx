@@ -5,7 +5,7 @@ interface SlaveCardProps {
 }
 
 export default function SlaveCard({ slave }: SlaveCardProps) {
-  const { combat, endurance, intelligence, obedience } = slave.primaryStats;
+  const { combat, endurance, intelligence, obedience, charisma = 10, luck = 10 } = slave.primaryStats;
   const { stamina, stress, rebellion } = slave.conditionStats;
 
   const renderGender = () => {
@@ -28,33 +28,57 @@ export default function SlaveCard({ slave }: SlaveCardProps) {
             種族：{slave.race}
           </span>
         </div>
+        <div className="text-right flex flex-col items-end gap-1">
+          <span className={`text-xs px-2 py-0.5 rounded font-bold ${slave.activityStatus === '閒置' ? 'bg-gray-800 text-gray-400' : 'bg-yellow-900/30 text-yellow-500 border border-yellow-700/50'}`}>
+            {slave.activityStatus}
+          </span>
+          <span className="text-xs text-blue-400 font-bold bg-blue-900/20 px-2 py-0.5 rounded border border-blue-900/50">
+            服從: {obedience}/100
+          </span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 text-sm z-10 mt-1 border-t border-gray-800 pt-3">
-        <div className="flex flex-col gap-1.5">
-          <div className="flex justify-between"><span className="text-gray-500 text-xs">武力:</span> <span className="text-gray-200 font-mono">{combat}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500 text-xs">體質:</span> <span className="text-gray-200 font-mono">{endurance}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500 text-xs">智力:</span> <span className="text-gray-200 font-mono">{intelligence}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500 text-xs">服從:</span> <span className={obedience < 20 ? 'text-red-500 font-bold font-mono' : 'text-gray-200 font-mono'}>{obedience}</span></div>
+      <div className="grid grid-cols-2 gap-4 mt-1 z-10">
+        <div className="flex flex-col justify-center gap-1 bg-gray-950 p-2 rounded border border-gray-800">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-gray-500 font-bold">武力</span>
+            <span className="text-red-400 font-mono font-bold">{combat}</span>
+          </div>
+          <div className="flex justify-between items-center text-xs border-t border-gray-800/60 pt-1">
+            <span className="text-gray-500 font-bold">體質</span>
+            <span className="text-green-400 font-mono font-bold">{endurance}</span>
+          </div>
+          <div className="flex justify-between items-center text-xs border-t border-gray-800/60 pt-1">
+            <span className="text-gray-500 font-bold">智力</span>
+            <span className="text-blue-400 font-mono font-bold">{intelligence}</span>
+          </div>
+          <div className="flex justify-between items-center text-xs border-t border-gray-800/60 pt-1">
+            <span className="text-gray-500 font-bold">魅力</span>
+            <span className="text-pink-400 font-mono font-bold">{charisma}</span>
+          </div>
+          <div className="flex justify-between items-center text-xs border-t border-gray-800/60 pt-1">
+            <span className="text-gray-500 font-bold">幸運</span>
+            <span className="text-yellow-400 font-mono font-bold">{luck}</span>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-1.5 border-l border-gray-800 pl-4 justify-center">
+        <div className="flex flex-col justify-center gap-3 bg-gray-950 p-2 rounded border border-gray-800">
           <div className="flex flex-col gap-0.5">
             <div className="flex justify-between text-3xs text-gray-500 font-bold"><span>體力</span><span>{stamina}/100</span></div>
-            <div className="w-full h-1 bg-gray-950 rounded overflow-hidden flex border border-gray-800">
-              <div className="bg-green-600 h-full" style={{ width: `${stamina}%` }}></div>
+            <div className="w-full h-1.5 bg-gray-900 rounded overflow-hidden flex border border-gray-800">
+              <div className="bg-green-600 h-full shadow-[0_0_5px_rgba(22,163,74,0.5)]" style={{ width: `${stamina}%` }}></div>
             </div>
           </div>
           <div className="flex flex-col gap-0.5">
             <div className="flex justify-between text-3xs text-gray-500 font-bold"><span>壓力</span><span>{stress}/100</span></div>
-            <div className="w-full h-1 bg-gray-950 rounded overflow-hidden flex border border-gray-800">
-              <div className="bg-yellow-600 h-full" style={{ width: `${stress}%` }}></div>
+            <div className="w-full h-1.5 bg-gray-900 rounded overflow-hidden flex border border-gray-800">
+              <div className="bg-yellow-600 h-full shadow-[0_0_5px_rgba(202,138,4,0.5)]" style={{ width: `${stress}%` }}></div>
             </div>
           </div>
           <div className="flex flex-col gap-0.5">
             <div className="flex justify-between text-3xs text-gray-500 font-bold"><span>反抗</span><span>{rebellion}/100</span></div>
-            <div className="w-full h-1 bg-gray-950 rounded overflow-hidden flex border border-gray-800">
-              <div className="bg-blood-red h-full" style={{ width: `${rebellion}%` }}></div>
+            <div className="w-full h-1.5 bg-gray-900 rounded overflow-hidden flex border border-gray-800">
+              <div className="bg-blood-red h-full shadow-[0_0_5px_rgba(220,38,38,0.5)]" style={{ width: `${rebellion}%` }}></div>
             </div>
           </div>
         </div>
@@ -63,7 +87,7 @@ export default function SlaveCard({ slave }: SlaveCardProps) {
       {slave.traits.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1 z-10">
           {slave.traits.map(trait => (
-            <span key={trait} className="text-2xs px-2 py-0.5 bg-gray-950 text-gray-400 rounded border border-gray-800 tracking-wider">
+            <span key={trait} className="px-2 py-0.5 bg-purple-900/30 text-purple-400 border border-purple-800/50 rounded text-3xs font-bold tracking-widest">
               {trait}
             </span>
           ))}
