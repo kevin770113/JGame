@@ -20,7 +20,7 @@ export default function InteractionView() {
   
   const useItem = useGameStore((state) => state.useItem);
   const equipWeapon = useGameStore((state) => state.equipWeapon);
-  const unequipWeapon = useGameStore((state) => state.unequipWeapon); // ★ V2.8.0 引入沒收武裝函數
+  const unequipWeapon = useGameStore((state) => state.unequipWeapon); 
   const appointRole = useGameStore((state) => state.appointRole);
 
   const [currentTask, setCurrentTask] = useState<TaskType>('none');
@@ -164,7 +164,6 @@ export default function InteractionView() {
 
   return (
     <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in relative font-mono">
-      {/* 標題欄 */}
       <div className="flex justify-between items-center border-b border-gray-700 pb-2 shrink-0">
         <div>
           <h2 className="text-xl font-bold text-gray-300">互動與管理中心</h2>
@@ -187,7 +186,6 @@ export default function InteractionView() {
         </button>
       </div>
 
-      {/* ==================== 第一層：五大任務大按鈕選單 ==================== */}
       {currentTask === 'none' && (
         <div className="grid grid-cols-1 gap-3 mt-2 animate-fade-in w-full max-w-md mx-auto">
           <button onClick={() => setCurrentTask('dialogue')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg text-left px-5 flex justify-between items-center group transition-all shadow-md active:scale-98">
@@ -208,14 +206,39 @@ export default function InteractionView() {
           </button>
           <button onClick={() => setCurrentTask('role')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg text-left px-5 flex justify-between items-center group transition-all shadow-md active:scale-98">
             <span className="text-gray-300 group-hover:text-white font-bold tracking-widest text-sm">［職務任免］</span>
-            <span className="text-3xs text-gray-500 font-normal">指派高級保全與管家女僕</span>
+            {/* ★ V2.9.0 名詞淨化 */}
+            <span className="text-3xs text-gray-500 font-normal">指派高級守衛與管家</span>
           </button>
         </div>
       )}
 
-      {/* ==================== 第二/三層：3D Cover-Flow 立體卡片輪播 ==================== */}
-      {/* ★ V2.8.0 修改：只要選了任務，輪播就一定會出現，統一操作流程 */}
-      {currentTask !== 'none' && (
+      {currentTask === 'inventory' && !selectedItemId && (
+        <div className="w-full max-w-md mx-auto bg-gray-900/80 p-4 border border-gray-700 rounded-lg shadow-xl animate-fade-in flex flex-col gap-3">
+          <div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-2 tracking-widest">［請先選取商會庫房資產］</div>
+          {Object.entries(inventory).length === 0 ? (
+            <div className="text-xs text-gray-500 text-center py-8">［商會庫房目前空無一物］</div>
+          ) : (
+            <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto pr-1 scrollbar-none">
+              {Object.entries(inventory).map(([itemId, qty]) => {
+                if (qty <= 0) return null;
+                const item = ITEMS_DATA[itemId];
+                if (!item) return null;
+                return (
+                  <div key={itemId} onClick={() => setSelectedItemId(itemId)} className="flex justify-between items-center bg-gray-950 p-3 border border-gray-800 rounded hover:border-gray-600 transition-colors cursor-pointer group">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-bold text-gray-200 group-hover:text-white">{item.name} <span className="text-xs text-gray-500 font-mono ml-1">x{qty}</span></span>
+                      <span className="text-2xs text-gray-500">{item.desc}</span>
+                    </div>
+                    <span className="text-3xs text-gray-500 font-bold tracking-widest shrink-0">［點擊選定］</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {currentTask !== 'none' && (currentTask !== 'inventory' || selectedItemId) && (
         <div className="w-full flex flex-col gap-5 mt-2 animate-fade-in">
           {idleSlaves.length === 0 ? (
             <div className="text-xs text-red-500 bg-red-950/20 p-4 border border-red-900/30 rounded text-center max-w-sm mx-auto">
@@ -224,7 +247,6 @@ export default function InteractionView() {
           ) : (
             <div className="flex flex-col items-center w-full relative">
               
-              {/* 3D 輪播舞台區間 */}
               <div className="flex items-center justify-center w-full h-[260px] md:h-[280px] relative overflow-hidden perspective-1000">
                 {idleSlaves.map((slave, index) => {
                   const diff = index - carouselIndex;
@@ -247,7 +269,6 @@ export default function InteractionView() {
                       onClick={() => { if (!isCenter) setCarouselIndex(index); }}
                       className={`absolute w-[240px] md:w-[280px] h-full bg-gray-900/95 border ${slave.isInjured ? 'border-red-900/80' : 'border-gray-700'} rounded-xl p-4 shadow-2xl transition-all duration-500 ease-out flex flex-col justify-between transform ${transformClass} select-none shrink-0`}
                     >
-                      {/* 昏厥覆蓋網 */}
                       {isSlaveFainted && isCenter && (
                         <div className="absolute inset-0 bg-gray-950/90 z-40 flex flex-col items-center justify-center p-3 text-center backdrop-blur-xs rounded-xl">
                           <span className="text-red-500 font-black tracking-widest text-2xs animate-pulse border border-red-900/60 bg-red-950/40 px-2 py-1 rounded">
@@ -259,7 +280,6 @@ export default function InteractionView() {
                         </div>
                       )}
 
-                      {/* 卡片標頭 */}
                       <div className="flex justify-between items-start w-full shrink-0">
                         <div className="flex flex-col gap-0.5">
                           <span className={`font-black text-sm tracking-widest truncate max-w-[140px] ${slave.isInjured ? 'text-red-400' : 'text-blue-400'}`}>
@@ -270,18 +290,16 @@ export default function InteractionView() {
                           </span>
                         </div>
                         
-                        {/* 職務微型勳章 */}
                         <div className="flex flex-col items-end gap-1">
-                          {slave.role === 'maid' && <span className="text-4xs px-1.5 py-0.5 bg-blue-900/40 border border-blue-700/50 text-blue-300 font-bold rounded">內務傭人</span>}
-                          {slave.role === 'security' && <span className="text-4xs px-1.5 py-0.5 bg-purple-900/40 border border-purple-700/50 text-purple-300 font-bold rounded">商會保全</span>}
+                          {/* ★ V2.9.0 名詞淨化 */}
+                          {slave.role === 'maid' && <span className="text-4xs px-1.5 py-0.5 bg-blue-900/40 border border-blue-700/50 text-blue-300 font-bold rounded">管家</span>}
+                          {slave.role === 'security' && <span className="text-4xs px-1.5 py-0.5 bg-purple-900/40 border border-purple-700/50 text-purple-300 font-bold rounded">守衛</span>}
                           {slave.isInjured && <span className="text-4xs px-1.5 py-0.5 bg-red-950 border border-red-800 text-red-400 font-black animate-pulse rounded">負傷</span>}
                         </div>
                       </div>
 
-                      {/* 卡片中段：任務資訊降噪特化區 */}
                       <div className="flex-1 my-3 bg-gray-950/80 rounded-lg p-2.5 border border-gray-800 flex flex-col justify-center gap-1.5 text-3xs shrink-0">
                         
-                        {/* A. 特訓任務資訊 */}
                         {currentTask === 'train' && (
                           <>
                             <div className="text-4xs text-gray-500 font-bold border-b border-gray-800 pb-1 mb-0.5 tracking-widest">［培育特訓現況］</div>
@@ -291,7 +309,6 @@ export default function InteractionView() {
                           </>
                         )}
 
-                        {/* B. 任免職務資訊 */}
                         {currentTask === 'role' && (
                           <>
                             <div className="text-4xs text-gray-500 font-bold border-b border-gray-800 pb-1 mb-0.5 tracking-widest">［進階職能審查］</div>
@@ -305,7 +322,6 @@ export default function InteractionView() {
                           </>
                         )}
 
-                        {/* C. 常規內政/對話/裝備通用資訊 */}
                         {(currentTask === 'clean' || currentTask === 'dialogue' || currentTask === 'inventory') && (
                           <>
                             <div className="text-4xs text-gray-500 font-bold border-b border-gray-800 pb-1 mb-0.5 tracking-widest">［狀態核心觀測］</div>
@@ -326,7 +342,6 @@ export default function InteractionView() {
                         )}
                       </div>
 
-                      {/* 卡片下段：血條與體力基本盤 */}
                       <div className="w-full flex flex-col gap-1 shrink-0">
                         <div className="flex justify-between text-4xs text-gray-500">
                           <span>儲備體力</span>
@@ -341,7 +356,6 @@ export default function InteractionView() {
                 })}
               </div>
 
-              {/* 手機直覺左右切換擋板 */}
               <div className="flex gap-10 mt-3 z-30 shrink-0">
                 <button onClick={prevCarousel} className="px-4 py-1.5 bg-gray-900 border border-gray-700 rounded text-xs font-bold text-gray-400 hover:text-white transition-colors active:scale-95 shadow">
                   〈 傳喚上一位
@@ -351,11 +365,9 @@ export default function InteractionView() {
                 </button>
               </div>
 
-              {/* ==================== 第三層：命令執行控制底座 ==================== */}
               {activeSlave && (
                 <div className="w-full max-w-md mt-4 bg-gray-950 p-4 border border-gray-800 rounded-xl shadow-inner animate-fade-in shrink-0 relative z-20">
                   
-                  {/* A. 執行對話 */}
                   {currentTask === 'dialogue' && (
                     <div className="flex flex-col gap-3">
                       <div className="text-xs text-gray-300 italic text-center py-4 px-2 bg-gray-900/60 rounded border border-gray-800 min-h-[60px] flex items-center justify-center">
@@ -367,7 +379,6 @@ export default function InteractionView() {
                     </div>
                   )}
 
-                  {/* B. 執行手動打掃 */}
                   {currentTask === 'clean' && (
                     <div className="flex flex-col gap-3">
                       <div className="text-2xs text-gray-500 leading-relaxed bg-gray-900/60 p-3 rounded border border-gray-800">
@@ -381,7 +392,6 @@ export default function InteractionView() {
                     </div>
                   )}
 
-                  {/* C. 執行特訓 */}
                   {currentTask === 'train' && (
                     <div className="flex flex-col gap-2">
                       <div className="text-2xs text-yellow-600 font-bold bg-gray-900/60 p-2.5 rounded border border-gray-800 mb-1 tracking-wider leading-relaxed">
@@ -405,11 +415,8 @@ export default function InteractionView() {
                     </div>
                   )}
 
-                  {/* ★ D. 執行道具武器裝備 (V2.8.0 流程翻新：加入解除武裝與道具選擇面板) */}
                   {currentTask === 'inventory' && (
                     <div className="flex flex-col gap-3">
-                      
-                      {/* 強制解除武裝按鈕 */}
                       {activeSlave.equipment?.weaponId && (
                         <button 
                           disabled={isFainted}
@@ -478,10 +485,10 @@ export default function InteractionView() {
                     </div>
                   )}
 
-                  {/* E. 執行職務任免 */}
                   {currentTask === 'role' && (
                     <div className="flex flex-col gap-3">
                       <div className="grid grid-cols-2 gap-2">
+                        {/* ★ V2.9.0 名詞淨化 */}
                         <button
                           disabled={isFainted}
                           onClick={() => appointRole(activeSlave.id, activeSlave.role === 'maid' ? 'none' : 'maid')}
@@ -491,7 +498,7 @@ export default function InteractionView() {
                               : 'bg-gray-800 text-gray-400 border-gray-600 hover:bg-gray-700'
                           }`}
                         >
-                          {activeSlave.role === 'maid' ? '［解除內務傭人］' : '［任用為內務傭人］'}
+                          {activeSlave.role === 'maid' ? '［解除管家］' : '［任用為管家］'}
                         </button>
                         <button
                           disabled={isFainted}
@@ -502,7 +509,7 @@ export default function InteractionView() {
                               : 'bg-gray-800 text-gray-400 border-gray-600 hover:bg-gray-700'
                           }`}
                         >
-                          {activeSlave.role === 'security' ? '［解除商會保全］' : '［任用為商會保全］'}
+                          {activeSlave.role === 'security' ? '［解除守衛］' : '［任用為守衛］'}
                         </button>
                       </div>
                     </div>
@@ -516,14 +523,12 @@ export default function InteractionView() {
         </div>
       )}
 
-      {/* 底部即時回報日誌 */}
       {sysMessage && (
         <div className={`p-3 border rounded text-xs leading-relaxed tracking-wide shrink-0 ${ sysMessage.type === 'success' ? 'bg-gray-900 border-green-800 text-green-500' : 'bg-gray-900 border-red-900 text-red-500' }`}>
           {sysMessage.text}
         </div>
       )}
 
-      {/* 時光前進確認彈窗 */}
       {confirmModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[110] animate-fade-in">
           <div className="bg-gray-900 border-t-2 border-blood-red rounded-lg p-5 max-w-sm w-full shadow-2xl border-x border-b border-gray-700">
