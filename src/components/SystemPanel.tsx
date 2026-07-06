@@ -1,37 +1,34 @@
 import { useGameStore } from '../store/useGameStore';
-import { Slave } from '../types';
+import { supabase } from '../services/supabaseClient';
 
-interface SlavePanelProps {
-  onSelectSlave: (slave: Slave) => void;
-}
-
-export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
-  const slaves = useGameStore((state) => state.slaves);
+export default function SystemPanel() {
   const activeWindow = useGameStore((state) => state.activeWindow);
   const setActiveWindow = useGameStore((state) => state.setActiveWindow);
+  const isSaving = useGameStore((state) => state.isSaving);
+  const syncProfileToCloud = useGameStore((state) => state.syncProfileToCloud);
+  const localSaveVersion = useGameStore((state) => state.localSaveVersion);
 
-  const isOpen = activeWindow === 'roster';
+  const isOpen = activeWindow === 'system';
 
   const handleToggle = () => {
-    setActiveWindow(isOpen ? null : 'roster');
+    setActiveWindow(isOpen ? null : 'system');
   };
 
-  const handleSelect = (slave: Slave) => {
-    setActiveWindow(null); 
-    onSelectSlave(slave);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
   return (
     <>
-      <div className="fixed right-0 top-1/4 z-40 flex items-start pointer-events-none animate-fade-in">
+      <div className="fixed left-0 top-[45%] z-40 flex items-start pointer-events-none animate-fade-in">
         <button
           onClick={handleToggle}
-          className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-300 py-3 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
+          className="pointer-events-auto bg-gray-900 border-y border-r border-gray-600 text-gray-400 py-3 px-1.5 rounded-r-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
         >
-          <span>成</span>
-          <span>員</span>
-          <span>名</span>
-          <span>冊</span>
+          <span>系</span>
+          <span>統</span>
+          <span>選</span>
+          <span>單</span>
         </button>
       </div>
 
@@ -43,12 +40,11 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
       )}
 
       <div 
-        className={`fixed right-0 top-0 h-full w-64 sm:w-72 bg-gray-950 border-l border-purple-900/50 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed left-0 top-0 h-full w-64 bg-gray-950 border-r border-gray-700 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/80 shrink-0">
           <h3 className="text-sm font-bold text-gray-200 tracking-widest flex items-center gap-2">
-             <span className="text-purple-400">👁️</span> ［試驗體名冊］ 
-             <span className="text-xs font-mono text-gray-500">({slaves.length}/{useGameStore.getState().player.maxSlaveCapacity})</span>
+             <span className="text-gray-400">⚙️</span> ［系統管理］
           </h3>
           <button 
             onClick={() => setActiveWindow(null)}
@@ -58,50 +54,31 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 scrollbar-none pb-20">
-          {slaves.map((slave) => (
-            <button
-              key={slave.id}
-              onClick={() => handleSelect(slave)}
-              className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-lg p-3 text-left flex flex-col gap-1 transition-all active:scale-98 shadow group relative overflow-hidden shrink-0"
-            >
-              {slave.isInjured && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-600 animate-pulse"></div>}
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+          <div className="bg-gray-900 p-4 rounded-lg border border-gray-800 flex flex-col gap-3 shadow-inner">
+             <div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-2 tracking-widest">［存檔狀態］</div>
+             <div className="text-xs text-gray-300 font-mono flex justify-between">
+                <span>本地記憶版號:</span>
+                <span className="text-blue-400">v{localSaveVersion}</span>
+             </div>
+             <button 
+               onClick={() => { syncProfileToCloud(); }}
+               disabled={isSaving}
+               className={`w-full mt-2 py-2.5 rounded font-bold text-xs tracking-widest transition-colors shadow-sm border ${isSaving ? 'bg-gray-800 text-gray-500 border-gray-700 cursor-wait' : 'bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-600 active:scale-95'}`}
+             >
+               {isSaving ? '［同步中...］' : '［強制上傳雲端］'}
+             </button>
+          </div>
 
-              <div className="text-sm font-bold text-gray-200 group-hover:text-white truncate pr-2">
-                {slave.name}
-              </div>
-              
-              {/* ★ V2.9.0 移除 DNA emoji，保持介面冷峻 */}
-              <div className="text-2xs text-gray-400 flex items-center gap-2">
-                <span className="text-purple-300 font-bold">{slave.race}</span>
-                <span className="text-gray-700">｜</span>
-                <span className={slave.gender === 'Male' ? 'text-blue-400' : 'text-pink-400'}>
-                  {slave.gender === 'Male' ? '♂ 男性' : '♀ 女性'}
-                </span>
-              </div>
-
-              <div className="text-2xs flex items-center gap-2 mt-1.5 border-t border-gray-800/60 pt-2 w-full whitespace-nowrap">
-                <span className="flex items-center gap-1 shrink-0">
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    slave.isInjured ? 'bg-red-600 animate-pulse' : slave.activityStatus === '閒置' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
-                  }`} />
-                  <span className={slave.isInjured ? 'text-red-500 font-bold' : slave.activityStatus !== '閒置' ? 'text-yellow-500 font-bold' : 'text-gray-500'}>
-                    {slave.isInjured ? '負傷' : slave.activityStatus}
-                  </span>
-                </span>
-                <span className="text-gray-700 shrink-0">｜</span>
-                <span className="text-green-400 font-mono font-bold shrink-0">體 {slave.conditionStats.stamina}</span>
-                <span className="text-gray-700 shrink-0">｜</span>
-                <span className="text-yellow-600 font-mono font-bold shrink-0">壓 {slave.conditionStats.stress}</span>
-              </div>
-            </button>
-          ))}
-
-          {slaves.length === 0 && (
-            <div className="text-xs text-gray-600 text-center py-16 italic tracking-widest">
-              ［目前名冊內空無一人］
-            </div>
-          )}
+          <div className="bg-gray-900 p-4 rounded-lg border border-gray-800 flex flex-col gap-3 shadow-inner mt-auto">
+             <div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-2 tracking-widest">［帳號連線］</div>
+             <button 
+               onClick={handleLogout}
+               className="w-full mt-2 py-2.5 rounded font-bold text-xs tracking-widest transition-colors shadow-sm border bg-red-950/40 hover:bg-red-900/60 text-red-500 border-red-900 active:scale-95"
+             >
+               ［切斷連結並登出］
+             </button>
+          </div>
         </div>
       </div>
     </>
