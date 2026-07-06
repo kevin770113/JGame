@@ -6,7 +6,7 @@ import { Slave } from '../types';
 import { ITEMS_DATA } from '../utils/gameData';
 
 export default function MarketView() {
-  const { gold, maxSlaveCapacity, location, shopStock } = useGameStore((state) => state.player); // ★ 讀取商店庫存
+  const { gold, maxSlaveCapacity, location, shopStock } = useGameStore((state) => state.player); 
   const deductGold = useGameStore((state) => state.deductGold);
   const addSlave = useGameStore((state) => state.addSlave);
   const sellSlave = useGameStore((state) => state.sellSlave);
@@ -23,7 +23,6 @@ export default function MarketView() {
   
   const setGlobalModal = useGameStore((state) => state.setGlobalModal);
 
-  // ★ 移除 arena 頁籤
   const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'shop'>('buy');
   const [eventSlaveId, setEventSlaveId] = useState<string>('');
 
@@ -116,10 +115,13 @@ export default function MarketView() {
             marketSlaves.map((slave) => {
               const price = calculateBuyPrice(slave);
               return (
+                // ★ V2.9.2 介面淨化：徹底拔除 ［檔案紀錄］{slave.backgroundStory} 的顯示區塊
                 <div key={slave.id} className="relative group flex flex-col gap-1.5 animate-slide-up">
                   <SlaveCard slave={slave} />
-                  <div className="bg-gray-950 px-3 py-2 text-2xs text-gray-500 italic border-l border-gray-800 leading-relaxed">［檔案紀錄］{slave.backgroundStory}</div>
-                  <div className="flex justify-between items-center bg-gray-900 px-4 py-2.5 rounded border border-gray-700"><span className="text-gray-400 text-xs font-bold">商隊報價: <strong className="text-yellow-500 text-base ml-2">{price}</strong></span><button onClick={() => handleBuy(slave, price)} className={`px-4 py-2 rounded font-bold text-xs ${isFull ? 'bg-gray-800 text-gray-600 border-gray-700' : gold >= price ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-500' : 'bg-gray-900 text-gray-700 border-gray-800'}`} disabled={isFull || gold < price}>{isFull ? '［據點已滿］' : gold >= price ? '［簽署血契］' : '［資金不足］'}</button></div>
+                  <div className="flex justify-between items-center bg-gray-900 px-4 py-2.5 rounded border border-gray-700">
+                    <span className="text-gray-400 text-xs font-bold">商隊報價: <strong className="text-yellow-500 text-base ml-2">{price}</strong></span>
+                    <button onClick={() => handleBuy(slave, price)} className={`px-4 py-2 rounded font-bold text-xs ${isFull ? 'bg-gray-800 text-gray-600 border-gray-700' : gold >= price ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-500' : 'bg-gray-900 text-gray-700 border-gray-800'}`} disabled={isFull || gold < price}>{isFull ? '［據點已滿］' : gold >= price ? '［簽署血契］' : '［資金不足］'}</button>
+                  </div>
                 </div>
               );
             })
@@ -139,7 +141,6 @@ export default function MarketView() {
         </div>
       )}
 
-      {/* ★ 道具黑市加入庫存 UI 顯示與控管 */}
       {activeTab === 'shop' && (
         <div className="flex flex-col gap-4 animate-fade-in">
           <p className="text-xs text-gray-400 italic border-l-2 border-purple-500 pl-2">「這裡流通著帝國明令禁止的特種物資與軍械。」</p>
