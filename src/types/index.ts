@@ -24,8 +24,8 @@ export interface PrimaryStats {
   endurance: number;
   intelligence: number;
   obedience: number;
-  charisma?: number;  // ★ V2.9.0 新增：魅力（設為可選以相容舊存檔）
-  luck?: number;      // ★ V2.9.0 新增：幸運（設為可選以相容舊存檔）
+  charisma?: number;  
+  luck?: number;      
 }
 
 export interface ConditionStats {
@@ -46,7 +46,7 @@ export interface Slave {
   primaryStats: PrimaryStats;
   conditionStats: ConditionStats;
   traits: string[];
-  backgroundStory: string;
+  backgroundStory?: string; // ★ V2.9.1 改為可選，向下相容舊存檔
   parents?: {
     fatherId: string;
     motherId: string;
