@@ -1,5 +1,6 @@
 export type Scene = 'Home' | 'Town';
-export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map' | 'Interaction' | 'Arena' | 'Abyss';
+// ★ V2.9.5 新增 'Housekeeping' 頁面
+export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map' | 'Interaction' | 'Arena' | 'Abyss' | 'Housekeeping';
 
 export type Race = '人類' | '精靈' | '半獸人' | '矮人' | '不死族' | '龍族';
 export type Gender = 'Male' | 'Female';
@@ -59,7 +60,6 @@ export interface Slave {
 }
 
 export interface Player {
-  // ★ V2.9.4 新增：首領本體實體化數據
   leaderName: string;
   leaderGender: Gender;
   leaderStamina: number;
@@ -116,7 +116,6 @@ export interface CombatPlaybackData {
   isAbyss: boolean;
 }
 
-// ★ V2.9.4 新增：全域數值進位格式化工具 (供 UI 端統一呼叫)
 export const formatK = (num: number): string => {
   if (num >= 1000) {
     return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
