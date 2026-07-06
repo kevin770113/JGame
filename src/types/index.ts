@@ -9,7 +9,6 @@ export type Location = 'Frontlines' | 'NeutralHub' | 'Capital';
 
 export type ActivityStatus = '閒置' | '外派中' | '特訓中';
 
-// ★ V2.6 新增職位型別
 export type Role = 'none' | 'maid' | 'security';
 
 export type ActiveWindow = 'quest' | 'roster' | 'system' | null;
@@ -25,6 +24,8 @@ export interface PrimaryStats {
   endurance: number;
   intelligence: number;
   obedience: number;
+  charisma?: number;  // ★ V2.9.0 新增：魅力（設為可選以相容舊存檔）
+  luck?: number;      // ★ V2.9.0 新增：幸運（設為可選以相容舊存檔）
 }
 
 export interface ConditionStats {
@@ -39,8 +40,8 @@ export interface Slave {
   race: Race;
   gender: Gender;
   activityStatus: ActivityStatus;
-  role: Role;            // ★ V2.6 據點職務
-  faintTurns: number;    // ★ V2.6 昏厥剩餘回合數
+  role: Role;            
+  faintTurns: number;    
   skills: Skills;
   primaryStats: PrimaryStats;
   conditionStats: ConditionStats;
