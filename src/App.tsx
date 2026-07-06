@@ -6,6 +6,7 @@ import BreedingView from './views/BreedingView';
 import DispatchView from './views/DispatchView'; 
 import MapView from './views/MapView';
 import InteractionView from './views/InteractionView';
+import HousekeepingView from './views/HousekeepingView'; // ★ V2.9.5 補齊：引入家政視圖
 import ArenaView from './views/ArenaView';
 import AbyssView from './views/AbyssView'; 
 import LoginView from './views/LoginView';
@@ -84,7 +85,6 @@ function App() {
   const [session, setSession] = useState<any>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
-  // ★ V2.9.1 重構：頁籤由三等分縮減為兩等分適配
   const [slaveTab, setSlaveTab] = useState<'ability' | 'status'>('ability');
 
   useEffect(() => {
@@ -151,6 +151,7 @@ function App() {
         case 'Room': return <BreedingView />; 
         case 'Interaction': return <InteractionView />;
         case 'Map': return <MapView />;
+        case 'Housekeeping': return <HousekeepingView />; // ★ V2.9.5 補齊：家政系統路由註冊
         default: return <BaseView />;
       }
     } else {
@@ -248,7 +249,6 @@ function App() {
                 </div>
               </div>
 
-              {/* ★ V2.9.1 重構：兩等分水平導航頁籤 */}
               <div className="flex border-b border-gray-800 shrink-0">
                 <button onClick={() => setSlaveTab('ability')} className={`flex-1 py-2 text-xs font-bold tracking-widest transition-colors ${slaveTab === 'ability' ? 'text-purple-400 border-b-2 border-purple-500 bg-purple-900/10' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}`}>［戰鬥能力］</button>
                 <button onClick={() => setSlaveTab('status')} className={`flex-1 py-2 text-xs font-bold tracking-widest transition-colors ${slaveTab === 'status' ? 'text-blue-400 border-b-2 border-blue-500 bg-blue-900/10' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}`}>［綜合狀態］</button>
