@@ -20,6 +20,59 @@ import { ITEMS_DATA, getSlavePortraitUrl } from './utils/gameData';
 
 const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 
+// ★ V2.9.0 新增：動態 SVG 菱形雷達圖渲染引擎
+const renderRadar = (slave: Slave) => {
+  const getP = (val: number, angleIndex: number, maxR = 40) => {
+     // 五個頂點：0(頂), 72(右上), 144(右下), 216(左下), 288(左上)
+     const angle = (angleIndex * 72 - 90) * (Math.PI / 180);
+     const r = (Math.min(100, Math.max(0, val)) / 100) * maxR;
+     return `${60 + r * Math.cos(angle)},${60 + r * Math.sin(angle)}`;
+  };
+  
+  const stats = [
+     slave.primaryStats.combat,
+     slave.primaryStats.intelligence,
+     slave.primaryStats.charisma ?? 10,
+     slave.primaryStats.luck ?? 10,
+     slave.primaryStats.endurance
+  ];
+  
+  const statPoints = stats.map((val, i) => getP(val, i)).join(' ');
+  const bg100 = [100,100,100,100,100].map((v,i) => getP(v,i)).join(' ');
+  const bg75 = [75,75,75,75,75].map((v,i) => getP(v,i)).join(' ');
+  const bg50 = [50,50,50,50,50].map((v,i) => getP(v,i)).join(' ');
+  const bg25 = [25,25,25,25,25].map((v,i) => getP(v,i)).join(' ');
+
+  return (
+    <div className="relative w-36 h-36 sm:w-44 sm:h-44 shrink-0 flex items-center justify-center -ml-2">
+       <svg viewBox="0 0 120 120" className="w-full h-full drop-shadow-md">
+          {/* 背景輔助線 */}
+          <polygon points={bg100} fill="rgba(31, 41, 55, 0.4)" stroke="#4b5563" strokeWidth="1" />
+          <polygon points={bg75} fill="none" stroke="#374151" strokeWidth="0.5" strokeDasharray="2 2" />
+          <polygon points={bg50} fill="none" stroke="#374151" strokeWidth="0.5" strokeDasharray="2 2" />
+          <polygon points={bg25} fill="none" stroke="#374151" strokeWidth="0.5" strokeDasharray="2 2" />
+          
+          {/* 五角軸線 */}
+          <line x1="60" y1="60" x2={getP(100,0).split(',')[0]} y2={getP(100,0).split(',')[1]} stroke="#4b5563" strokeWidth="1" />
+          <line x1="60" y1="60" x2={getP(100,1).split(',')[0]} y2={getP(100,1).split(',')[1]} stroke="#4b5563" strokeWidth="1" />
+          <line x1="60" y1="60" x2={getP(100,2).split(',')[0]} y2={getP(100,2).split(',')[1]} stroke="#4b5563" strokeWidth="1" />
+          <line x1="60" y1="60" x2={getP(100,3).split(',')[0]} y2={getP(100,3).split(',')[1]} stroke="#4b5563" strokeWidth="1" />
+          <line x1="60" y1="60" x2={getP(100,4).split(',')[0]} y2={getP(100,4).split(',')[1]} stroke="#4b5563" strokeWidth="1" />
+
+          {/* 實體數值多邊形 */}
+          <polygon points={statPoints} fill="rgba(139, 92, 246, 0.5)" stroke="#a855f7" strokeWidth="1.5" className="transition-all duration-700 ease-out" />
+
+          {/* 屬性標籤 */}
+          <text x="60" y="14" fontSize="10" fill="#f87171" textAnchor="middle" fontWeight="bold">武力</text>
+          <text x="110" y="52" fontSize="10" fill="#60a5fa" textAnchor="middle" fontWeight="bold">智力</text>
+          <text x="96" y="112" fontSize="10" fill="#f472b6" textAnchor="middle" fontWeight="bold">魅力</text>
+          <text x="24" y="112" fontSize="10" fill="#facc15" textAnchor="middle" fontWeight="bold">幸運</text>
+          <text x="10" y="52" fontSize="10" fill="#4ade80" textAnchor="middle" fontWeight="bold">體質</text>
+       </svg>
+    </div>
+  );
+};
+
 function App() {
   const currentScene = useGameStore((state) => state.currentScene);
   const currentSubView = useGameStore((state) => state.currentSubView);
@@ -36,6 +89,14 @@ function App() {
   const [activeSlave, setActiveSlave] = useState<Slave | null>(null);
   const [session, setSession] = useState<any>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+
+  // ★ V2.9.0 新增：SLG 標籤化頁籤狀態
+  const [slaveTab, setSlaveTab] = useState<'ability' | 'status' | 'profile'>('ability');
+
+  // 切換奴隸時重置頁籤
+  useEffect(() => {
+    if (activeSlave) setSlaveTab('ability');
+  }, [activeSlave?.id]);
 
   useEffect(() => {
     if (!_hasHydrated) return;
@@ -155,13 +216,14 @@ function App() {
         </main>
       </div>
 
+      {/* ★ 奴隸詳細面板大重構：SLG 五維雷達與標籤化系統 */}
       {activeSlave && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
-          <div className="w-full max-w-2xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
-            {/* ★ V2.9.0 關閉按鈕物理防禦層級重構：絕對右上角、更高 z-index 與防誤觸設計 */}
-            <button onClick={() => setActiveSlave(null)} className="absolute top-0 right-0 z-[60] text-gray-400 hover:text-white text-sm font-bold transition-colors bg-red-950/80 hover:bg-red-900/90 rounded-bl-xl px-4 py-2 shadow-md">［關閉］</button>
+          <div className="w-full max-w-3xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setActiveSlave(null)} className="absolute top-0 right-0 z-[60] text-gray-400 hover:text-white text-sm font-bold transition-colors bg-red-950/80 hover:bg-red-900/90 rounded-bl-xl px-4 py-2 shadow-md border-b border-l border-red-900">［關閉］</button>
             
-            <div className="w-full sm:w-1/3 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[240px] sm:min-h-[380px] relative overflow-hidden group shrink-0">
+            {/* 左側立繪 */}
+            <div className="w-full sm:w-2/5 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[220px] sm:min-h-[420px] relative overflow-hidden group shrink-0">
               <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-0">
                 <span className="text-gray-700 text-3xl opacity-30">⛓️</span>
               </div>
@@ -177,110 +239,185 @@ function App() {
               <div className="absolute inset-0 bg-gray-800/10 group-hover:bg-gray-800/30 transition-colors z-20 pointer-events-none"></div>
             </div>
             
-            <div className="w-full sm:w-2/3 flex flex-col gap-4 overflow-y-auto max-h-[60vh] sm:max-h-[70vh] pr-1 scrollbar-none">
-              <div className="shrink-0">
-                <h3 className="text-xl font-bold text-gray-200 flex items-center gap-2">{activeSlave.name}<span className={`text-sm ${activeSlave.gender === 'Male' ? 'text-blue-400' : 'text-pink-400'}`}>[{activeSlave.gender === 'Male' ? '男' : '女'}]</span></h3>
-                <div className="flex flex-wrap gap-2 mt-1.5">
-                  <span className="text-xs text-gray-300 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-700">種族：{activeSlave.race}</span>
-                  <span className={`text-xs px-2.5 py-0.5 rounded border ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-700 text-gray-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-500 font-bold'}`}>狀態：{activeSlave.activityStatus}</span>
-                  
-                  {/* ★ V2.9.0 名詞淨化 */}
-                  {activeSlave.role === 'maid' && <span className="text-xs px-2.5 py-0.5 bg-blue-900/30 border border-blue-700 text-blue-400 font-bold rounded">職位：管家</span>}
-                  {activeSlave.role === 'security' && <span className="text-xs px-2.5 py-0.5 bg-purple-900/30 border border-purple-700 text-purple-400 font-bold rounded">職位：守衛</span>}
-                  {(activeSlave.faintTurns || 0) > 0 && <span className="text-xs px-2.5 py-0.5 bg-gray-800 border border-gray-500 text-gray-300 font-extrabold rounded">昏厥中 ({activeSlave.faintTurns} 回合)</span>}
-                  {activeSlave.isInjured && <span className="text-xs px-2.5 py-0.5 bg-red-950 border border-red-700 text-red-400 font-extrabold rounded animate-pulse">［負傷狀態］</span>}
-                  
-                  <span className="text-xs text-gray-400 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-800 font-mono flex items-center gap-1">⚔️ 勝 {activeSlave.combatRecord?.wins || 0} / 敗 {activeSlave.combatRecord?.losses || 0}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-sm bg-gray-950 p-3 rounded border border-gray-800 relative overflow-hidden shrink-0">
-                {(activeSlave.faintTurns || 0) > 0 && <div className="absolute inset-0 bg-gray-950/60 z-10 pointer-events-none"></div>}
-
-                <div className="flex flex-col gap-1.5 border-r border-gray-800 pr-3 z-20">
-                  <div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-1 mb-1 tracking-widest">［天賦屬性］</div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">武力:</span> 
-                    {activeSlave.isInjured ? 
-                      <span><span className="text-red-500 font-mono font-bold">{Math.floor(activeSlave.primaryStats.combat * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.primaryStats.combat})</span></span> 
-                      : <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.combat}</span>}
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">體質:</span> 
-                    {activeSlave.isInjured ? 
-                      <span><span className="text-red-500 font-mono font-bold">{Math.floor(activeSlave.primaryStats.endurance * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.primaryStats.endurance})</span></span> 
-                      : <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.endurance}</span>}
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">智力:</span> 
-                    {activeSlave.isInjured ? 
-                      <span><span className="text-red-500 font-mono font-bold">{Math.floor(activeSlave.primaryStats.intelligence * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.primaryStats.intelligence})</span></span> 
-                      : <span className="text-gray-200 font-mono font-bold">{activeSlave.primaryStats.intelligence}</span>}
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">服從:</span> 
-                    <span className={activeSlave.primaryStats.obedience < 20 ? 'text-red-400 font-bold' : 'text-gray-200 font-mono'}>{activeSlave.primaryStats.obedience}</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5 pl-1 z-20">
-                  <div className="text-xs text-gray-400 font-bold border-b border-gray-800 pb-1 mb-1 tracking-widest">［掌握技能］</div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">戰鬥:</span> 
-                    {activeSlave.isInjured ? 
-                      <span><span className="text-red-500 font-mono font-bold">Lv.{Math.floor((activeSlave.skills?.combat || 1) * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.skills?.combat || 1})</span></span> 
-                      : <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.combat || 1}</span>}
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">管家:</span> 
-                    {activeSlave.isInjured ? 
-                      <span><span className="text-red-500 font-mono font-bold">Lv.{Math.floor((activeSlave.skills?.housework || 1) * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.skills?.housework || 1})</span></span> 
-                      : <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.housework || 1}</span>}
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">生存:</span> 
-                    {activeSlave.isInjured ? 
-                      <span><span className="text-red-500 font-mono font-bold">Lv.{Math.floor((activeSlave.skills?.survival || 1) * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.skills?.survival || 1})</span></span> 
-                      : <span className="text-blue-400 font-mono font-bold">Lv.{activeSlave.skills?.survival || 1}</span>}
-                  </div>
-                </div>
-              </div>
+            {/* 右側資訊流 */}
+            <div className="w-full sm:w-3/5 flex flex-col gap-2 overflow-y-hidden max-h-[60vh] sm:max-h-[75vh]">
               
-              <div className="flex flex-col gap-2 bg-gray-950 p-3 rounded border border-gray-800 text-sm shadow-inner shrink-0">
-                <div className="flex flex-col gap-1 border-b border-gray-800 pb-2">
-                  <span className="text-xs text-gray-400 font-bold tracking-widest">［血脈被動］</span>
-                  <span className="text-yellow-500 text-xs leading-relaxed font-bold">
-                    {activeSlave.race === '人類' && '【絕境意志】血量低於 40% 時爆發，武力提升 25%。'}
-                    {activeSlave.race === '精靈' && '【風之眷顧】速度提升 20%，若取得先手則首擊傷害增加 15%。'}
-                    {activeSlave.race === '半獸人' && '【狂熱戰血】武力提升 15%，防禦降低 10%。受擊疊加印記，最高增傷 30%。'}
-                    {activeSlave.race === '矮人' && '【堅岩體魄】最大血量提升 20%，防禦提升 15%。受擊固定減免 5 點傷害。'}
-                    {activeSlave.race === '龍族' && '【真龍威壓】武力、防禦、速度全面提升 10%，自帶 20% 最終傷害減免。'}
-                    {activeSlave.race === '不死族' && '【枯骨不朽】每次攻擊造成傷害時，將吸收 15% 轉化為自身生命力。'}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1 pt-1">
-                  <span className="text-xs text-gray-400 font-bold tracking-widest">［當前武裝］</span>
-                  <span className="text-blue-400 text-xs font-bold">
-                    {activeSlave.equipment?.weaponId && ITEMS_DATA[activeSlave.equipment.weaponId] 
-                      ? `【${ITEMS_DATA[activeSlave.equipment.weaponId].name}】 ${ITEMS_DATA[activeSlave.equipment.weaponId].desc}`
-                      : '［無配戴武器］'}
-                  </span>
+              {/* 頭部表單區 */}
+              <div className="shrink-0 flex flex-col gap-1.5 pb-2">
+                <h3 className="text-xl font-bold text-gray-200 flex items-center gap-2">
+                  {activeSlave.name}
+                  <span className={`text-sm ${activeSlave.gender === 'Male' ? 'text-blue-400' : 'text-pink-400'}`}>[{activeSlave.gender === 'Male' ? '男' : '女'}]</span>
+                </h3>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="text-xs text-gray-300 bg-gray-950 px-2 py-0.5 rounded border border-gray-700 shadow-sm">種族：{activeSlave.race}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded border shadow-sm ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-700 text-gray-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-500 font-bold'}`}>狀態：{activeSlave.activityStatus}</span>
+                  
+                  {activeSlave.role === 'maid' && <span className="text-xs px-2 py-0.5 bg-blue-900/30 border border-blue-700 text-blue-400 font-bold rounded shadow-sm">職位：管家</span>}
+                  {activeSlave.role === 'security' && <span className="text-xs px-2 py-0.5 bg-purple-900/30 border border-purple-700 text-purple-400 font-bold rounded shadow-sm">職位：守衛</span>}
+                  {(activeSlave.faintTurns || 0) > 0 && <span className="text-xs px-2 py-0.5 bg-gray-800 border border-gray-500 text-gray-300 font-extrabold rounded shadow-sm">昏厥 ({activeSlave.faintTurns} 回合)</span>}
+                  {activeSlave.isInjured && <span className="text-xs px-2 py-0.5 bg-red-950 border border-red-700 text-red-400 font-extrabold rounded animate-pulse shadow-sm">負傷</span>}
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 shrink-0">
-                  <div className="flex flex-col gap-0.5"><div className="flex justify-between text-3xs text-gray-400 font-bold"><span>體力</span><span className="font-mono">{activeSlave.conditionStats.stamina}/100</span></div><div className="w-full h-1.5 bg-gray-950 rounded overflow-hidden border border-gray-800"><div className="bg-green-600 h-full" style={{ width: `${activeSlave.conditionStats.stamina}%` }}></div></div></div>
-                  <div className="flex flex-col gap-0.5"><div className="flex justify-between text-3xs text-gray-400 font-bold"><span>壓力</span><span className="font-mono">{activeSlave.conditionStats.stress}/100</span></div><div className="w-full h-1.5 bg-gray-950 rounded overflow-hidden border border-gray-800"><div className="bg-yellow-600 h-full" style={{ width: `${activeSlave.conditionStats.stress}%` }}></div></div></div>
-                  <div className="flex flex-col gap-0.5"><div className="flex justify-between text-3xs text-gray-400 font-bold"><span>反抗</span><span className="font-mono">{activeSlave.conditionStats.rebellion}/100</span></div><div className="w-full h-1.5 bg-gray-950 rounded overflow-hidden border border-gray-800"><div className="bg-blood-red h-full" style={{ width: `${activeSlave.conditionStats.rebellion}%` }}></div></div></div>
+              {/* 導航頁籤 */}
+              <div className="flex border-b border-gray-800 shrink-0">
+                <button onClick={() => setSlaveTab('ability')} className={`flex-1 py-2 text-xs font-bold tracking-widest transition-colors ${slaveTab === 'ability' ? 'text-purple-400 border-b-2 border-purple-500 bg-purple-900/10' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}`}>［戰鬥能力］</button>
+                <button onClick={() => setSlaveTab('status')} className={`flex-1 py-2 text-xs font-bold tracking-widest transition-colors ${slaveTab === 'status' ? 'text-blue-400 border-b-2 border-blue-500 bg-blue-900/10' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}`}>［綜合狀態］</button>
+                <button onClick={() => setSlaveTab('profile')} className={`flex-1 py-2 text-xs font-bold tracking-widest transition-colors ${slaveTab === 'profile' ? 'text-yellow-400 border-b-2 border-yellow-500 bg-yellow-900/10' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}`}>［檔案列傳］</button>
               </div>
-              <div className="text-xs text-gray-300 italic bg-gray-950 p-3 rounded border-l-2 border-blood-red bg-gray-950/40 leading-relaxed shrink-0">［檔案紀錄］{activeSlave.backgroundStory}</div>
+
+              {/* 動態頁籤內容 */}
+              <div className="flex-1 overflow-y-auto scrollbar-none pb-2 mt-2">
+                
+                {/* 頁籤 A：戰鬥能力 (雷達圖與被動) */}
+                {slaveTab === 'ability' && (
+                  <div className="flex flex-col gap-4 animate-fade-in">
+                    <div className="flex flex-row items-center gap-3 bg-gray-950/60 p-2 sm:p-3 rounded border border-gray-800/80 shadow-inner">
+                       {renderRadar(activeSlave)}
+                       
+                       <div className="flex-1 flex flex-col gap-1.5 text-xs">
+                          <div className="flex justify-between items-center bg-gray-900/80 px-2 py-1.5 rounded border border-gray-800">
+                             <span className="text-gray-500 font-bold">武力:</span>
+                             {activeSlave.isInjured ? 
+                                <span><span className="text-red-500 font-mono font-bold">{Math.floor(activeSlave.primaryStats.combat * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.primaryStats.combat})</span></span> 
+                                : <span className="text-red-400 font-mono font-bold">{activeSlave.primaryStats.combat}</span>}
+                          </div>
+                          <div className="flex justify-between items-center bg-gray-900/80 px-2 py-1.5 rounded border border-gray-800">
+                             <span className="text-gray-500 font-bold">體質:</span>
+                             {activeSlave.isInjured ? 
+                                <span><span className="text-red-500 font-mono font-bold">{Math.floor(activeSlave.primaryStats.endurance * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.primaryStats.endurance})</span></span> 
+                                : <span className="text-green-400 font-mono font-bold">{activeSlave.primaryStats.endurance}</span>}
+                          </div>
+                          <div className="flex justify-between items-center bg-gray-900/80 px-2 py-1.5 rounded border border-gray-800">
+                             <span className="text-gray-500 font-bold">智力:</span>
+                             {activeSlave.isInjured ? 
+                                <span><span className="text-red-500 font-mono font-bold">{Math.floor(activeSlave.primaryStats.intelligence * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.primaryStats.intelligence})</span></span> 
+                                : <span className="text-blue-400 font-mono font-bold">{activeSlave.primaryStats.intelligence}</span>}
+                          </div>
+                          <div className="flex justify-between items-center bg-gray-900/80 px-2 py-1.5 rounded border border-gray-800">
+                             <span className="text-gray-500 font-bold">魅力:</span>
+                             <span className="text-pink-400 font-mono font-bold">{activeSlave.primaryStats.charisma ?? 10}</span>
+                          </div>
+                          <div className="flex justify-between items-center bg-gray-900/80 px-2 py-1.5 rounded border border-gray-800">
+                             <span className="text-gray-500 font-bold">幸運:</span>
+                             <span className="text-yellow-400 font-mono font-bold">{activeSlave.primaryStats.luck ?? 10}</span>
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                       <div className="text-xs text-gray-400 font-bold tracking-widest border-b border-gray-800 pb-1">［掌握技能］</div>
+                       <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-gradient-to-r from-blue-950 to-transparent border-l-2 border-blue-600 px-2 py-1.5 rounded-r">
+                             <div className="text-3xs text-gray-500">戰鬥專精</div>
+                             {activeSlave.isInjured ? 
+                                <div className="text-red-500 font-mono font-bold text-xs">Lv.{Math.floor((activeSlave.skills?.combat || 1) * 0.5)}</div>
+                                : <div className="text-blue-400 font-mono font-bold text-xs">Lv.{activeSlave.skills?.combat || 1}</div>}
+                          </div>
+                          <div className="bg-gradient-to-r from-green-950 to-transparent border-l-2 border-green-600 px-2 py-1.5 rounded-r">
+                             <div className="text-3xs text-gray-500">內政管家</div>
+                             {activeSlave.isInjured ? 
+                                <div className="text-red-500 font-mono font-bold text-xs">Lv.{Math.floor((activeSlave.skills?.housework || 1) * 0.5)}</div>
+                                : <div className="text-green-400 font-mono font-bold text-xs">Lv.{activeSlave.skills?.housework || 1}</div>}
+                          </div>
+                          <div className="bg-gradient-to-r from-yellow-950 to-transparent border-l-2 border-yellow-600 px-2 py-1.5 rounded-r">
+                             <div className="text-3xs text-gray-500">生存本能</div>
+                             {activeSlave.isInjured ? 
+                                <div className="text-red-500 font-mono font-bold text-xs">Lv.{Math.floor((activeSlave.skills?.survival || 1) * 0.5)}</div>
+                                : <div className="text-yellow-400 font-mono font-bold text-xs">Lv.{activeSlave.skills?.survival || 1}</div>}
+                          </div>
+                       </div>
+                       
+                       <div className="text-xs text-gray-400 font-bold tracking-widest border-b border-gray-800 pb-1 mt-2">［血脈被動］</div>
+                       <div className="bg-gradient-to-r from-purple-950/50 to-transparent border-l-2 border-purple-500 px-3 py-2 rounded-r shadow-sm border border-gray-800 border-l-0">
+                          <span className="text-yellow-500 text-xs leading-relaxed font-bold">
+                            {activeSlave.race === '人類' && '【絕境意志】血量低於 40% 時爆發，武力提升 25%。'}
+                            {activeSlave.race === '精靈' && '【風之眷顧】速度提升 20%，若取得先手則首擊傷害增加 15%。'}
+                            {activeSlave.race === '半獸人' && '【狂熱戰血】武力提升 15%，防禦降低 10%。受擊疊加印記，最高增傷 30%。'}
+                            {activeSlave.race === '矮人' && '【堅岩體魄】最大血量提升 20%，防禦提升 15%。受擊固定減免 5 點傷害。'}
+                            {activeSlave.race === '龍族' && '【真龍威壓】武力、防禦、速度全面提升 10%，自帶 20% 最終傷害減免。'}
+                            {activeSlave.race === '不死族' && '【枯骨不朽】每次攻擊造成傷害時，將吸收 15% 轉化為自身生命力。'}
+                          </span>
+                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 頁籤 B：綜合狀態 (體力/裝備/履歷) */}
+                {slaveTab === 'status' && (
+                  <div className="flex flex-col gap-4 animate-fade-in relative overflow-hidden">
+                    {(activeSlave.faintTurns || 0) > 0 && <div className="absolute inset-0 bg-gray-950/60 z-10 pointer-events-none rounded"></div>}
+                    
+                    <div className="flex flex-col gap-3 bg-gray-950 p-4 rounded-lg border border-gray-800 shadow-inner z-20">
+                       <div className="flex flex-col gap-1">
+                          <div className="flex justify-between text-xs text-gray-400 font-bold">
+                             <span className="tracking-widest">體力 (Stamina)</span>
+                             <span className="font-mono text-green-400">{activeSlave.conditionStats.stamina}/100</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-gray-900 rounded overflow-hidden border border-gray-800">
+                             <div className="bg-green-600 h-full shadow-[0_0_10px_rgba(22,163,74,0.5)] transition-all" style={{ width: `${activeSlave.conditionStats.stamina}%` }}></div>
+                          </div>
+                       </div>
+                       <div className="flex flex-col gap-1">
+                          <div className="flex justify-between text-xs text-gray-400 font-bold">
+                             <span className="tracking-widest">壓力 (Stress)</span>
+                             <span className="font-mono text-yellow-500">{activeSlave.conditionStats.stress}/100</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-gray-900 rounded overflow-hidden border border-gray-800">
+                             <div className="bg-yellow-600 h-full shadow-[0_0_10px_rgba(202,138,4,0.5)] transition-all" style={{ width: `${activeSlave.conditionStats.stress}%` }}></div>
+                          </div>
+                       </div>
+                       <div className="flex flex-col gap-1">
+                          <div className="flex justify-between text-xs text-gray-400 font-bold">
+                             <span className="tracking-widest">反抗 (Rebellion)</span>
+                             <span className="font-mono text-red-500">{activeSlave.conditionStats.rebellion}/100</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-gray-900 rounded overflow-hidden border border-gray-800">
+                             <div className="bg-blood-red h-full shadow-[0_0_10px_rgba(220,38,38,0.5)] transition-all" style={{ width: `${activeSlave.conditionStats.rebellion}%` }}></div>
+                          </div>
+                       </div>
+                       <div className="flex flex-col gap-1 mt-1 pt-3 border-t border-gray-800/50">
+                          <div className="flex justify-between text-xs text-gray-400 font-bold">
+                             <span className="tracking-widest">服從度 (Obedience)</span>
+                             <span className={activeSlave.primaryStats.obedience < 20 ? 'text-red-400 font-bold font-mono' : 'text-blue-400 font-mono'}>{activeSlave.primaryStats.obedience}/100</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-gray-900 rounded overflow-hidden border border-gray-800">
+                             <div className="bg-blue-600 h-full shadow-[0_0_10px_rgba(37,99,235,0.5)] transition-all" style={{ width: `${activeSlave.primaryStats.obedience}%` }}></div>
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 z-20">
+                       <div className="bg-gradient-to-t from-gray-900 to-gray-950 p-3 rounded border border-gray-800 flex flex-col gap-1 shadow-sm">
+                          <span className="text-xs text-gray-500 font-bold tracking-widest mb-1">［當前武裝］</span>
+                          <span className="text-blue-400 text-xs font-bold leading-relaxed whitespace-pre-wrap">
+                             {activeSlave.equipment?.weaponId && ITEMS_DATA[activeSlave.equipment.weaponId] 
+                               ? `【${ITEMS_DATA[activeSlave.equipment.weaponId].name}】\n${ITEMS_DATA[activeSlave.equipment.weaponId].desc}`
+                               : '［無配戴武器］'}
+                          </span>
+                       </div>
+                       <div className="bg-gradient-to-t from-gray-900 to-gray-950 p-3 rounded border border-gray-800 flex flex-col gap-1 shadow-sm">
+                          <span className="text-xs text-gray-500 font-bold tracking-widest mb-1 border-b border-gray-800 pb-1">［戰鬥履歷］</span>
+                          <div className="flex items-center justify-around text-sm mt-1">
+                             <div className="flex flex-col items-center"><span className="text-3xs text-gray-500">勝場</span><span className="text-green-400 font-mono font-black text-lg">{activeSlave.combatRecord?.wins || 0}</span></div>
+                             <span className="text-gray-700 text-xl font-thin">/</span>
+                             <div className="flex flex-col items-center"><span className="text-3xs text-gray-500">敗場</span><span className="text-red-400 font-mono font-black text-lg">{activeSlave.combatRecord?.losses || 0}</span></div>
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 頁籤 C：檔案列傳 (故事背景) */}
+                {slaveTab === 'profile' && (
+                  <div className="flex flex-col h-full animate-fade-in">
+                     <div className="text-xs text-gray-300 bg-gradient-to-b from-gray-900 to-gray-950 p-5 rounded-lg border-l-4 border-yellow-600 leading-relaxed tracking-wide shadow-inner flex-1 whitespace-pre-wrap">
+                        {activeSlave.backgroundStory}
+                     </div>
+                  </div>
+                )}
+
+              </div>
             </div>
           </div>
         </div>
