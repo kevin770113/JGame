@@ -28,7 +28,6 @@ export interface GlobalModal {
   title: string; message: string; isConfirm: boolean; action?: () => void;
 }
 
-// ★ V2.9.0 重新定義 ArenaNPC，隔離對舊型別的依賴
 export interface ArenaNPC {
   id: string; location: Location; name: string; description: string;
   stats: { combat: number; endurance: number; intelligence: number; charisma: number; luck: number };
@@ -480,7 +479,7 @@ export const useGameStore = create<GameStore>()(
         let newDirtiness = Math.min(100, player.roomDirtiness + Math.ceil(updatedSlaves.length * (player.location === 'Capital' ? 1 : player.location === 'NeutralHub' ? 1.5 : 2)) + Math.pow(overpopulation, 2) * 5);
         
         let newShopStock = { ...player.shopStock };
-        let newArenaNPCs = state.arenaNPCs; // ★ 每日重新生成鬥士
+        let newArenaNPCs = state.arenaNPCs;
         
         let maidFaintedThisNight = false;
         let maidName = '';
@@ -735,7 +734,6 @@ export const useGameStore = create<GameStore>()(
         const survivalSkill = slave.isInjured ? Math.floor((slave.skills?.survival || 1) * 0.5) : (slave.skills?.survival || 1);
 
         const sLuck = slave.primaryStats.luck ?? 10;
-        const sCharisma = slave.primaryStats.charisma ?? 10;
 
         let sHpMax = Math.floor(enduranceStat * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
         let sAtk = combatStat + weaponAtk; let sDef = Math.floor(enduranceStat * 0.5 + survivalSkill * 2); let sSpd = intelligenceStat;
@@ -886,7 +884,6 @@ export const useGameStore = create<GameStore>()(
         const survivalSkill = slave.isInjured ? Math.floor((slave.skills?.survival || 1) * 0.5) : (slave.skills?.survival || 1);
 
         const sLuck = slave.primaryStats.luck ?? 10;
-        const sCharisma = slave.primaryStats.charisma ?? 10;
 
         let sHpMax = Math.floor(enduranceStat * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
         let sAtk = combatStat + weaponAtk; let sDef = Math.floor(enduranceStat * 0.5 + survivalSkill * 2); let sSpd = intelligenceStat;
