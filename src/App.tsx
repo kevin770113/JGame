@@ -23,7 +23,6 @@ const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 // ★ V2.9.0 新增：動態 SVG 菱形雷達圖渲染引擎
 const renderRadar = (slave: Slave) => {
   const getP = (val: number, angleIndex: number, maxR = 40) => {
-     // 五個頂點：0(頂), 72(右上), 144(右下), 216(左下), 288(左上)
      const angle = (angleIndex * 72 - 90) * (Math.PI / 180);
      const r = (Math.min(100, Math.max(0, val)) / 100) * maxR;
      return `${60 + r * Math.cos(angle)},${60 + r * Math.sin(angle)}`;
@@ -90,10 +89,8 @@ function App() {
   const [session, setSession] = useState<any>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
-  // ★ V2.9.0 新增：SLG 標籤化頁籤狀態
   const [slaveTab, setSlaveTab] = useState<'ability' | 'status' | 'profile'>('ability');
 
-  // 切換奴隸時重置頁籤
   useEffect(() => {
     if (activeSlave) setSlaveTab('ability');
   }, [activeSlave?.id]);
@@ -207,6 +204,7 @@ function App() {
       
       <SystemPanel /> 
       <QuestPanel />
+      {/* ★ V2.9.0 修正：補回漏掉的 onSelectSlave 傳遞 */}
       <SlavePanel onSelectSlave={setActiveSlave} />
       <CombatTheater /> 
 
@@ -216,13 +214,11 @@ function App() {
         </main>
       </div>
 
-      {/* ★ 奴隸詳細面板大重構：SLG 五維雷達與標籤化系統 */}
       {activeSlave && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
           <div className="w-full max-w-3xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setActiveSlave(null)} className="absolute top-0 right-0 z-[60] text-gray-400 hover:text-white text-sm font-bold transition-colors bg-red-950/80 hover:bg-red-900/90 rounded-bl-xl px-4 py-2 shadow-md border-b border-l border-red-900">［關閉］</button>
             
-            {/* 左側立繪 */}
             <div className="w-full sm:w-2/5 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[220px] sm:min-h-[420px] relative overflow-hidden group shrink-0">
               <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-0">
                 <span className="text-gray-700 text-3xl opacity-30">⛓️</span>
@@ -239,10 +235,8 @@ function App() {
               <div className="absolute inset-0 bg-gray-800/10 group-hover:bg-gray-800/30 transition-colors z-20 pointer-events-none"></div>
             </div>
             
-            {/* 右側資訊流 */}
             <div className="w-full sm:w-3/5 flex flex-col gap-2 overflow-y-hidden max-h-[60vh] sm:max-h-[75vh]">
               
-              {/* 頭部表單區 */}
               <div className="shrink-0 flex flex-col gap-1.5 pb-2">
                 <h3 className="text-xl font-bold text-gray-200 flex items-center gap-2">
                   {activeSlave.name}
@@ -259,17 +253,14 @@ function App() {
                 </div>
               </div>
 
-              {/* 導航頁籤 */}
               <div className="flex border-b border-gray-800 shrink-0">
                 <button onClick={() => setSlaveTab('ability')} className={`flex-1 py-2 text-xs font-bold tracking-widest transition-colors ${slaveTab === 'ability' ? 'text-purple-400 border-b-2 border-purple-500 bg-purple-900/10' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}`}>［戰鬥能力］</button>
                 <button onClick={() => setSlaveTab('status')} className={`flex-1 py-2 text-xs font-bold tracking-widest transition-colors ${slaveTab === 'status' ? 'text-blue-400 border-b-2 border-blue-500 bg-blue-900/10' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}`}>［綜合狀態］</button>
                 <button onClick={() => setSlaveTab('profile')} className={`flex-1 py-2 text-xs font-bold tracking-widest transition-colors ${slaveTab === 'profile' ? 'text-yellow-400 border-b-2 border-yellow-500 bg-yellow-900/10' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}`}>［檔案列傳］</button>
               </div>
 
-              {/* 動態頁籤內容 */}
               <div className="flex-1 overflow-y-auto scrollbar-none pb-2 mt-2">
                 
-                {/* 頁籤 A：戰鬥能力 (雷達圖與被動) */}
                 {slaveTab === 'ability' && (
                   <div className="flex flex-col gap-4 animate-fade-in">
                     <div className="flex flex-row items-center gap-3 bg-gray-950/60 p-2 sm:p-3 rounded border border-gray-800/80 shadow-inner">
@@ -343,7 +334,6 @@ function App() {
                   </div>
                 )}
 
-                {/* 頁籤 B：綜合狀態 (體力/裝備/履歷) */}
                 {slaveTab === 'status' && (
                   <div className="flex flex-col gap-4 animate-fade-in relative overflow-hidden">
                     {(activeSlave.faintTurns || 0) > 0 && <div className="absolute inset-0 bg-gray-950/60 z-10 pointer-events-none rounded"></div>}
@@ -408,7 +398,6 @@ function App() {
                   </div>
                 )}
 
-                {/* 頁籤 C：檔案列傳 (故事背景) */}
                 {slaveTab === 'profile' && (
                   <div className="flex flex-col h-full animate-fade-in">
                      <div className="text-xs text-gray-300 bg-gradient-to-b from-gray-900 to-gray-950 p-5 rounded-lg border-l-4 border-yellow-600 leading-relaxed tracking-wide shadow-inner flex-1 whitespace-pre-wrap">
