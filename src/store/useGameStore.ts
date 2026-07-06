@@ -127,6 +127,7 @@ export interface GameStore {
   _hasHydrated: boolean;
   activeCombat: CombatPlaybackData | null;
 
+  setPlayerNameAndGender: (name: string, gender: Gender) => void;
   setActiveWindow: (win: ActiveWindow | null) => void;
   setGlobalModal: (modal: GlobalModal | null) => void;
   setIsSaving: (val: boolean) => void; 
@@ -143,9 +144,10 @@ export interface GameStore {
   addFood: (amount: number) => void;
   deductFood: (amount: number) => void;
   addPrestige: (amount: number) => void;
+  deductPrestige: (amount: number) => void;
   changeLocation: (loc: Location) => void;
   navigate: (scene: Scene, subView: SubView) => void;
-  cleanRoom: () => void;
+  cleanRoom: (useLeaderStamina?: boolean) => void;
   addSlave: (slave: Slave) => void;
   updateSlave: (id: string, updates: Partial<Slave>) => void;
   sellSlave: (slaveId: string) => void; 
@@ -236,6 +238,7 @@ export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
       player: { 
+        leaderName: '神秘的支配者', leaderGender: 'Male', leaderStamina: 100, leaderFaintTurns: 0,
         day: 1, timePhase: '早上', gold: 99999, food: 120, location: 'Frontlines', roomDirtiness: 0, maxSlaveCapacity: 5, prestige: 9999, actionPoints: 50, lastApUpdateTime: Date.now(),
         deviceId: '', unlockedFacilities: [], usedIdentityIds: [],
         inventory: {}, quests: {}, abyssFloor: 1, shopStock: { ...DEFAULT_SHOP_STOCK }
@@ -244,6 +247,7 @@ export const useGameStore = create<GameStore>()(
       activeEvent: null, globalModal: null, activeWindow: null, isSaving: false, localSaveVersion: 0, _hasHydrated: false,
       activeCombat: null,
 
+      setPlayerNameAndGender: (name, gender) => set(s => ({ player: { ...s.player, leaderName: name, leaderGender: gender } })),
       setActiveWindow: (win) => set({ activeWindow: win }),
       setGlobalModal: (modal) => set({ globalModal: modal }),
       setIsSaving: (val) => set({ isSaving: val }),
@@ -300,7 +304,7 @@ export const useGameStore = create<GameStore>()(
         const state = get(); const p = state.player;
         const { error } = await supabase.from('profiles').upsert({
           id: session.user.id, day: p.day, gold: p.gold, food: p.food, action_points: p.actionPoints, prestige: p.prestige, unlocked_facilities: p.unlockedFacilities,
-          save_data: { localSaveVersion: newVersion, usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent, arenaNPCs: state.arenaNPCs }
+          save_data: { localSaveVersion: newVersion, usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent, arenaNPCs: state.arenaNPCs, leaderName: p.leaderName, leaderGender: p.leaderGender, leaderStamina: p.leaderStamina, leaderFaintTurns: p.leaderFaintTurns }
         });
         
         if (error) console.error('［同步異常］', error);
@@ -317,14 +321,11 @@ export const useGameStore = create<GameStore>()(
         const cloudVersion = sData.localSaveVersion || 0;
         const currentLocalVersion = get().localSaveVersion || 0;
 
-        if (!forceLoad && cloudVersion <= currentLocalVersion) {
-           console.log(`［防禦網啟動］雲端版號 (v${cloudVersion}) <= 本地版號 (v${currentLocalVersion})，絕對信任本地資料，攔截覆蓋。`);
-           return; 
-        }
+        if (!forceLoad && cloudVersion <= currentLocalVersion) { return; }
 
         set((state) => ({
           localSaveVersion: cloudVersion,
-          player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor, shopStock: sData.shopStock || state.player.shopStock },
+          player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor, shopStock: sData.shopStock || state.player.shopStock, leaderName: sData.leaderName || state.player.leaderName, leaderGender: sData.leaderGender || state.player.leaderGender, leaderStamina: sData.leaderStamina ?? state.player.leaderStamina, leaderFaintTurns: sData.leaderFaintTurns ?? state.player.leaderFaintTurns },
           slaves: sData.slaves || state.slaves, marketSlaves: sData.marketSlaves || state.marketSlaves, activeDispatches: sData.activeDispatches || state.activeDispatches, activeEvent: sData.activeEvent || state.activeEvent,
           arenaNPCs: sData.arenaNPCs && sData.arenaNPCs.length > 0 ? sData.arenaNPCs : state.arenaNPCs
         }));
@@ -339,13 +340,23 @@ export const useGameStore = create<GameStore>()(
       }),
 
       useItem: (itemId, slaveId) => set(state => {
-        const item = ITEMS_DATA[itemId]; const slave = state.slaves.find(s => s.id === slaveId); const qty = state.player.inventory[itemId] || 0;
-        if (qty > 0 && slave && item.type === 'potion') {
+        const item = ITEMS_DATA[itemId]; const qty = state.player.inventory[itemId] || 0;
+        if (qty > 0 && item.type === 'potion') {
             let healAmount = item.effect.stamina || 0;
-            if (slave.isInjured) { healAmount = Math.floor(healAmount * 0.5); }
-            const newStamina = Math.min(100, slave.conditionStats.stamina + healAmount);
             const newInv = { ...state.player.inventory, [itemId]: qty - 1 }; if (newInv[itemId] <= 0) delete newInv[itemId];
-            return { player: { ...state.player, inventory: newInv }, slaves: state.slaves.map(s => s.id === slaveId ? { ...s, conditionStats: { ...s.conditionStats, stamina: newStamina } } : s) };
+            
+            // ★ V2.9.4 新增：藥水可對首領使用，並自動解除昏厥狀態
+            if (slaveId === 'LEADER') {
+                const newStamina = Math.min(100, state.player.leaderStamina + healAmount);
+                return { player: { ...state.player, leaderStamina: newStamina, leaderFaintTurns: 0, inventory: newInv } };
+            } else {
+                const slave = state.slaves.find(s => s.id === slaveId);
+                if (slave) {
+                    if (slave.isInjured) { healAmount = Math.floor(healAmount * 0.5); }
+                    const newStamina = Math.min(100, slave.conditionStats.stamina + healAmount);
+                    return { player: { ...state.player, inventory: newInv }, slaves: state.slaves.map(s => s.id === slaveId ? { ...s, conditionStats: { ...s.conditionStats, stamina: newStamina }, faintTurns: 0 } : s) };
+                }
+            }
         }
         return state;
       }),
@@ -404,8 +415,6 @@ export const useGameStore = create<GameStore>()(
         
         try {
           const usedIds = get().player.usedIdentityIds;
-          
-          // ★ V2.9.2 優化：動態排除已使用名字，徹底解決無限呼叫 AI 造成的卡頓問題
           let query = supabase.from('global_identities').select('*');
           if (usedIds.length > 0) {
              query = query.not('id', 'in', `(${usedIds.join(',')})`);
@@ -435,7 +444,6 @@ export const useGameStore = create<GameStore>()(
           return { name: identity.name, story: identity.story || "" };
         } catch (e) {
           console.error("［系統攔截］", e); 
-          // ★ V2.9.2 防禦：如果徹底潰堤，回傳預設代號，且這筆資料絕對不會被寫入 Supabase
           return { name: `代號 ${Math.floor(Math.random() * 9000 + 1000)}`, story: "" };
         } finally {
           set({ isPoolGenerating: false });
@@ -447,9 +455,44 @@ export const useGameStore = create<GameStore>()(
       addFood: (amount) => set((state) => ({ player: { ...state.player, food: state.player.food + amount } })),
       deductFood: (amount) => set((state) => ({ player: { ...state.player, food: Math.max(0, state.player.food - amount) } })),
       addPrestige: (amount) => set((state) => ({ player: { ...state.player, prestige: state.player.prestige + amount } })),
-      changeLocation: (loc) => { set((state) => { let capacity = 5; if (loc === 'NeutralHub') capacity = 10; if (loc === 'Capital') capacity = 20; return { player: { ...state.player, location: loc, maxSlaveCapacity: capacity } }; }); get().checkQuestCompletion(); },
+      deductPrestige: (amount) => set((state) => ({ player: { ...state.player, prestige: Math.max(0, state.player.prestige - amount) } })),
+      
+      changeLocation: (loc) => { set((state) => { 
+        let capacity = 5; let cost = 0;
+        if (loc === 'NeutralHub') { capacity = 10; cost = 12000; }
+        if (loc === 'Capital') { capacity = 20; cost = 40000; }
+        if (loc === 'Frontlines') { capacity = 5; cost = 0; }
+        
+        // ★ V2.9.4 向上搬遷收費機制
+        const currentRank = state.player.location === 'Capital' ? 3 : state.player.location === 'NeutralHub' ? 2 : 1;
+        const targetRank = loc === 'Capital' ? 3 : loc === 'NeutralHub' ? 2 : 1;
+        
+        if (targetRank > currentRank) {
+          if (state.player.gold < cost) {
+            setTimeout(() => { get().setGlobalModal({ title: '［資金不足］', message: `向上搬遷至該區域需要支付一個月的通行費 $${cost}。`, isConfirm: false }); }, 50);
+            return state;
+          }
+          return { player: { ...state.player, gold: state.player.gold - cost, location: loc, maxSlaveCapacity: capacity } };
+        }
+        return { player: { ...state.player, location: loc, maxSlaveCapacity: capacity } }; 
+      }); get().checkQuestCompletion(); },
+      
       navigate: (scene, subView) => set({ currentScene: scene, currentSubView: subView }),
-      cleanRoom: () => set((state) => { if (state.player.gold >= 50) return { player: { ...state.player, gold: state.player.gold - 50, roomDirtiness: Math.max(0, state.player.roomDirtiness - 40) } }; return state; }),
+      
+      // ★ V2.9.4 雙軌打掃制
+      cleanRoom: (useLeaderStamina = false) => set((state) => { 
+        if (useLeaderStamina) {
+          if (state.player.leaderStamina >= 20) {
+            return { player: { ...state.player, leaderStamina: state.player.leaderStamina - 20, roomDirtiness: Math.max(0, state.player.roomDirtiness - 40) } };
+          }
+        } else {
+          if (state.player.gold >= 50) {
+            return { player: { ...state.player, gold: state.player.gold - 50, roomDirtiness: Math.max(0, state.player.roomDirtiness - 40) } };
+          }
+        }
+        return state; 
+      }),
+      
       addSlave: (slave) => { set((state) => ({ slaves: [...state.slaves, slave] })); get().checkQuestCompletion(); },
       updateSlave: (id, updates) => set((state) => ({ slaves: state.slaves.map(s => s.id === id ? { ...s, ...updates, conditionStats: { ...s.conditionStats, ...(updates.conditionStats || {}) } } : s) })),
       sellSlave: (slaveId) => set((state) => {
@@ -459,7 +502,9 @@ export const useGameStore = create<GameStore>()(
       }),
       dispatchSlave: (slaveId, missionId) => {
         const state = get(); const mission = state.dailyMissions.find(m => m.id === missionId); if (!mission) return;
-        state.updateSlave(slaveId, { activityStatus: '外派中' });
+        if (slaveId !== 'LEADER') {
+          state.updateSlave(slaveId, { activityStatus: '外派中' });
+        }
         set({ activeDispatches: [...state.activeDispatches, { slaveId, mission, remainingPhases: mission.requiredPhases }], dailyMissions: state.dailyMissions.filter(m => m.id !== missionId) });
       },
       triggerBackgroundMarketRefresh: async () => {
@@ -483,9 +528,24 @@ export const useGameStore = create<GameStore>()(
 
         const newAp = player.actionPoints - 1; const newApUpdateTime = player.actionPoints === 50 ? Date.now() : player.lastApUpdateTime;
         const currentPhaseIndex = TIME_PHASES.indexOf(player.timePhase);
-        let nextPhase: TimePhase; let nextDay = player.day; let triggerDailySettlement = false;
+        let nextPhase: TimePhase; let nextDay = player.day; let triggerDailySettlement = false; let triggerWeeklyRent = false;
 
-        if (currentPhaseIndex === TIME_PHASES.length - 1) { nextPhase = '早上'; nextDay += 1; triggerDailySettlement = true; } else { nextPhase = TIME_PHASES[currentPhaseIndex + 1]; }
+        if (currentPhaseIndex === TIME_PHASES.length - 1) { 
+           nextPhase = '早上'; nextDay += 1; triggerDailySettlement = true; 
+           if (nextDay % 7 === 0) triggerWeeklyRent = true;
+        } else { 
+           nextPhase = TIME_PHASES[currentPhaseIndex + 1]; 
+        }
+
+        // 首領狀態更新
+        let leaderFTurns = player.leaderFaintTurns || 0;
+        if (leaderFTurns > 0) leaderFTurns -= 1;
+        let leaderStamina = player.leaderStamina;
+        const isLeaderDispatched = activeDispatches.some(d => d.slaveId === 'LEADER');
+        // ★ V2.9.4 首領自然恢復體力
+        if (!isLeaderDispatched && leaderFTurns === 0) {
+           leaderStamina = Math.min(100, leaderStamina + 10);
+        }
 
         let updatedSlaves = slaves.map(s => {
           let fTurns = s.faintTurns || 0;
@@ -496,16 +556,126 @@ export const useGameStore = create<GameStore>()(
         const overpopulation = Math.max(0, updatedSlaves.length - player.maxSlaveCapacity);
         let newDirtiness = Math.min(100, player.roomDirtiness + Math.ceil(updatedSlaves.length * (player.location === 'Capital' ? 1 : player.location === 'NeutralHub' ? 1.5 : 2)) + Math.pow(overpopulation, 2) * 5);
         
+        // 即時外派結算
+        const newDispatches: ActiveDispatch[] = []; let earnedGold = 0; let earnedPrestige = 0; let earnedFood = 0;
+        let phaseLogs: string[] = [];
+
+        activeDispatches.forEach(dispatch => {
+          dispatch.remainingPhases -= 1;
+          if (dispatch.remainingPhases <= 0) {
+            let baseReward = dispatch.mission.reward;
+            let foodReward = dispatch.mission.rank === '翠綠' ? 10 : dispatch.mission.rank === '蔚藍' ? 20 : dispatch.mission.rank === '紫色' ? 35 : 50;
+            
+            if (dispatch.slaveId === 'LEADER') {
+               const isSuccess = Math.random() < (dispatch.mission.successRate ?? 1.0);
+               if (isSuccess) {
+                 const successChance = 45 / 200; // 首領固定智力 45
+                 if (Math.random() < successChance) {
+                    baseReward = Math.floor(baseReward * 1.5);
+                    phaseLogs.push(`［大捷］您親自出馬，完美規避風險，帶回額外 1.5 倍收益！`);
+                 }
+                 earnedGold += baseReward;
+                 earnedFood += foodReward;
+                 if (dispatch.mission.rank === '紫色' && Math.random() > 0.5) earnedPrestige += Math.floor(Math.random() * 20) + 10;
+                 
+                 leaderStamina = Math.max(0, leaderStamina - dispatch.mission.staminaCost);
+                 phaseLogs.push(`［平安歸隊］您已安全完成 ${dispatch.mission.title} 並帶回物資與資金。`);
+                 if (leaderStamina <= 0) { leaderStamina = 0; leaderFTurns = 3; phaseLogs.push(`［過勞］您耗盡了最後一絲體力，陷入重傷昏厥 (3時段)！`); }
+               } else {
+                 leaderStamina = Math.max(0, leaderStamina - 40);
+                 phaseLogs.push(`［慘敗］您在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫！`);
+                 if (leaderStamina <= 0) { leaderStamina = 0; leaderFTurns = 3; phaseLogs.push(`［重傷］您傷勢過重，陷入重傷昏厥 (3時段)！`); }
+               }
+            } else {
+               const slave = updatedSlaves.find(s => s.id === dispatch.slaveId);
+               if (slave) {
+                  const isSuccess = Math.random() < (dispatch.mission.successRate ?? 1.0);
+                  if (isSuccess) {
+                    const intelligenceStat = slave.isInjured ? Math.floor(slave.primaryStats.intelligence * 0.5) : slave.primaryStats.intelligence;
+                    const successChance = intelligenceStat / 200;
+                    if (Math.random() < successChance) {
+                       baseReward = Math.floor(baseReward * 1.5);
+                       phaseLogs.push(`［大捷］${slave.name} 憑藉智力完美規避風險，帶回額外 1.5 倍收益！`);
+                    }
+                    earnedGold += baseReward;
+                    earnedFood += foodReward;
+
+                    let updatedSkills = { ...slave.skills };
+                    if (dispatch.mission.rank === '紫色') {
+                      if (Math.random() > 0.5) earnedPrestige += Math.floor(Math.random() * 20) + 10;
+                      else { const keys = ['combat', 'housework', 'survival'] as const; const k = keys[Math.floor(Math.random() * keys.length)]; if (updatedSkills[k] < 10) updatedSkills[k] += 1; }
+                    }
+                    
+                    const finalStamina = Math.max(0, slave.conditionStats.stamina - Math.max(10, dispatch.mission.staminaCost - ((slave.isInjured ? Math.floor(slave.skills.combat * 0.5) : slave.skills.combat) * 2)));
+                    slave.conditionStats.stamina = finalStamina;
+                    slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + dispatch.mission.stressGain);
+                    
+                    const obReward = dispatch.mission.obedienceReward || 0;
+                    if (obReward > 0) {
+                      slave.primaryStats.obedience = Math.min(100, slave.primaryStats.obedience + obReward);
+                      phaseLogs.push(`［捷報］${slave.name} 順利完成 ${dispatch.mission.title}，服從度提升 ${obReward} 點！`);
+                    } else {
+                      phaseLogs.push(`［平安歸隊］${slave.name} 已安全完成 ${dispatch.mission.title}。`);
+                    }
+
+                    slave.activityStatus = '閒置';
+                    slave.skills = updatedSkills;
+
+                    if (finalStamina <= 0 && !slave.isInjured) {
+                      slave.conditionStats.stamina = 0; slave.faintTurns = 5;
+                      slave.primaryStats.obedience = Math.max(0, slave.primaryStats.obedience - 5);
+                      slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 15);
+                    }
+                  } else {
+                    slave.conditionStats.stamina = Math.max(0, slave.conditionStats.stamina - 40);
+                    slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 20);
+                    slave.activityStatus = '閒置';
+                    phaseLogs.push(`［慘敗］${slave.name} 在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫！`);
+
+                    if (slave.conditionStats.stamina <= 0) {
+                      slave.faintTurns = 5;
+                      slave.primaryStats.obedience = Math.max(0, slave.primaryStats.obedience - 5);
+                      slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 15);
+                    }
+                  }
+               }
+            }
+          } else { newDispatches.push(dispatch); }
+        });
+
+        if (earnedGold > 0) get().addGold(earnedGold); 
+        if (earnedPrestige > 0) get().addPrestige(earnedPrestige);
+        if (earnedFood > 0) get().addFood(earnedFood);
+        set({ activeDispatches: newDispatches });
+
         let newShopStock = { ...player.shopStock };
         let newArenaNPCs = state.arenaNPCs;
         
-        let maidFaintedThisNight = false;
-        let maidName = '';
+        let dailyLogs: string[] = [];
+
         if (triggerDailySettlement) {
           newShopStock = { ...DEFAULT_SHOP_STOCK };
           newArenaNPCs = generateArenaNPCs();
           
+          let isBankrupt = false;
+          let rentCost = location === 'Frontlines' ? 500 : location === 'NeutralHub' ? 3000 : 10000;
+          
+          if (triggerWeeklyRent) {
+             if (get().player.gold >= rentCost) {
+                get().deductGold(rentCost);
+                dailyLogs.push(`［繳納地租］已從金庫扣除本週地租 $${rentCost}，獲得片刻安寧。`);
+             } else {
+                get().deductGold(get().player.gold);
+                get().deductPrestige(100);
+                isBankrupt = true;
+                dailyLogs.push(`［⚠️ 破產危機］資金斷裂！無法支付地租 $${rentCost}，商會威望掃地，據點內陷入極大恐慌與叛逆！`);
+             }
+          }
+
           const maid = updatedSlaves.find(s => s.role === 'maid');
+          const totalPeople = updatedSlaves.length + 1; 
+          const foodNeeded = totalPeople * GAME_CONSTANTS.FOOD_CONSUMPTION_PER_SLAVE;
+          
           if (maid && (maid.faintTurns || 0) === 0) {
             const maidHousework = maid.isInjured ? Math.floor((maid.skills?.housework || 1) * 0.5) : (maid.skills?.housework || 1);
             newDirtiness = Math.max(0, newDirtiness - (maidHousework * 15));
@@ -515,144 +685,87 @@ export const useGameStore = create<GameStore>()(
               maid.faintTurns = 5;
               maid.primaryStats.obedience = Math.max(0, maid.primaryStats.obedience - 10);
               maid.conditionStats.stress = Math.min(100, maid.conditionStats.stress + 30);
-              maidFaintedThisNight = true;
-              maidName = maid.name;
+              dailyLogs.push(`［傭人過勞］打掃管家【${maid.name}】因無腦高強度打掃致使體力徹底榨乾，陷入昏厥罷工。`);
             }
-          }
-        }
 
-        set({ player: { ...player, day: nextDay, timePhase: nextPhase, roomDirtiness: newDirtiness, actionPoints: newAp, lastApUpdateTime: newApUpdateTime, shopStock: newShopStock }, arenaNPCs: newArenaNPCs });
-
-        const newDispatches: ActiveDispatch[] = []; let earnedGold = 0; let earnedPrestige = 0;
-        let dispatchLogs: string[] = [];
-
-        activeDispatches.forEach(dispatch => {
-          dispatch.remainingPhases -= 1;
-          if (dispatch.remainingPhases <= 0) {
-            let baseReward = dispatch.mission.reward;
-            const slave = updatedSlaves.find(s => s.id === dispatch.slaveId);
-            if (slave) {
-               const isSuccess = Math.random() < (dispatch.mission.successRate ?? 1.0);
-
-               if (isSuccess) {
-                 const intelligenceStat = slave.isInjured ? Math.floor(slave.primaryStats.intelligence * 0.5) : slave.primaryStats.intelligence;
-                 const successChance = intelligenceStat / 200;
-                 if (Math.random() < successChance) {
-                    baseReward = Math.floor(baseReward * 1.5);
-                    dispatchLogs.push(`［外派大成功］${slave.name} 憑藉智力完美規避風險，帶回額外 1.5 倍收益！`);
-                 }
-                 earnedGold += baseReward;
-
-                 let updatedSkills = { ...slave.skills };
-                 if (dispatch.mission.rank === '紫色') {
-                   if (Math.random() > 0.5) earnedPrestige += Math.floor(Math.random() * 20) + 10;
-                   else { const keys = ['combat', 'housework', 'survival'] as const; const k = keys[Math.floor(Math.random() * keys.length)]; if (updatedSkills[k] < 10) updatedSkills[k] += 1; }
-                 }
-                 
-                 const finalStamina = Math.max(0, slave.conditionStats.stamina - Math.max(10, dispatch.mission.staminaCost - ((slave.isInjured ? Math.floor(slave.skills.combat * 0.5) : slave.skills.combat) * 2)));
-                 slave.conditionStats.stamina = finalStamina;
-                 slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + dispatch.mission.stressGain);
-                 
-                 const obReward = dispatch.mission.obedienceReward || 0;
-                 if (obReward > 0) {
-                   slave.primaryStats.obedience = Math.min(100, slave.primaryStats.obedience + obReward);
-                   dispatchLogs.push(`［外派捷報］${slave.name} 順利完成 ${dispatch.mission.title}，服從度提升了 ${obReward} 點！`);
-                 } else {
-                   dispatchLogs.push(`［外派回報］${slave.name} 已安全完成 ${dispatch.mission.title} 並歸隊。`);
-                 }
-
-                 slave.activityStatus = '閒置';
-                 slave.skills = updatedSkills;
-
-                 if (finalStamina <= 0 && !slave.isInjured) {
-                   slave.conditionStats.stamina = 0;
-                   slave.faintTurns = 5;
-                   slave.primaryStats.obedience = Math.max(0, slave.primaryStats.obedience - 5);
-                   slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 15);
-                 }
+            const discount = Math.min(0.9, maidHousework * 0.05);
+            const foodUnitPrice = Math.floor(20 * (1 - discount));
+            const foodMissing = Math.max(0, foodNeeded - get().player.food);
+            
+            if (foodMissing > 0) {
+               const cost = foodMissing * foodUnitPrice;
+               if (get().player.gold >= cost) {
+                  get().deductGold(cost);
+                  get().addFood(foodMissing);
+                  dailyLogs.push(`［管家後勤］管家 ${maid.name} 憑藉交涉技巧，花費 $${cost} 替商會採購了 ${foodMissing} 單位糧食。`);
                } else {
-                 slave.conditionStats.stamina = Math.max(0, slave.conditionStats.stamina - 40);
-                 slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 20);
-                 slave.activityStatus = '閒置';
-                 dispatchLogs.push(`［外派慘敗］${slave.name} 在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫 40 點、壓力暴增 20 點！`);
-
-                 if (slave.conditionStats.stamina <= 0) {
-                   slave.faintTurns = 5;
-                   slave.primaryStats.obedience = Math.max(0, slave.primaryStats.obedience - 5);
-                   slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 15);
-                 }
+                  const affordableFood = Math.floor(get().player.gold / foodUnitPrice);
+                  if (affordableFood > 0) {
+                     get().deductGold(affordableFood * foodUnitPrice);
+                     get().addFood(affordableFood);
+                     dailyLogs.push(`［管家後勤］資金枯竭，管家 ${maid.name} 僅能勉強花費 $${affordableFood * foodUnitPrice} 買到 ${affordableFood} 單位口糧。`);
+                  }
                }
             }
-          } else { newDispatches.push(dispatch); }
-        });
+          }
 
-        if (earnedGold > 0) get().addGold(earnedGold); if (earnedPrestige > 0) get().addPrestige(earnedPrestige);
-        set({ activeDispatches: newDispatches });
+          let isStarving = false;
+          if (get().player.food >= foodNeeded) {
+             get().deductFood(foodNeeded);
+          } else {
+             get().deductFood(get().player.food);
+             isStarving = true;
+             dailyLogs.push(`［⚠️ 飢荒蔓延］口糧徹底耗盡！首領與所有成員強制進入飢餓狀態！`);
+          }
 
-        let escapedNames: string[] = [];
-        let suppressedNames: string[] = [];
-        if (triggerDailySettlement) {
-          const foodNeeded = updatedSlaves.length * GAME_CONSTANTS.FOOD_CONSUMPTION_PER_SLAVE; let isStarving = false;
-          if (get().player.food >= foodNeeded) get().deductFood(foodNeeded); else { get().deductFood(get().player.food); isStarving = true; }
+          if (isStarving) {
+             leaderStamina = Math.max(0, leaderStamina - 20);
+             if (leaderStamina === 0 && leaderFTurns === 0) {
+                leaderFTurns = 3;
+                dailyLogs.push(`［首領倒下］您因嚴重飢餓與過勞，陷入重傷昏厥！`);
+             }
+          }
 
+          if (isBankrupt) {
+             updatedSlaves.forEach(s => {
+                s.conditionStats.stress = Math.min(100, s.conditionStats.stress + 40);
+                s.conditionStats.rebellion = Math.min(100, s.conditionStats.rebellion + 50);
+             });
+          }
+
+          let escapedNames: string[] = [];
+          let suppressedNames: string[] = [];
+          
           const rebels = updatedSlaves.filter(s => s.conditionStats.rebellion >= 100 && (s.faintTurns || 0) === 0 && !s.isInjured);
           const security = updatedSlaves.find(s => s.role === 'security');
 
-          let totalStolenGold = 0;
-          let totalPrestigeLoss = 0;
+          let totalStolenGold = 0; let totalPrestigeLoss = 0;
 
           if (rebels.length > 0) {
             if (!security || (security.faintTurns || 0) > 0 || security.conditionStats.rebellion >= 100) {
-              rebels.forEach(r => {
-                escapedNames.push(r.name);
-                totalStolenGold += Math.floor(Math.random() * 1500) + 500;
-                totalPrestigeLoss += Math.floor(Math.random() * 20) + 10;
-              });
+              rebels.forEach(r => { escapedNames.push(r.name); totalStolenGold += Math.floor(Math.random() * 1500) + 500; totalPrestigeLoss += Math.floor(Math.random() * 20) + 10; });
             } else {
               for (let rebel of rebels) {
                 if (security.conditionStats.stamina <= 0 || (security.faintTurns || 0) > 0) {
-                  escapedNames.push(rebel.name);
-                  totalStolenGold += Math.floor(Math.random() * 1500) + 500;
-                  totalPrestigeLoss += Math.floor(Math.random() * 20) + 10;
+                  escapedNames.push(rebel.name); totalStolenGold += Math.floor(Math.random() * 1500) + 500; totalPrestigeLoss += Math.floor(Math.random() * 20) + 10;
                   continue;
                 }
+                let secHpMax = (security.isInjured ? Math.floor(security.primaryStats.endurance * 0.5) : security.primaryStats.endurance) * 5; let secHp = Math.floor(secHpMax * (security.conditionStats.stamina / 100));
+                let rebHpMax = (rebel.isInjured ? Math.floor(rebel.primaryStats.endurance * 0.5) : rebel.primaryStats.endurance) * 5; let rebHp = Math.floor(rebHpMax * (rebel.conditionStats.stamina / 100));
 
-                let secAtk = security.isInjured ? Math.floor(security.primaryStats.combat * 0.5) : security.primaryStats.combat;
-                let secDef = security.isInjured ? Math.floor(security.primaryStats.endurance * 0.25) : Math.floor(security.primaryStats.endurance * 0.5);
-                let secHpMax = (security.isInjured ? Math.floor(security.primaryStats.endurance * 0.5) : security.primaryStats.endurance) * 5;
-                let secHp = Math.floor(secHpMax * (security.conditionStats.stamina / 100));
+                let secAtk = security.isInjured ? Math.floor(security.primaryStats.combat * 0.5) : security.primaryStats.combat; let secDef = security.isInjured ? Math.floor(security.primaryStats.endurance * 0.25) : Math.floor(security.primaryStats.endurance * 0.5);
+                let rebAtk = rebel.isInjured ? Math.floor(rebel.primaryStats.combat * 0.5) : rebel.primaryStats.combat; let rebDef = rebel.isInjured ? Math.floor(rebel.primaryStats.endurance * 0.25) : Math.floor(rebel.primaryStats.endurance * 0.5);
 
-                let rebAtk = rebel.isInjured ? Math.floor(rebel.primaryStats.combat * 0.5) : rebel.primaryStats.combat;
-                let rebDef = rebel.isInjured ? Math.floor(rebel.primaryStats.endurance * 0.25) : Math.floor(rebel.primaryStats.endurance * 0.5);
-                let rebHpMax = (rebel.isInjured ? Math.floor(rebel.primaryStats.endurance * 0.5) : rebel.primaryStats.endurance) * 5;
-                let rebHp = Math.floor(rebHpMax * (rebel.conditionStats.stamina / 100));
-
-                while (secHp > 0 && rebHp > 0) {
-                  rebHp -= Math.max(1, secAtk - rebDef);
-                  if (rebHp <= 0) break;
-                  secHp -= Math.max(1, rebAtk - secDef);
-                }
+                while (secHp > 0 && rebHp > 0) { rebHp -= Math.max(1, secAtk - rebDef); if (rebHp <= 0) break; secHp -= Math.max(1, rebAtk - secDef); }
 
                 if (secHp > 0) {
                   suppressedNames.push(rebel.name);
-                  rebel.isInjured = true;
-                  rebel.conditionStats.stamina = 0;
-                  rebel.conditionStats.rebellion = 0;
-                  
+                  rebel.isInjured = true; rebel.conditionStats.stamina = 0; rebel.conditionStats.rebellion = 0;
                   security.conditionStats.stamina = Math.max(0, Math.floor((secHp / secHpMax) * 100));
-                  if (security.conditionStats.stamina <= 0) {
-                    security.faintTurns = 5;
-                  }
+                  if (security.conditionStats.stamina <= 0) { security.faintTurns = 5; }
                 } else {
-                  escapedNames.push(rebel.name);
-                  totalStolenGold += Math.floor(Math.random() * 1500) + 500;
-                  totalPrestigeLoss += Math.floor(Math.random() * 20) + 10;
-
-                  security.conditionStats.stamina = 0;
-                  security.faintTurns = 5;
-                  security.conditionStats.stress = Math.min(100, security.conditionStats.stress + 40);
-                  security.primaryStats.obedience = Math.max(0, security.primaryStats.obedience - 15);
-                  security.conditionStats.rebellion = Math.min(100, security.conditionStats.rebellion + 20);
+                  escapedNames.push(rebel.name); totalStolenGold += Math.floor(Math.random() * 1500) + 500; totalPrestigeLoss += Math.floor(Math.random() * 20) + 10;
+                  security.conditionStats.stamina = 0; security.faintTurns = 5; security.conditionStats.stress = Math.min(100, security.conditionStats.stress + 40); security.primaryStats.obedience = Math.max(0, security.primaryStats.obedience - 15); security.conditionStats.rebellion = Math.min(100, security.conditionStats.rebellion + 20);
                 }
               }
             }
@@ -660,10 +773,7 @@ export const useGameStore = create<GameStore>()(
 
           updatedSlaves.forEach(slave => {
             if (escapedNames.includes(slave.name)) return;
-
-            let currentIsInjured = slave.isInjured;
-            if (currentIsInjured && slave.conditionStats.stamina >= 100) { currentIsInjured = false; }
-
+            let currentIsInjured = slave.isInjured; if (currentIsInjured && slave.conditionStats.stamina >= 100) { currentIsInjured = false; }
             let newStamina = slave.conditionStats.stamina; let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
             let fTurns = slave.faintTurns || 0;
 
@@ -673,56 +783,23 @@ export const useGameStore = create<GameStore>()(
               if (overpopulation > 0) { newStress = Math.min(100, newStress + (overpopulation * 5)); const rebGain = Math.max(1, 3 - Math.floor(slave.primaryStats.obedience / 20)); newRebellion = Math.min(100, newRebellion + rebGain); }
             }
 
-            if (slave.primaryStats.obedience >= 80) {
-              newRebellion = Math.max(0, newRebellion - 3);
-            }
+            if (slave.primaryStats.obedience >= 80) newRebellion = Math.max(0, newRebellion - 3);
 
             if (newStamina <= 0 && !slave.isInjured && fTurns === 0) {
-              newStamina = 0;
-              fTurns = 5;
-              slave.primaryStats.obedience = Math.max(0, slave.primaryStats.obedience - 5);
-              newStress = Math.min(100, newStress + 15);
+              newStamina = 0; fTurns = 5; slave.primaryStats.obedience = Math.max(0, slave.primaryStats.obedience - 5); newStress = Math.min(100, newStress + 15);
             }
 
-            slave.isInjured = currentIsInjured;
-            slave.conditionStats.stamina = newStamina;
-            slave.conditionStats.stress = newStress;
-            slave.conditionStats.rebellion = newRebellion;
-            slave.faintTurns = fTurns;
+            slave.isInjured = currentIsInjured; slave.conditionStats.stamina = newStamina; slave.conditionStats.stress = newStress; slave.conditionStats.rebellion = newRebellion; slave.faintTurns = fTurns;
           });
 
           if (escapedNames.length > 0) {
-             const actualStolen = Math.min(get().player.gold, totalStolenGold);
-             const actualPrestigeLoss = Math.min(get().player.prestige, totalPrestigeLoss);
+             const actualStolen = Math.min(get().player.gold, totalStolenGold); const actualPrestigeLoss = Math.min(get().player.prestige, totalPrestigeLoss);
              set(s => ({ player: { ...s.player, gold: Math.max(0, s.player.gold - actualStolen), prestige: Math.max(0, s.player.prestige - actualPrestigeLoss) } }));
-             
-             setTimeout(() => { 
-               get().setGlobalModal({ 
-                 title: '［據點突發事件：越獄成功］', 
-                 message: `以下成員趁夜衝破防線逃離據點：\n\n【${escapedNames.join('】、【')}】\n\n商會共計損失資金：$${actualStolen}，威望降低 ${actualPrestigeLoss} 點。`, 
-                 isConfirm: false 
-               }); 
-             }, 200);
+             dailyLogs.push(`［越獄成功］以下成員逃離據點：【${escapedNames.join('】、【')}】\n商會損失資金：$${actualStolen}，威望降低 ${actualPrestigeLoss} 點。`);
           }
 
           if (suppressedNames.length > 0) {
-            setTimeout(() => {
-              get().setGlobalModal({
-                title: '［據點治安回報：成功鎮壓］',
-                message: `守衛防線成功攔截並擊潰了以下試驗體的夜間叛逃企圖：\n\n【${suppressedNames.join('】、【')}】\n\n上述成員已被強制重傷拘禁，反抗心重置為 0。`,
-                isConfirm: false
-              });
-            }, escapedNames.length > 0 ? 250 : 200);
-          }
-
-          if (maidFaintedThisNight && escapedNames.length === 0 && suppressedNames.length === 0) {
-            setTimeout(() => {
-              get().setGlobalModal({ title: '［據點治安回報：傭人過勞］', message: `打掃管家【${maidName}】因無腦高強度打掃致使體力徹底榨乾，已陷入昏厥罷工狀態。`, isConfirm: false });
-            }, 200);
-          }
-
-          if (dispatchLogs.length > 0 && escapedNames.length === 0 && suppressedNames.length === 0 && !maidFaintedThisNight) { 
-            setTimeout(() => { get().setGlobalModal({ title: '［商會經營成果回報］', message: dispatchLogs.join('\n'), isConfirm: false }); }, 250); 
+            dailyLogs.push(`［成功鎮壓］守衛成功擊潰以下成員的叛逃企圖：【${suppressedNames.join('】、【')}】\n上述成員已被強制重傷拘禁，反抗心清零。`);
           }
 
           let nextEvent = null;
@@ -731,10 +808,25 @@ export const useGameStore = create<GameStore>()(
 
           triggerBackgroundMarketRefresh(); 
           set({ dailyMissions: generateDailyMissions(), activeEvent: nextEvent });
+          
+          const finalSlaves = updatedSlaves.filter(sl => !escapedNames.includes(sl.name));
+          set({ slaves: finalSlaves });
+        } else {
+          set({ slaves: updatedSlaves });
         }
 
-        const finalSlaves = updatedSlaves.filter(sl => !escapedNames.includes(sl.name));
-        set({ slaves: finalSlaves });
+        set(s => ({ player: { ...s.player, day: nextDay, timePhase: nextPhase, actionPoints: newAp, lastApUpdateTime: newApUpdateTime, roomDirtiness: newDirtiness, shopStock: newShopStock, leaderStamina, leaderFaintTurns: leaderFTurns }, arenaNPCs: newArenaNPCs }));
+
+        if (triggerDailySettlement) {
+           if (phaseLogs.length > 0) dailyLogs = [...phaseLogs, ...dailyLogs];
+           if (dailyLogs.length > 0) {
+              setTimeout(() => { get().setGlobalModal({ title: '［每日經濟結算］', message: dailyLogs.join('\n\n'), isConfirm: false }); }, 250);
+           }
+        } else {
+           if (phaseLogs.length > 0) {
+              setTimeout(() => { get().setGlobalModal({ title: '［外派結果回報］', message: phaseLogs.join('\n\n'), isConfirm: false }); }, 250);
+           }
+        }
         
         get().syncProfileToCloud();
       },
@@ -750,7 +842,6 @@ export const useGameStore = create<GameStore>()(
         const intelligenceStat = slave.isInjured ? Math.floor(slave.primaryStats.intelligence * 0.5) : slave.primaryStats.intelligence;
         const combatSkill = slave.isInjured ? Math.floor((slave.skills?.combat || 1) * 0.5) : (slave.skills?.combat || 1);
         const survivalSkill = slave.isInjured ? Math.floor((slave.skills?.survival || 1) * 0.5) : (slave.skills?.survival || 1);
-
         const sLuck = slave.primaryStats.luck ?? 10;
         
         let sHpMax = Math.floor(enduranceStat * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
@@ -762,13 +853,9 @@ export const useGameStore = create<GameStore>()(
         if (slave.race === '矮人') { sHpMax = Math.floor(sHpMax * 1.2); sHp = Math.floor(sHp * 1.2); sDef = Math.floor(sDef * 1.15); }
         if (slave.race === '龍族') { sAtk = Math.floor(sAtk * 1.1); sDef = Math.floor(sDef * 1.1); sSpd = Math.floor(sSpd * 1.1); sDmgReduc += 0.2; }
 
-        let nHpMax = npc.stats.endurance * 5; 
-        let nHp = nHpMax;
-        let nAtk = npc.stats.combat; 
-        let nDef = Math.floor(npc.stats.endurance * 0.5); 
-        let nSpd = npc.stats.intelligence;
-        let nLuck = npc.stats.luck;
-        let nCharisma = npc.stats.charisma;
+        let nHpMax = npc.stats.endurance * 5; let nHp = nHpMax;
+        let nAtk = npc.stats.combat; let nDef = Math.floor(npc.stats.endurance * 0.5); 
+        let nSpd = npc.stats.intelligence; let nLuck = npc.stats.luck; let nCharisma = npc.stats.charisma;
 
         const logs: CombatLog[] = []; 
         logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system', sHp, nHp });
@@ -801,8 +888,7 @@ export const useGameStore = create<GameStore>()(
                     dmg = Math.floor(dmg * 1.5);
                     logs.push({ round, message: `［爆擊］${slave.name} 抓住了轉瞬即逝的破綻，造成 1.5 倍爆擊傷害！`, type: 'damage', sHp, nHp });
                 }
-                nHp -= dmg;
-                nHp = Math.max(0, nHp);
+                nHp -= dmg; nHp = Math.max(0, nHp);
                 logs.push({ round, message: `${slave.name} 發動攻擊，對 ${npc.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
                 if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal', sHp, nHp, damage: heal }); } }
             }
@@ -822,8 +908,7 @@ export const useGameStore = create<GameStore>()(
                     dmg = Math.floor(dmg * 1.5);
                     logs.push({ round, message: `［爆擊］${npc.name} 的攻勢異常兇猛，對 ${slave.name} 造成 1.5 倍爆擊傷害！`, type: 'damage', sHp, nHp });
                 }
-                sHp -= dmg; 
-                sHp = Math.max(0, sHp);
+                sHp -= dmg; sHp = Math.max(0, sHp);
                 logs.push({ round, message: `${npc.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
                 if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦層數］${slave.name} 承受攻擊，痛苦激發狂暴！`, type: 'skill', sHp, nHp }); }
             }
@@ -846,9 +931,14 @@ export const useGameStore = create<GameStore>()(
           const finalRewardGold = Math.floor(npc.rewardGold * charismaBonus);
           get().addGold(finalRewardGold); 
           if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige);
+          
+          // ★ V2.9.4 角鬥場戰利品(糧食)與即時換怪
+          const foodReward = Math.floor(Math.random() * 11) + 5;
+          get().addFood(foodReward);
+          logs.push({ round: round - 1, message: `［戰利品附加］在對手身上搜刮到口糧 ${foodReward} 單位。`, type: 'system', sHp, nHp });
 
           if (charismaBonus > 1) {
-              logs.push({ round: round - 1, message: `［戰利品加成］擊敗高魅力對手，基礎資金獲得額外 ${Math.round((charismaBonus - 1) * 100)}% 加成，共計獲取 ${finalRewardGold}！`, type: 'system', sHp, nHp });
+              logs.push({ round: round - 1, message: `［戰利品加成］擊敗高魅力對手，資金獲得額外加成，共計獲取 ${finalRewardGold}！`, type: 'system', sHp, nHp });
           }
 
           const netWins = newWins - newLosses;
@@ -859,6 +949,18 @@ export const useGameStore = create<GameStore>()(
             const nameMap = { combat: '武力', endurance: '體質', intelligence: '智力', charisma: '魅力', luck: '幸運' };
             logs.push({ round: round - 1, message: `歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill', sHp, nHp });
           }
+          
+          // 即時替補新對手
+          const newNpcs = get().arenaNPCs.filter(n => n.id !== npcId);
+          const baseMatch = BASE_ARENA_NPCS.find(b => b.location === npc.location) || BASE_ARENA_NPCS[0];
+          const rand = Math.random();
+          let prefix = ''; let cStats = { ...baseMatch.stats };
+          if (rand < 0.33) { prefix = '【狂暴的】'; cStats.combat = Math.floor(cStats.combat * 1.15); cStats.endurance = Math.floor(cStats.endurance * 0.85); }
+          else if (rand < 0.66) { prefix = '【鐵壁的】'; cStats.endurance = Math.floor(cStats.endurance * 1.20); cStats.combat = Math.floor(cStats.combat * 0.90); cStats.intelligence = Math.floor(cStats.intelligence * 0.90); }
+          else { prefix = '【狡詐的】'; cStats.luck += 15; cStats.intelligence = Math.floor(cStats.intelligence * 1.10); cStats.endurance = Math.floor(cStats.endurance * 0.85); }
+          newNpcs.push({ ...baseMatch, id: `${baseMatch.id}-${Date.now()}`, name: `${prefix}${baseMatch.name}`, stats: cStats });
+          set({ arenaNPCs: newNpcs });
+
         } else {
           newLosses++;
           newStamina = 0; 
@@ -900,7 +1002,6 @@ export const useGameStore = create<GameStore>()(
         const intelligenceStat = slave.isInjured ? Math.floor(slave.primaryStats.intelligence * 0.5) : slave.primaryStats.intelligence;
         const combatSkill = slave.isInjured ? Math.floor((slave.skills?.combat || 1) * 0.5) : (slave.skills?.combat || 1);
         const survivalSkill = slave.isInjured ? Math.floor((slave.skills?.survival || 1) * 0.5) : (slave.skills?.survival || 1);
-
         const sLuck = slave.primaryStats.luck ?? 10;
         
         let sHpMax = Math.floor(enduranceStat * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
@@ -912,13 +1013,9 @@ export const useGameStore = create<GameStore>()(
         if (slave.race === '矮人') { sHpMax = Math.floor(sHpMax * 1.2); sHp = Math.floor(sHp * 1.2); sDef = Math.floor(sDef * 1.15); }
         if (slave.race === '龍族') { sAtk = Math.floor(sAtk * 1.1); sDef = Math.floor(sDef * 1.1); sSpd = Math.floor(sSpd * 1.1); sDmgReduc += 0.2; }
 
-        let nHpMax = enemy.stats.endurance * 5; 
-        let nHp = nHpMax;
-        let nAtk = enemy.stats.combat; 
-        let nDef = Math.floor(enemy.stats.endurance * 0.5); 
-        let nSpd = enemy.stats.intelligence;
-        let nLuck = enemy.stats.luck;
-        let nCharisma = enemy.stats.charisma;
+        let nHpMax = enemy.stats.endurance * 5; let nHp = nHpMax;
+        let nAtk = enemy.stats.combat; let nDef = Math.floor(enemy.stats.endurance * 0.5); 
+        let nSpd = enemy.stats.intelligence; let nLuck = enemy.stats.luck; let nCharisma = enemy.stats.charisma;
 
         logs.push({ round: 0, message: `［系統］${slave.name} 踏入深淵第 ${floor} 階，迎戰 ${enemy.name}。`, type: 'system', sHp, nHp });
         logs.push({ round: 0, message: `「${enemy.quote}」`, type: 'system', sHp, nHp });
@@ -951,8 +1048,7 @@ export const useGameStore = create<GameStore>()(
                     dmg = Math.floor(dmg * 1.5);
                     logs.push({ round, message: `［爆擊］${slave.name} 抓住了轉瞬即逝的破綻，造成 1.5 倍爆擊傷害！`, type: 'damage', sHp, nHp });
                 }
-                nHp -= dmg;
-                nHp = Math.max(0, nHp);
+                nHp -= dmg; nHp = Math.max(0, nHp);
                 logs.push({ round, message: `${slave.name} 發動攻擊，對 ${enemy.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
                 if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal', sHp, nHp, damage: heal }); } }
             }
@@ -972,8 +1068,7 @@ export const useGameStore = create<GameStore>()(
                     dmg = Math.floor(dmg * 1.5);
                     logs.push({ round, message: `［爆擊］${enemy.name} 的攻勢異常兇猛，對 ${slave.name} 造成 1.5 倍爆擊傷害！`, type: 'damage', sHp, nHp });
                 }
-                sHp -= dmg; 
-                sHp = Math.max(0, sHp);
+                sHp -= dmg; sHp = Math.max(0, sHp);
                 logs.push({ round, message: `${enemy.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害.`, type: 'damage', sHp, nHp, damage: dmg });
                 if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦層數］${slave.name} 承受攻擊，痛苦激發狂暴！`, type: 'skill', sHp, nHp }); }
             }
@@ -1000,7 +1095,7 @@ export const useGameStore = create<GameStore>()(
           set((s) => ({ player: { ...s.player, abyssFloor: s.player.abyssFloor + 1 } }));
 
           if (charismaBonus > 1) {
-              logs.push({ round: round - 1, message: `［戰利品加成］擊破高魅力淵主，基礎資金獲得額外 ${Math.round((charismaBonus - 1) * 100)}% 加成，共計獲取 ${finalRewardGold}！`, type: 'system', sHp, nHp });
+              logs.push({ round: round - 1, message: `［戰利品加成］擊破高魅力淵主，資金獲得額外加成，共計獲取 ${finalRewardGold}！`, type: 'system', sHp, nHp });
           }
 
           const netWins = newWins - newLosses;
