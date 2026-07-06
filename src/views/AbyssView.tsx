@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useGameStore, getAbyssEnemy } from '../store/useGameStore';
+import { useGameStore } from '../store/useGameStore';
+import { getAbyssEnemy } from '../utils/generators'; // ★ 修復：正確引入生成器
 import CustomSelect, { Option } from '../components/CustomSelect';
 
 export default function AbyssView() {
