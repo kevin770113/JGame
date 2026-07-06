@@ -19,7 +19,9 @@ export default function Header() {
   const [showLeaderPanel, setShowLeaderPanel] = useState(false);
   const [editName, setEditName] = useState('');
 
-  // 掛載自動回復計時器：每 10 秒檢查一次是否達到回復條件
+  // 防護 NaN
+  const safeLeaderStamina = isNaN(leaderStamina) ? 100 : leaderStamina;
+
   useEffect(() => {
     const timer = setInterval(() => {
       checkApRecovery();
@@ -36,11 +38,12 @@ export default function Header() {
     }
   };
 
+  // ★ V2.9.5 恢復百分比顯示
   const getDirtinessDisplay = () => {
-    if (roomDirtiness < 20) return <span className="text-green-400">整潔</span>;
-    if (roomDirtiness < 50) return <span className="text-yellow-400">尚可</span>;
-    if (roomDirtiness < 80) return <span className="text-orange-400">髒亂</span>;
-    return <span className="text-red-500 font-bold animate-pulse">惡劣</span>;
+    if (roomDirtiness < 20) return <span className="text-green-400">乾淨({roomDirtiness}%)</span>;
+    if (roomDirtiness < 50) return <span className="text-yellow-400">尚可({roomDirtiness}%)</span>;
+    if (roomDirtiness < 80) return <span className="text-orange-400">髒亂({roomDirtiness}%)</span>;
+    return <span className="text-red-500 font-bold animate-pulse">惡劣({roomDirtiness}%)</span>;
   };
 
   const openLeaderPanel = () => {
@@ -66,26 +69,25 @@ export default function Header() {
 
   return (
     <>
-      <div className="bg-gray-950 border-b border-gray-800 p-2 flex justify-between items-center shadow-md select-none sticky top-0 z-30">
+      {/* ★ V2.9.5 釋放排版空間，Avatar 完美等高 1:1 */}
+      <div className="bg-gray-950 border-b border-gray-800 p-2 flex items-stretch shadow-md select-none sticky top-0 z-30 min-h-[4rem]">
         
-        {/* 左側：首領頭像框 (1:1 固定尺寸) */}
         <div 
           onClick={openLeaderPanel}
-          className="flex-shrink-0 w-12 h-12 bg-gray-900 border border-gray-700 rounded flex items-center justify-center cursor-pointer hover:border-gray-500 transition-colors shadow-inner"
+          className="aspect-square flex-shrink-0 bg-gray-900 border border-gray-700 rounded flex items-center justify-center cursor-pointer hover:border-gray-500 transition-colors shadow-inner mr-2 sm:mr-3"
         >
           <span className="text-xs font-bold text-gray-500 text-center leading-tight">
             {leaderGender === 'Male' ? '首領\n(男)' : '首領\n(女)'}
           </span>
         </div>
 
-        {/* 右側：3行極簡純文字資訊區塊 */}
-        <div className="flex-1 ml-2 flex flex-col gap-0.5 text-xs font-bold tracking-widest justify-center">
+        <div className="flex-1 flex flex-col justify-between text-[11px] sm:text-xs font-bold tracking-widest py-0.5">
           
-          {/* 第一行：時空與威望 */}
+          {/* 第一行 */}
           <div className="flex justify-between items-center text-gray-400 border-b border-gray-800/50 pb-0.5">
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1">
               <span>[第{day}天 - <span className="text-gray-200">{timePhase}</span>]</span>
-              <span className="border-l border-gray-700 h-2.5"></span>
+              <span className="border-l border-gray-700 h-2.5 mx-0.5 sm:mx-1"></span>
               <span>[{getLocationName()}]</span>
             </span>
             <span>
@@ -93,9 +95,9 @@ export default function Header() {
             </span>
           </div>
 
-          {/* 第二行：核心經濟 */}
+          {/* 第二行 */}
           <div className="flex justify-between items-center text-gray-500 border-b border-gray-800/50 pb-0.5">
-            <span className="flex gap-3">
+            <span className="flex gap-2 sm:gap-3">
               <span>資金: <span className="text-yellow-500 font-mono">${formatK(gold)}</span></span>
               <span>糧食: <span className="text-green-500 font-mono">{formatK(food)}</span></span>
             </span>
@@ -104,11 +106,10 @@ export default function Header() {
             </span>
           </div>
 
-          {/* 第三行：據點與行動 */}
+          {/* 第三行 */}
           <div className="flex justify-between items-center text-gray-500">
             <span className="flex items-center gap-1">
-              <span>AP:</span>
-              <span className={actionPoints < 10 ? 'text-red-500 font-mono animate-pulse' : 'text-blue-400 font-mono'}>{actionPoints}/50</span>
+              <span>AP: <span className={actionPoints < 10 ? 'text-red-500 font-mono animate-pulse' : 'text-blue-400 font-mono'}>{actionPoints}/50</span></span>
               <button 
                 onClick={processTurn}
                 disabled={actionPoints < 1}
@@ -125,7 +126,6 @@ export default function Header() {
         </div>
       </div>
 
-      {/* 首領控制面板 Modal */}
       {showLeaderPanel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="bg-gray-950 border border-gray-700 rounded-lg shadow-2xl w-full max-w-sm flex flex-col overflow-hidden animate-slide-up">
@@ -137,7 +137,6 @@ export default function Header() {
 
             <div className="p-4 flex flex-col gap-4">
               
-              {/* 名稱與性別設定 */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs text-gray-400 font-bold tracking-widest">首領稱呼</label>
                 <div className="flex gap-2">
@@ -160,14 +159,13 @@ export default function Header() {
                 </div>
               </div>
 
-              {/* 體力與急救 */}
               <div className="bg-gray-900/50 p-3 rounded border border-gray-800 flex flex-col gap-2 shadow-inner">
                 <div className="flex justify-between items-center text-xs font-bold">
                   <span className="text-gray-400">當前狀態: <span className={leaderFaintTurns > 0 ? 'text-red-400 animate-pulse' : isLeaderDispatched ? 'text-yellow-400' : 'text-green-400'}>{leaderStatus}</span></span>
-                  <span className="text-gray-400">體力: <span className={leaderStamina < 30 ? 'text-red-400 font-mono' : 'text-green-400 font-mono'}>{leaderStamina}/100</span></span>
+                  <span className="text-gray-400">體力: <span className={safeLeaderStamina < 30 ? 'text-red-400 font-mono' : 'text-green-400 font-mono'}>{safeLeaderStamina}/100</span></span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-950 rounded overflow-hidden flex border border-gray-800">
-                  <div className={`h-full ${leaderStamina < 30 ? 'bg-red-600' : 'bg-green-600'}`} style={{ width: `${leaderStamina}%` }}></div>
+                  <div className={`h-full ${safeLeaderStamina < 30 ? 'bg-red-600' : 'bg-green-600'}`} style={{ width: `${safeLeaderStamina}%` }}></div>
                 </div>
                 <div className="flex justify-end mt-1">
                   <button 
@@ -184,7 +182,6 @@ export default function Header() {
                 </div>
               </div>
 
-              {/* 固定素質 */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs text-gray-400 font-bold tracking-widest">首領能力 (不可成長)</label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
