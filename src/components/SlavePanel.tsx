@@ -23,7 +23,6 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
 
   return (
     <>
-      {/* 右側懸浮標籤按鈕 */}
       <div className="fixed right-0 top-1/4 z-40 flex items-start pointer-events-none animate-fade-in">
         <button
           onClick={handleToggle}
@@ -36,7 +35,6 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
         </button>
       </div>
 
-      {/* 絕對互斥 ✕ 抽屜暗色背景遮罩 */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300"
@@ -44,7 +42,6 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
         ></div>
       )}
 
-      {/* 右側滑出抽屜本體 */}
       <div 
         className={`fixed right-0 top-0 h-full w-64 sm:w-72 bg-gray-950 border-l border-purple-900/50 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
@@ -61,7 +58,6 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
           </button>
         </div>
 
-        {/* 3 行卡片排版，移除勝敗場，保留乾淨介面，可順暢上下滑動 */}
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 scrollbar-none pb-20">
           {slaves.map((slave) => (
             <button
@@ -69,24 +65,21 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
               onClick={() => handleSelect(slave)}
               className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-lg p-3 text-left flex flex-col gap-1 transition-all active:scale-98 shadow group relative overflow-hidden shrink-0"
             >
-              {/* 左側負傷狀態邊條指示 */}
               {slave.isInjured && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-600 animate-pulse"></div>}
 
-              {/* 第一行：名字 */}
               <div className="text-sm font-bold text-gray-200 group-hover:text-white truncate pr-2">
                 {slave.name}
               </div>
               
-              {/* 第二行：種族 / 性別 */}
+              {/* ★ V2.9.0 移除 DNA emoji，保持介面冷峻 */}
               <div className="text-2xs text-gray-400 flex items-center gap-2">
-                <span className="text-purple-300 font-bold">🧬 {slave.race}</span>
+                <span className="text-purple-300 font-bold">{slave.race}</span>
                 <span className="text-gray-700">｜</span>
                 <span className={slave.gender === 'Male' ? 'text-blue-400' : 'text-pink-400'}>
                   {slave.gender === 'Male' ? '♂ 男性' : '♀ 女性'}
                 </span>
               </div>
 
-              {/* 第三行：狀態燈號 / 體力 / 壓力數值外顯 */}
               <div className="text-2xs flex items-center gap-2 mt-1.5 border-t border-gray-800/60 pt-2 w-full whitespace-nowrap">
                 <span className="flex items-center gap-1 shrink-0">
                   <span className={`w-1.5 h-1.5 rounded-full ${
