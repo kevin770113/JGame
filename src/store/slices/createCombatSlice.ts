@@ -5,7 +5,7 @@ import { ITEMS_DATA } from '../../utils/gameData';
 import { getAbyssEnemy, BASE_ARENA_NPCS } from '../../utils/generators';
 
 export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get) => ({
-  executeArenaBattle: (slaveId, npcId) => {
+  executeArenaBattle: (slaveId: string, npcId: string) => {
     const state = get(); const slave = state.slaves.find(s => s.id === slaveId); const npc = state.arenaNPCs.find(n => n.id === npcId);
     if (!slave || !npc || state.player.actionPoints < 1) return null;
 
@@ -123,7 +123,7 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
         logs.push({ round: round - 1, message: `歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill', sHp, nHp });
       }
       
-      set(s => {
+      set((s: GameStore) => {
         const newNpcs = s.arenaNPCs.filter(n => n.id !== npcId);
         const baseMatch = BASE_ARENA_NPCS.find(b => b.location === npc.location) || BASE_ARENA_NPCS[0];
         const rand = Math.random();
@@ -142,7 +142,7 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
       logs.push({ round: round - 1, message: `［結算］${slave.name} 遭受重創倒地，體力耗盡並陷入【負傷】狀態！`, type: 'system', sHp, nHp });
     }
 
-    set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
+    set((s: GameStore) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
     let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
     if (slave.race !== '不死族') {
       newStress = Math.min(100, newStress + (isWin ? 5 : 15)); newRebellion = Math.min(100, newRebellion + (isWin ? 2 : 10));
@@ -162,7 +162,7 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
     get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
   },
 
-  executeAbyssBattle: (slaveId) => {
+  executeAbyssBattle: (slaveId: string) => {
     const state = get(); const slave = state.slaves.find(s => s.id === slaveId);
     if (!slave || state.player.actionPoints < 1) return null;
 
@@ -266,7 +266,7 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
       get().addGold(finalRewardGold); 
       if (enemy.rewardPrestige > 0) get().addPrestige(enemy.rewardPrestige);
       
-      set((s) => ({ player: { ...s.player, abyssFloor: s.player.abyssFloor + 1 } }));
+      set((s: GameStore) => ({ player: { ...s.player, abyssFloor: s.player.abyssFloor + 1 } }));
 
       if (charismaBonus > 1) {
           logs.push({ round: round - 1, message: `［戰利品加成］擊破高魅力淵主，資金獲得額外加成，共計獲取 ${finalRewardGold}！`, type: 'system', sHp, nHp });
@@ -287,7 +287,7 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
       logs.push({ round: round - 1, message: `［結算］${slave.name} 不支倒地，被深淵無情吞噬並陷入【負傷】狀態！`, type: 'system', sHp, nHp });
     }
 
-    set((s) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
+    set((s: GameStore) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
     let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
     if (slave.race !== '不死族') {
       newStress = Math.min(100, newStress + (isWin ? 10 : 25)); newRebellion = Math.min(100, newRebellion + (isWin ? 5 : 15));
