@@ -70,6 +70,7 @@ export default function SystemPanel() {
     setIsFetchingDb(false);
   };
 
+  // ★ V2.9.3 安全化重構：清空本地 canConsume 記憶紀錄，實現無痛名字循環測試
   const handleClearDb = () => {
     setGlobalModal({
       title: '［🔄 除錯功能：重置本地已用名單］',
