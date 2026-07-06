@@ -158,9 +158,9 @@ function App() {
       {activeSlave && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
           <div className="w-full max-w-2xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setActiveSlave(null)} className="absolute top-2 right-3 text-gray-400 hover:text-white text-sm font-bold transition-colors z-20 shadow-md bg-gray-950/80 px-2 rounded">［關閉］</button>
+            {/* ★ V2.9.0 關閉按鈕物理防禦層級重構：絕對右上角、更高 z-index 與防誤觸設計 */}
+            <button onClick={() => setActiveSlave(null)} className="absolute top-0 right-0 z-[60] text-gray-400 hover:text-white text-sm font-bold transition-colors bg-red-950/80 hover:bg-red-900/90 rounded-bl-xl px-4 py-2 shadow-md">［關閉］</button>
             
-            {/* ★ V2.8.1 立繪渲染區塊：加入高度解放 (min-h-[240px]) 與鏡頭偏移 (object-[center_15%]) */}
             <div className="w-full sm:w-1/3 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[240px] sm:min-h-[380px] relative overflow-hidden group shrink-0">
               <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-0">
                 <span className="text-gray-700 text-3xl opacity-30">⛓️</span>
@@ -173,7 +173,6 @@ function App() {
                 onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
               />
               
-              {/* 羽化邊緣漸層與 Hover 互動疊加 */}
               <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/20 to-transparent z-10 pointer-events-none"></div>
               <div className="absolute inset-0 bg-gray-800/10 group-hover:bg-gray-800/30 transition-colors z-20 pointer-events-none"></div>
             </div>
@@ -185,8 +184,9 @@ function App() {
                   <span className="text-xs text-gray-300 bg-gray-950 px-2.5 py-0.5 rounded border border-gray-700">種族：{activeSlave.race}</span>
                   <span className={`text-xs px-2.5 py-0.5 rounded border ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-700 text-gray-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-500 font-bold'}`}>狀態：{activeSlave.activityStatus}</span>
                   
-                  {activeSlave.role === 'maid' && <span className="text-xs px-2.5 py-0.5 bg-blue-900/30 border border-blue-700 text-blue-400 font-bold rounded">職位：內務傭人</span>}
-                  {activeSlave.role === 'security' && <span className="text-xs px-2.5 py-0.5 bg-purple-900/30 border border-purple-700 text-purple-400 font-bold rounded">職位：商會保全</span>}
+                  {/* ★ V2.9.0 名詞淨化 */}
+                  {activeSlave.role === 'maid' && <span className="text-xs px-2.5 py-0.5 bg-blue-900/30 border border-blue-700 text-blue-400 font-bold rounded">職位：管家</span>}
+                  {activeSlave.role === 'security' && <span className="text-xs px-2.5 py-0.5 bg-purple-900/30 border border-purple-700 text-purple-400 font-bold rounded">職位：守衛</span>}
                   {(activeSlave.faintTurns || 0) > 0 && <span className="text-xs px-2.5 py-0.5 bg-gray-800 border border-gray-500 text-gray-300 font-extrabold rounded">昏厥中 ({activeSlave.faintTurns} 回合)</span>}
                   {activeSlave.isInjured && <span className="text-xs px-2.5 py-0.5 bg-red-950 border border-red-700 text-red-400 font-extrabold rounded animate-pulse">［負傷狀態］</span>}
                   
