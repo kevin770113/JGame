@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import localforage from 'localforage';
-import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, ArenaNPC, CombatLog, ActiveWindow, CombatPlaybackData, Role } from '../types';
+import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, CombatLog, ActiveWindow, CombatPlaybackData, Role } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
 import { fetchIdentityBatch } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
@@ -25,32 +25,86 @@ export interface DynamicEvent {
 }
 
 export interface GlobalModal {
-  title: string;
-  message: string;
-  isConfirm: boolean;
-  action?: () => void;
+  title: string; message: string; isConfirm: boolean; action?: () => void;
 }
 
-export const ARENA_NPCS: ArenaNPC[] = [
-  { id: 'npc-1', location: 'Frontlines', name: '地下狂徒', description: '滿身泥濘與血污的亡命之徒，毫無技巧可言。', stats: { hp: 300, attack: 25, defense: 10, speed: 15 }, rewardGold: 800, rewardPrestige: 0 },
-  { id: 'npc-2', location: 'NeutralHub', name: '鐵血角鬥士', description: '公會重金培育的職業鬥士，裝備精良且受過專業訓練。', stats: { hp: 800, attack: 55, defense: 35, speed: 40 }, rewardGold: 2500, rewardPrestige: 10 },
-  { id: 'npc-3', location: 'Capital', name: '皇家處刑者', description: '帝國皇室的殺人機器，專門用來粉碎挑戰者。', stats: { hp: 2000, attack: 110, defense: 60, speed: 70 }, rewardGold: 6000, rewardPrestige: 50 }
+// ★ V2.9.0 重新定義 ArenaNPC，隔離對舊型別的依賴
+export interface ArenaNPC {
+  id: string; location: Location; name: string; description: string;
+  stats: { combat: number; endurance: number; intelligence: number; charisma: number; luck: number };
+  rewardGold: number; rewardPrestige: number;
+}
+
+export const BASE_ARENA_NPCS: ArenaNPC[] = [
+  { id: 'npc-1', location: 'Frontlines', name: '地下狂徒', description: '滿身泥濘與血污的亡命之徒，毫無技巧可言。', stats: { combat: 30, endurance: 25, intelligence: 15, charisma: 5, luck: 10 }, rewardGold: 800, rewardPrestige: 0 },
+  { id: 'npc-2', location: 'NeutralHub', name: '鐵血角鬥士', description: '公會重金培育的職業鬥士，裝備精良且受過專業訓練。', stats: { combat: 60, endurance: 50, intelligence: 40, charisma: 40, luck: 30 }, rewardGold: 2500, rewardPrestige: 10 },
+  { id: 'npc-3', location: 'Capital', name: '皇家處刑者', description: '帝國皇室的殺人機器，專門用來粉碎挑戰者。', stats: { combat: 120, endurance: 80, intelligence: 70, charisma: 85, luck: 45 }, rewardGold: 6000, rewardPrestige: 50 }
 ];
+
+export const generateArenaNPCs = (): ArenaNPC[] => {
+  return BASE_ARENA_NPCS.map(base => {
+    const rand = Math.random();
+    let prefix = '';
+    let stats = { ...base.stats };
+
+    if (rand < 0.33) {
+      prefix = '【狂暴的】';
+      stats.combat = Math.floor(stats.combat * 1.15);
+      stats.endurance = Math.floor(stats.endurance * 0.85);
+    } else if (rand < 0.66) {
+      prefix = '【鐵壁的】';
+      stats.endurance = Math.floor(stats.endurance * 1.20);
+      stats.combat = Math.floor(stats.combat * 0.90);
+      stats.intelligence = Math.floor(stats.intelligence * 0.90);
+    } else {
+      prefix = '【狡詐的】';
+      stats.luck += 15;
+      stats.intelligence = Math.floor(stats.intelligence * 1.10);
+      stats.endurance = Math.floor(stats.endurance * 0.85);
+    }
+
+    return {
+      ...base,
+      id: `${base.id}-${Date.now()}`,
+      name: `${prefix}${base.name}`,
+      stats
+    };
+  });
+};
 
 export const getAbyssEnemy = (floor: number) => {
   const boss = HEROES_DATA.find(h => h.floor === floor);
   const multiplier = 1 + (floor - 1) * 0.05;
+  const linearFloor = Math.min(100, floor);
+  const intLuckScale = linearFloor / 100; 
+
   if (boss) {
     return {
       name: boss.name, quote: boss.quote,
-      stats: { hp: Math.floor(boss.stats.hp * multiplier), attack: Math.floor(boss.stats.attack * multiplier), defense: Math.floor(boss.stats.defense * multiplier), speed: Math.floor(boss.stats.speed * multiplier) },
+      stats: { 
+        combat: Math.floor(boss.stats.combat * multiplier), 
+        endurance: Math.floor(boss.stats.endurance * multiplier), 
+        intelligence: Math.floor(boss.stats.intelligence + (100 - boss.stats.intelligence) * intLuckScale), 
+        charisma: Math.min(100, boss.stats.charisma + Math.floor(floor / 5) * 5),
+        luck: Math.floor(boss.stats.luck + (100 - boss.stats.luck) * intLuckScale)
+      },
       rewardGold: boss.rewardGold, rewardPrestige: boss.rewardPrestige, isBoss: true
     };
   }
-  const baseHp = 400; const baseAtk = 35; const baseDef = 15; const baseSpd = 20;
+  
+  const baseCombat = 35; const baseEndurance = 30;
+  const baseInt = 20; const baseLuck = 10;
+  const maxInt = 60; const maxLuck = 25; 
+
   return {
     name: `深淵衛士 (第 ${floor} 階)`, quote: '……',
-    stats: { hp: Math.floor(baseHp * multiplier), attack: Math.floor(baseAtk * multiplier), defense: Math.floor(baseDef * multiplier), speed: Math.floor(baseSpd * multiplier) },
+    stats: { 
+       combat: Math.floor(baseCombat * multiplier), 
+       endurance: Math.floor(baseEndurance * multiplier), 
+       intelligence: Math.floor(baseInt + (maxInt - baseInt) * intLuckScale), 
+       charisma: Math.min(80, 10 + Math.floor(floor / 5) * 5),
+       luck: Math.floor(baseLuck + (maxLuck - baseLuck) * intLuckScale)
+    },
     rewardGold: 500 + floor * 150, rewardPrestige: Math.floor(floor / 2), isBoss: false
   };
 };
@@ -59,6 +113,7 @@ export interface GameStore {
   player: Player & { shopStock: Record<string, number> }; 
   slaves: Slave[];
   marketSlaves: Slave[];
+  arenaNPCs: ArenaNPC[];
   isMarketGenerating: boolean;
   isPoolGenerating: boolean;
   currentScene: Scene;
@@ -153,7 +208,14 @@ const generateBaseMarketSlave = (idSuffix: string, identity: {name: string, stor
   return {
     id: `market-${Date.now()}-${idSuffix}`, name: identity.name, race, gender, activityStatus: '閒置', role: 'none', faintTurns: 0,
     skills: { combat: 1, housework: 1, survival: 1 },
-    primaryStats: { combat: Math.floor(Math.random() * 60) + 20, endurance: Math.floor(Math.random() * 60) + 20, intelligence: Math.floor(Math.random() * 60) + 20, obedience: Math.floor(Math.random() * 40) + 10 },
+    primaryStats: { 
+      combat: Math.floor(Math.random() * 60) + 20, 
+      endurance: Math.floor(Math.random() * 60) + 20, 
+      intelligence: Math.floor(Math.random() * 60) + 20, 
+      obedience: Math.floor(Math.random() * 40) + 10,
+      charisma: Math.floor(Math.random() * 80) + 10,
+      luck: Math.floor(Math.random() * 80) + 10
+    },
     conditionStats: { stamina: 100, stress: 0, rebellion: Math.floor(Math.random() * 20) },
     traits: [], backgroundStory: identity.story,
     combatRecord: { wins: 0, losses: 0 },
@@ -178,7 +240,7 @@ export const useGameStore = create<GameStore>()(
         deviceId: '', unlockedFacilities: [], usedIdentityIds: [],
         inventory: {}, quests: {}, abyssFloor: 1, shopStock: { ...DEFAULT_SHOP_STOCK }
       },
-      currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], isMarketGenerating: false, isPoolGenerating: false,
+      currentScene: 'Home', currentSubView: 'Main', dailyMissions: generateDailyMissions(), activeDispatches: [], slaves: [], marketSlaves: [], arenaNPCs: generateArenaNPCs(), isMarketGenerating: false, isPoolGenerating: false,
       activeEvent: null, globalModal: null, activeWindow: null, isSaving: false, localSaveVersion: 0, _hasHydrated: false,
       activeCombat: null,
 
@@ -191,21 +253,14 @@ export const useGameStore = create<GameStore>()(
       appointRole: (slaveId, role) => set(state => {
         const target = state.slaves.find(s => s.id === slaveId);
         if (!target) return state;
-        
         if (role !== 'none' && target.primaryStats.obedience < 80) {
-          setTimeout(() => {
-            get().setGlobalModal({ title: '［職務任免駁回］', message: `${target.name} 的服從度未達到 80 點，拒絕履行商會高級職務！`, isConfirm: false });
-          }, 50);
+          setTimeout(() => { get().setGlobalModal({ title: '［職務任免駁回］', message: `${target.name} 的服從度未達到 80 點，拒絕履行商會高級職務！`, isConfirm: false }); }, 50);
           return state;
         }
-
         const updated = state.slaves.map(s => {
-          let r = s.role;
-          if (role !== 'none' && s.role === role) r = 'none';
-          if (s.id === slaveId) r = role;
+          let r = s.role; if (role !== 'none' && s.role === role) r = 'none'; if (s.id === slaveId) r = role;
           return { ...s, role: r };
         });
-
         return { slaves: updated };
       }),
 
@@ -215,13 +270,7 @@ export const useGameStore = create<GameStore>()(
            const qData = QUESTS_DATA[questId as keyof typeof QUESTS_DATA];
            setTimeout(() => {
              get().syncProfileToCloud();
-             if (qData) {
-               get().setGlobalModal({
-                 title: '［⚡ 發現新劇情任務解鎖］',
-                 message: `${qData.title}\n\n任務目標：${qData.description}`,
-                 isConfirm: false
-               });
-             }
+             if (qData) { get().setGlobalModal({ title: '［⚡ 發現新劇情任務解鎖］', message: `${qData.title}\n\n任務目標：${qData.description}`, isConfirm: false }); }
            }, 100); 
            return { player: { ...state.player, quests: newQuests } };
         }
@@ -230,24 +279,13 @@ export const useGameStore = create<GameStore>()(
 
       checkQuestCompletion: () => {
          const state = get(); let updated = false; const newQuests = { ...state.player.quests }; let title = ''; let msg = ''; let addG = 0;
-         
-         if (newQuests['q_first_blood'] === 'active' && state.slaves.length > 0) { 
-            newQuests['q_first_blood'] = 'completed'; addG = 2000; updated = true;
-            title = '［任務達成］【深淵的初啼】'; msg = `成功簽署第一份血脈契約！商會基礎雛形已然確立。\n\n獲得報酬：\n資金 +2,000`;
-         }
-         else if (newQuests['q_first_fusion'] === 'active' && state.slaves.some(s => s.parents)) { 
-            newQuests['q_first_fusion'] = 'completed'; addG = 1500; updated = true;
-            title = '［任務達成］【禁忌的鍊金術】'; msg = `成功在血統密室中編織融合出全新的生命血脈！\n\n獲得報酬：\n資金 +1,500`;
-         }
-         else if (newQuests['q_enter_hub'] === 'active' && (state.player.location === 'NeutralHub' || state.player.location === 'Capital')) { 
-            newQuests['q_enter_hub'] = 'completed'; addG = 5000; updated = true;
-            title = '［任務達成］【踏入灰色地帶】'; msg = `成功突破混亂前線，向核心城區拔營挺進！\n\n獲得報酬：\n資金 +5,000`;
-         }
+         if (newQuests['q_first_blood'] === 'active' && state.slaves.length > 0) { newQuests['q_first_blood'] = 'completed'; addG = 2000; updated = true; title = '［任務達成］【深淵的初啼】'; msg = `成功簽署第一份血脈契約！商會基礎雛形已然確立。\n\n獲得報酬：\n資金 +2,000`; }
+         else if (newQuests['q_first_fusion'] === 'active' && state.slaves.some(s => s.parents)) { newQuests['q_first_fusion'] = 'completed'; addG = 1500; updated = true; title = '［任務達成］【禁忌的鍊金術】'; msg = `成功在血統密室中編織融合出全新的生命血脈！\n\n獲得報酬：\n資金 +1,500`; }
+         else if (newQuests['q_enter_hub'] === 'active' && (state.player.location === 'NeutralHub' || state.player.location === 'Capital')) { newQuests['q_enter_hub'] = 'completed'; addG = 5000; updated = true; title = '［任務達成］【踏入灰色地帶】'; msg = `成功突破混亂前線，向核心城區拔營挺進！\n\n獲得報酬：\n資金 +5,000`; }
 
          if (updated) {
             set({ player: { ...state.player, quests: newQuests, gold: state.player.gold + addG } });
-            get().setGlobalModal({ title, message: msg, isConfirm: false });
-            get().syncProfileToCloud();
+            get().setGlobalModal({ title, message: msg, isConfirm: false }); get().syncProfileToCloud();
          }
       },
 
@@ -262,7 +300,7 @@ export const useGameStore = create<GameStore>()(
         const state = get(); const p = state.player;
         const { error } = await supabase.from('profiles').upsert({
           id: session.user.id, day: p.day, gold: p.gold, food: p.food, action_points: p.actionPoints, prestige: p.prestige, unlocked_facilities: p.unlockedFacilities,
-          save_data: { localSaveVersion: newVersion, usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent }
+          save_data: { localSaveVersion: newVersion, usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent, arenaNPCs: state.arenaNPCs }
         });
         
         if (error) console.error('［同步異常］', error);
@@ -287,7 +325,8 @@ export const useGameStore = create<GameStore>()(
         set((state) => ({
           localSaveVersion: cloudVersion,
           player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor, shopStock: sData.shopStock || state.player.shopStock },
-          slaves: sData.slaves || state.slaves, marketSlaves: sData.marketSlaves || state.marketSlaves, activeDispatches: sData.activeDispatches || state.activeDispatches, activeEvent: sData.activeEvent || state.activeEvent
+          slaves: sData.slaves || state.slaves, marketSlaves: sData.marketSlaves || state.marketSlaves, activeDispatches: sData.activeDispatches || state.activeDispatches, activeEvent: sData.activeEvent || state.activeEvent,
+          arenaNPCs: sData.arenaNPCs && sData.arenaNPCs.length > 0 ? sData.arenaNPCs : state.arenaNPCs
         }));
       },
 
@@ -441,11 +480,14 @@ export const useGameStore = create<GameStore>()(
         let newDirtiness = Math.min(100, player.roomDirtiness + Math.ceil(updatedSlaves.length * (player.location === 'Capital' ? 1 : player.location === 'NeutralHub' ? 1.5 : 2)) + Math.pow(overpopulation, 2) * 5);
         
         let newShopStock = { ...player.shopStock };
-        if (triggerDailySettlement) { newShopStock = { ...DEFAULT_SHOP_STOCK }; }
-
+        let newArenaNPCs = state.arenaNPCs; // ★ 每日重新生成鬥士
+        
         let maidFaintedThisNight = false;
         let maidName = '';
         if (triggerDailySettlement) {
+          newShopStock = { ...DEFAULT_SHOP_STOCK };
+          newArenaNPCs = generateArenaNPCs();
+          
           const maid = updatedSlaves.find(s => s.role === 'maid');
           if (maid && (maid.faintTurns || 0) === 0) {
             const maidHousework = maid.isInjured ? Math.floor((maid.skills?.housework || 1) * 0.5) : (maid.skills?.housework || 1);
@@ -462,7 +504,7 @@ export const useGameStore = create<GameStore>()(
           }
         }
 
-        set({ player: { ...player, day: nextDay, timePhase: nextPhase, roomDirtiness: newDirtiness, actionPoints: newAp, lastApUpdateTime: newApUpdateTime, shopStock: newShopStock } });
+        set({ player: { ...player, day: nextDay, timePhase: nextPhase, roomDirtiness: newDirtiness, actionPoints: newAp, lastApUpdateTime: newApUpdateTime, shopStock: newShopStock }, arenaNPCs: newArenaNPCs });
 
         const newDispatches: ActiveDispatch[] = []; let earnedGold = 0; let earnedPrestige = 0;
         let dispatchLogs: string[] = [];
@@ -650,7 +692,7 @@ export const useGameStore = create<GameStore>()(
             setTimeout(() => {
               get().setGlobalModal({
                 title: '［據點治安回報：成功鎮壓］',
-                message: `保全防線成功攔截並擊潰了以下試驗體的夜間叛逃企圖：\n\n【${suppressedNames.join('】、【')}】\n\n上述成員已被強制重傷拘禁，反抗心重置為 0。`,
+                message: `守衛防線成功攔截並擊潰了以下試驗體的夜間叛逃企圖：\n\n【${suppressedNames.join('】、【')}】\n\n上述成員已被強制重傷拘禁，反抗心重置為 0。`,
                 isConfirm: false
               });
             }, escapedNames.length > 0 ? 250 : 200);
@@ -658,7 +700,7 @@ export const useGameStore = create<GameStore>()(
 
           if (maidFaintedThisNight && escapedNames.length === 0 && suppressedNames.length === 0) {
             setTimeout(() => {
-              get().setGlobalModal({ title: '［據點治安回報：傭人過勞］', message: `打掃傭人【${maidName}】因無腦高強度打掃致使體力徹底榨乾，已陷入昏厥罷工狀態。`, isConfirm: false });
+              get().setGlobalModal({ title: '［據點治安回報：傭人過勞］', message: `打掃管家【${maidName}】因無腦高強度打掃致使體力徹底榨乾，已陷入昏厥罷工狀態。`, isConfirm: false });
             }, 200);
           }
 
@@ -681,7 +723,7 @@ export const useGameStore = create<GameStore>()(
       },
 
       executeArenaBattle: (slaveId, npcId) => {
-        const state = get(); const slave = state.slaves.find(s => s.id === slaveId); const npc = ARENA_NPCS.find(n => n.id === npcId);
+        const state = get(); const slave = state.slaves.find(s => s.id === slaveId); const npc = state.arenaNPCs.find(n => n.id === npcId);
         if (!slave || !npc || state.player.actionPoints < 1) return null;
 
         let weaponAtk = 0; if (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) weaponAtk = ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0;
@@ -692,6 +734,9 @@ export const useGameStore = create<GameStore>()(
         const combatSkill = slave.isInjured ? Math.floor((slave.skills?.combat || 1) * 0.5) : (slave.skills?.combat || 1);
         const survivalSkill = slave.isInjured ? Math.floor((slave.skills?.survival || 1) * 0.5) : (slave.skills?.survival || 1);
 
+        const sLuck = slave.primaryStats.luck ?? 10;
+        const sCharisma = slave.primaryStats.charisma ?? 10;
+
         let sHpMax = Math.floor(enduranceStat * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
         let sAtk = combatStat + weaponAtk; let sDef = Math.floor(enduranceStat * 0.5 + survivalSkill * 2); let sSpd = intelligenceStat;
         let sDmgMulti = 1 + (combatSkill * 0.05); let sDmgReduc = combatSkill * 0.03;
@@ -701,7 +746,13 @@ export const useGameStore = create<GameStore>()(
         if (slave.race === '矮人') { sHpMax = Math.floor(sHpMax * 1.2); sHp = Math.floor(sHp * 1.2); sDef = Math.floor(sDef * 1.15); }
         if (slave.race === '龍族') { sAtk = Math.floor(sAtk * 1.1); sDef = Math.floor(sDef * 1.1); sSpd = Math.floor(sSpd * 1.1); sDmgReduc += 0.2; }
 
-        let nHp = npc.stats.hp; const nHpMax = npc.stats.hp; const nAtk = npc.stats.attack; const nDef = npc.stats.defense; const nSpd = npc.stats.speed;
+        let nHpMax = npc.stats.endurance * 5; 
+        let nHp = nHpMax;
+        let nAtk = npc.stats.combat; 
+        let nDef = Math.floor(npc.stats.endurance * 0.5); 
+        let nSpd = npc.stats.intelligence;
+        let nLuck = npc.stats.luck;
+        let nCharisma = npc.stats.charisma;
 
         const logs: CombatLog[] = []; 
         logs.push({ round: 0, message: `［系統］${slave.name} 踏入賽場，迎戰 ${npc.name}。`, type: 'system', sHp, nHp });
@@ -719,26 +770,47 @@ export const useGameStore = create<GameStore>()(
           const isSlaveFirst = sSpd >= nSpd;
           const slaveAction = () => {
             if (sHp <= 0) return; let atkPower = sAtk; let dmgMulti = sDmgMulti;
-            // ★ V2.8.0 修正：將常規函數改為內聯區塊，解除 TypeScript 的 TS18048 型別警告
-            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) {
-              humanUnstoppable = true; 
-              logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp });
-            }
+            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp }); }
             if (humanUnstoppable) atkPower = Math.floor(atkPower * 1.25);
             if (slave.race === '精靈' && isSlaveFirst) dmgMulti += 0.15;
             if (slave.race === '半獸人') dmgMulti += Math.min(0.3, orcStack * 0.03);
-            let dmg = Math.floor(Math.max(1, atkPower - nDef) * dmgMulti); nHp -= dmg;
-            nHp = Math.max(0, nHp);
-            logs.push({ round, message: `${slave.name} 發動攻擊，對 ${npc.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
-            if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal', sHp, nHp, damage: heal }); } }
+
+            const nDodgeRate = Math.min(0.20, (nLuck / 100) * 0.20);
+            if (Math.random() < nDodgeRate) {
+                logs.push({ round, message: `［閃避］${npc.name} 驚險地避開了 ${slave.name} 的致命一擊！`, type: 'skill', sHp, nHp });
+            } else {
+                let dmg = Math.floor(Math.max(1, atkPower - nDef) * dmgMulti); 
+                const sCritRate = Math.min(0.30, (sLuck / 100) * 0.30);
+                if (Math.random() < sCritRate) {
+                    dmg = Math.floor(dmg * 1.5);
+                    logs.push({ round, message: `［爆擊］${slave.name} 抓住了轉瞬即逝的破綻，造成 1.5 倍爆擊傷害！`, type: 'damage', sHp, nHp });
+                }
+                nHp -= dmg;
+                nHp = Math.max(0, nHp);
+                logs.push({ round, message: `${slave.name} 發動攻擊，對 ${npc.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
+                if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal', sHp, nHp, damage: heal }); } }
+            }
           };
           const npcAction = () => {
-            if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); 
-            if (slave.race === '矮人') { dmg = Math.max(1, dmg - 5); logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill', sHp, nHp }); }
-            dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; 
-            sHp = Math.max(0, sHp);
-            logs.push({ round, message: `${npc.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
-            if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦狂暴］${slave.name} 的【狂熱戰血】受到痛覺刺激，怒氣加劇（當前層數: ${orcStack}）！`, type: 'skill', sHp, nHp }); }
+            if (nHp <= 0) return; 
+            const sDodgeRate = Math.min(0.20, (sLuck / 100) * 0.20);
+            if (Math.random() < sDodgeRate) {
+                logs.push({ round, message: `［閃避］${slave.name} 靈巧地避開了 ${npc.name} 的攻擊！`, type: 'skill', sHp, nHp });
+            } else {
+                let dmg = Math.max(1, nAtk - sDef); 
+                if (slave.race === '矮人') { dmg = Math.max(1, dmg - 5); logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill', sHp, nHp }); }
+                dmg = Math.floor(dmg * (1 - sDmgReduc)); 
+                
+                const nCritRate = Math.min(0.30, (nLuck / 100) * 0.30);
+                if (Math.random() < nCritRate) {
+                    dmg = Math.floor(dmg * 1.5);
+                    logs.push({ round, message: `［爆擊］${npc.name} 的攻勢異常兇猛，對 ${slave.name} 造成 1.5 倍爆擊傷害！`, type: 'damage', sHp, nHp });
+                }
+                sHp -= dmg; 
+                sHp = Math.max(0, sHp);
+                logs.push({ round, message: `${npc.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
+                if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦層數］${slave.name} 承受攻擊，痛苦激發狂暴！`, type: 'skill', sHp, nHp }); }
+            }
           };
           if (isSlaveFirst) { slaveAction(); npcAction(); } else { npcAction(); slaveAction(); }
           round++;
@@ -753,14 +825,22 @@ export const useGameStore = create<GameStore>()(
         if (isWin) {
           newWins++;
           logs.push({ round: round - 1, message: `［結算］${slave.name} 屹立到了最後，取得勝利。`, type: 'system', sHp, nHp });
-          get().addGold(npc.rewardGold); if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige);
+          
+          const charismaBonus = 1 + Math.floor(nCharisma / 10) * 0.05;
+          const finalRewardGold = Math.floor(npc.rewardGold * charismaBonus);
+          get().addGold(finalRewardGold); 
+          if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige);
+
+          if (charismaBonus > 1) {
+              logs.push({ round: round - 1, message: `［戰利品加成］擊敗高魅力對手，基礎資金獲得額外 ${Math.round((charismaBonus - 1) * 100)}% 加成，共計獲取 ${finalRewardGold}！`, type: 'system', sHp, nHp });
+          }
 
           const netWins = newWins - newLosses;
           if (netWins > 0 && netWins % 5 === 0) {
-            const pool = ['combat', 'endurance', 'intelligence'] as const;
+            const pool = ['combat', 'endurance', 'intelligence', 'charisma', 'luck'] as const;
             const picked = pool[Math.floor(Math.random() * pool.length)];
-            slave.primaryStats[picked] = Math.min(100, slave.primaryStats[picked] + 1);
-            const nameMap = { combat: '武力', endurance: '體質', intelligence: '智力' };
+            slave.primaryStats[picked] = Math.min(100, (slave.primaryStats[picked] ?? 10) + 1);
+            const nameMap = { combat: '武力', endurance: '體質', intelligence: '智力', charisma: '魅力', luck: '幸運' };
             logs.push({ round: round - 1, message: `歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill', sHp, nHp });
           }
         } else {
@@ -805,6 +885,9 @@ export const useGameStore = create<GameStore>()(
         const combatSkill = slave.isInjured ? Math.floor((slave.skills?.combat || 1) * 0.5) : (slave.skills?.combat || 1);
         const survivalSkill = slave.isInjured ? Math.floor((slave.skills?.survival || 1) * 0.5) : (slave.skills?.survival || 1);
 
+        const sLuck = slave.primaryStats.luck ?? 10;
+        const sCharisma = slave.primaryStats.charisma ?? 10;
+
         let sHpMax = Math.floor(enduranceStat * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
         let sAtk = combatStat + weaponAtk; let sDef = Math.floor(enduranceStat * 0.5 + survivalSkill * 2); let sSpd = intelligenceStat;
         let sDmgMulti = 1 + (combatSkill * 0.05); let sDmgReduc = combatSkill * 0.03;
@@ -814,7 +897,13 @@ export const useGameStore = create<GameStore>()(
         if (slave.race === '矮人') { sHpMax = Math.floor(sHpMax * 1.2); sHp = Math.floor(sHp * 1.2); sDef = Math.floor(sDef * 1.15); }
         if (slave.race === '龍族') { sAtk = Math.floor(sAtk * 1.1); sDef = Math.floor(sDef * 1.1); sSpd = Math.floor(sSpd * 1.1); sDmgReduc += 0.2; }
 
-        let nHp = enemy.stats.hp; const nHpMax = enemy.stats.hp; const nAtk = enemy.stats.attack; const nDef = enemy.stats.defense; const nSpd = enemy.stats.speed;
+        let nHpMax = enemy.stats.endurance * 5; 
+        let nHp = nHpMax;
+        let nAtk = enemy.stats.combat; 
+        let nDef = Math.floor(enemy.stats.endurance * 0.5); 
+        let nSpd = enemy.stats.intelligence;
+        let nLuck = enemy.stats.luck;
+        let nCharisma = enemy.stats.charisma;
 
         logs.push({ round: 0, message: `［系統］${slave.name} 踏入深淵第 ${floor} 階，迎戰 ${enemy.name}。`, type: 'system', sHp, nHp });
         logs.push({ round: 0, message: `「${enemy.quote}」`, type: 'system', sHp, nHp });
@@ -832,26 +921,47 @@ export const useGameStore = create<GameStore>()(
           const isSlaveFirst = sSpd >= nSpd;
           const slaveAction = () => {
             if (sHp <= 0) return; let atkPower = sAtk; let dmgMulti = sDmgMulti;
-            // ★ V2.8.0 修正：將常規函數改為內聯區塊，解除 TypeScript 的 TS18048 型別警告
-            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { 
-              humanUnstoppable = true; 
-              logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp }); 
-            }
+            if (slave.race === '人類' && sHp < sHpMax * 0.4 && !humanUnstoppable) { humanUnstoppable = true; logs.push({ round, message: `［絕境意志］${slave.name} 爆發強烈的求生欲，攻擊力極大幅提升！`, type: 'skill', sHp, nHp }); }
             if (humanUnstoppable) atkPower = Math.floor(atkPower * 1.25);
             if (slave.race === '精靈' && isSlaveFirst) dmgMulti += 0.15;
             if (slave.race === '半獸人') dmgMulti += Math.min(0.3, orcStack * 0.03);
-            let dmg = Math.floor(Math.max(1, atkPower - nDef) * dmgMulti); nHp -= dmg;
-            nHp = Math.max(0, nHp);
-            logs.push({ round, message: `${slave.name} 發動攻擊，對 ${enemy.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
-            if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal', sHp, nHp, damage: heal }); } }
+
+            const nDodgeRate = Math.min(0.20, (nLuck / 100) * 0.20);
+            if (Math.random() < nDodgeRate) {
+                logs.push({ round, message: `［閃避］${enemy.name} 看破了攻勢，完美閃避了 ${slave.name} 的攻擊！`, type: 'skill', sHp, nHp });
+            } else {
+                let dmg = Math.floor(Math.max(1, atkPower - nDef) * dmgMulti); 
+                const sCritRate = Math.min(0.30, (sLuck / 100) * 0.30);
+                if (Math.random() < sCritRate) {
+                    dmg = Math.floor(dmg * 1.5);
+                    logs.push({ round, message: `［爆擊］${slave.name} 抓住了轉瞬即逝的破綻，造成 1.5 倍爆擊傷害！`, type: 'damage', sHp, nHp });
+                }
+                nHp -= dmg;
+                nHp = Math.max(0, nHp);
+                logs.push({ round, message: `${slave.name} 發動攻擊，對 ${enemy.name} 造成 ${dmg} 點傷害。`, type: 'damage', sHp, nHp, damage: dmg });
+                if (slave.race === '不死族') { const heal = Math.floor(dmg * 0.15); if (heal > 0) { sHp = Math.min(sHpMax, sHp + heal); logs.push({ round, message: `［枯骨不朽］${slave.name} 吸收了 ${heal} 點生命力。`, type: 'heal', sHp, nHp, damage: heal }); } }
+            }
           };
           const npcAction = () => {
-            if (nHp <= 0) return; let dmg = Math.max(1, nAtk - sDef); 
-            if (slave.race === '矮人') { dmg = Math.max(1, dmg - 5); logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill', sHp, nHp }); }
-            dmg = Math.floor(dmg * (1 - sDmgReduc)); sHp -= dmg; 
-            sHp = Math.max(0, sHp);
-            logs.push({ round, message: `${enemy.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害.`, type: 'damage', sHp, nHp, damage: dmg });
-            if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦層數］${slave.name} 承受攻擊，痛苦激發狂暴！`, type: 'skill', sHp, nHp }); }
+            if (nHp <= 0) return; 
+            const sDodgeRate = Math.min(0.20, (sLuck / 100) * 0.20);
+            if (Math.random() < sDodgeRate) {
+                logs.push({ round, message: `［閃避］${slave.name} 靈巧地避開了 ${enemy.name} 的攻擊！`, type: 'skill', sHp, nHp });
+            } else {
+                let dmg = Math.max(1, nAtk - sDef); 
+                if (slave.race === '矮人') { dmg = Math.max(1, dmg - 5); logs.push({ round, message: `［天賦防禦］${slave.name} 的【堅岩體魄】使其硬生生抵擋並折抵了 5 點致命傷害！`, type: 'skill', sHp, nHp }); }
+                dmg = Math.floor(dmg * (1 - sDmgReduc)); 
+                
+                const nCritRate = Math.min(0.30, (nLuck / 100) * 0.30);
+                if (Math.random() < nCritRate) {
+                    dmg = Math.floor(dmg * 1.5);
+                    logs.push({ round, message: `［爆擊］${enemy.name} 的攻勢異常兇猛，對 ${slave.name} 造成 1.5 倍爆擊傷害！`, type: 'damage', sHp, nHp });
+                }
+                sHp -= dmg; 
+                sHp = Math.max(0, sHp);
+                logs.push({ round, message: `${enemy.name} 揮舞武器，對 ${slave.name} 造成 ${dmg} 點傷害.`, type: 'damage', sHp, nHp, damage: dmg });
+                if (slave.race === '半獸人') { orcStack++; logs.push({ round, message: `［天賦層數］${slave.name} 承受攻擊，痛苦激發狂暴！`, type: 'skill', sHp, nHp }); }
+            }
           };
           if (isSlaveFirst) { slaveAction(); npcAction(); } else { npcAction(); slaveAction(); }
           round++;
@@ -866,15 +976,24 @@ export const useGameStore = create<GameStore>()(
         if (isWin) {
           newWins++;
           logs.push({ round: round - 1, message: `［結算］${slave.name} 擊潰了深淵的阻礙，成功晉級！`, type: 'system', sHp, nHp });
-          get().addGold(enemy.rewardGold); if (enemy.rewardPrestige > 0) get().addPrestige(enemy.rewardPrestige);
+          
+          const charismaBonus = 1 + Math.floor(nCharisma / 10) * 0.05;
+          const finalRewardGold = Math.floor(enemy.rewardGold * charismaBonus);
+          get().addGold(finalRewardGold); 
+          if (enemy.rewardPrestige > 0) get().addPrestige(enemy.rewardPrestige);
+          
           set((s) => ({ player: { ...s.player, abyssFloor: s.player.abyssFloor + 1 } }));
+
+          if (charismaBonus > 1) {
+              logs.push({ round: round - 1, message: `［戰利品加成］擊破高魅力淵主，基礎資金獲得額外 ${Math.round((charismaBonus - 1) * 100)}% 加成，共計獲取 ${finalRewardGold}！`, type: 'system', sHp, nHp });
+          }
 
           const netWins = newWins - newLosses;
           if (netWins > 0 && netWins % 5 === 0) {
-            const pool = ['combat', 'endurance', 'intelligence'] as const;
+            const pool = ['combat', 'endurance', 'intelligence', 'charisma', 'luck'] as const;
             const picked = pool[Math.floor(Math.random() * pool.length)];
-            slave.primaryStats[picked] = Math.min(100, slave.primaryStats[picked] + 1);
-            const nameMap = { combat: '武力', endurance: '體質', intelligence: '智力' };
+            slave.primaryStats[picked] = Math.min(100, (slave.primaryStats[picked] ?? 10) + 1);
+            const nameMap = { combat: '武力', endurance: '體質', intelligence: '智力', charisma: '魅力', luck: '幸運' };
             logs.push({ round: round - 1, message: `歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill', sHp, nHp });
           }
         } else {
