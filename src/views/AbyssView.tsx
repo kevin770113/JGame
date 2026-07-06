@@ -29,61 +29,90 @@ export default function AbyssView() {
       return; 
     }
 
-    // ★ V2.5 呼叫底層函數錄製影帶，劇場將自動接管畫面
-    executeAbyssBattle(selectedFighterId);
+    const result = executeAbyssBattle(fighter.id);
+    if (result) {
+      setSelectedFighterId('');
+    }
   };
 
-  const fighterOptions: Option[] = idleSlaves.map(s => ({ 
-    value: s.id, 
-    label: `${s.name} (武力: ${s.primaryStats.combat} | 體力: ${s.conditionStats.stamina})` 
-  }));
+  const fighterOptions: Option[] = idleSlaves.map(s => {
+    const isExhausted = s.conditionStats.stamina < 30;
+    return {
+      value: s.id,
+      label: `${s.name} (體力: ${s.conditionStats.stamina}) ${isExhausted ? '［體力透支］' : ''}`,
+      disabled: isExhausted
+    };
+  });
+
+  const charismaBonusMultiplier = 1 + Math.floor(targetEnemy.stats.charisma / 10) * 0.05;
+  const expectedReward = Math.floor(targetEnemy.rewardGold * charismaBonusMultiplier);
 
   return (
-    <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in relative">
-      <div className="absolute inset-0 bg-purple-900/10 z-0 pointer-events-none rounded-xl blur-3xl"></div>
-      
-      <div className="flex justify-between items-center border-b border-purple-900/50 pb-2 relative z-10">
+    <div className="w-full flex flex-col gap-5 pb-10 animate-fade-in relative z-10">
+      <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
-          <h2 className="text-xl font-bold text-purple-300 tracking-widest">深淵之塔</h2>
-          <p className="text-2xs text-purple-500 mt-0.5">無盡的階梯與古代的狂魂，每一步都是邁向死亡的榮耀。</p>
+          <h2 className="text-xl font-bold text-purple-400">深淵之塔</h2>
+          <p className="text-xs text-gray-500 mt-1">無盡的黑暗階梯，埋藏著古代的英靈與無盡的財富。</p>
         </div>
-        <button onClick={() => navigate('Town', 'Main')} className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-purple-800/50 hover:bg-purple-900/30 text-purple-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest">
-          ［撤出深淵］
+        <button 
+          onClick={() => navigate('Town', 'Main')}
+          className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
+        >
+          ［返回城鎮］
         </button>
       </div>
 
-      <div className="flex flex-col gap-5 mt-2 relative z-10">
-        <div className={`p-5 rounded-lg border shadow-xl flex flex-col items-center justify-center relative overflow-hidden ${targetEnemy.isBoss ? 'bg-gradient-to-b from-red-950/40 to-gray-900 border-red-900/50' : 'bg-gray-900 border-purple-900/30'}`}>
-          <div className="absolute top-2 left-3 text-xs font-bold text-purple-500 tracking-widest opacity-50">FLOOR {abyssFloor}</div>
-          
-          <h3 className={`text-xl font-bold tracking-widest mb-1 mt-4 ${targetEnemy.isBoss ? 'text-red-500' : 'text-gray-300'}`}>
-            {targetEnemy.isBoss ? '【英靈首領】' : ''}{targetEnemy.name}
-          </h3>
-          <p className="text-xs text-gray-500 italic mb-6">「{targetEnemy.quote}」</p>
-          
-          <div className="grid grid-cols-2 gap-3 w-full text-xs font-mono text-gray-300 bg-gray-950/80 p-4 rounded border border-gray-800 shadow-inner">
-            <div className="flex justify-between"><span>深淵血量:</span> <span className="text-green-500">{targetEnemy.stats.hp}</span></div>
-            <div className="flex justify-between"><span>深淵防禦:</span> <span className="text-blue-400">{targetEnemy.stats.defense}</span></div>
-            <div className="flex justify-between"><span>深淵攻擊:</span> <span className="text-red-400">{targetEnemy.stats.attack}</span></div>
-            <div className="flex justify-between"><span>深淵速度:</span> <span className="text-yellow-400">{targetEnemy.stats.speed}</span></div>
-          </div>
-          
-          <div className="mt-4 text-xs text-purple-400 tracking-widest bg-purple-950/20 px-4 py-2 rounded border border-purple-900/30 w-full text-center">
-            突破獎金: <strong className="text-yellow-500">${targetEnemy.rewardGold}</strong> 
-            {targetEnemy.rewardPrestige > 0 && <span className="ml-2">| 威望: <strong className="text-blue-400">+{targetEnemy.rewardPrestige}</strong></span>}
+      <div className="flex flex-col md:flex-row gap-5 mt-2">
+        <div className="w-full md:w-1/2 flex flex-col gap-3">
+          <div className="bg-gray-900/80 p-5 rounded-lg border border-purple-900/50 shadow-xl relative overflow-hidden group flex flex-col items-center text-center">
+            <div className="absolute top-0 right-0 p-2 opacity-10">
+              <span className="text-6xl text-purple-500">🌀</span>
+            </div>
+            
+            <div className="w-16 h-16 rounded-full bg-purple-950 border-2 border-purple-800 flex items-center justify-center mb-3 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+              <span className="text-2xl font-black text-purple-400">{abyssFloor}</span>
+            </div>
+
+            <div className="text-xs text-purple-500 font-bold tracking-widest mb-1">
+              {targetEnemy.isBoss ? '［鎮守英靈］' : '［深淵魔物］'}
+            </div>
+            <h3 className={`text-xl font-black mb-2 truncate transition-colors ${targetEnemy.isBoss ? 'text-red-400 group-hover:text-red-300' : 'text-gray-200 group-hover:text-purple-300'}`}>
+              {targetEnemy.name}
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed italic mb-4 min-h-[40px]">
+              「{targetEnemy.quote}」
+            </p>
+            
+            <div className="grid grid-cols-2 gap-2 mt-2 bg-gray-950 p-3 rounded border border-gray-800 text-xs w-full text-left">
+              <div className="flex justify-between"><span>武力:</span> <span className="text-red-400 font-bold font-mono">{targetEnemy.stats.combat}</span></div>
+              <div className="flex justify-between"><span>體質:</span> <span className="text-green-400 font-bold font-mono">{targetEnemy.stats.endurance}</span></div>
+              <div className="flex justify-between"><span>智力:</span> <span className="text-blue-400 font-bold font-mono">{targetEnemy.stats.intelligence}</span></div>
+              <div className="flex justify-between"><span>魅力:</span> <span className="text-pink-400 font-bold font-mono">{targetEnemy.stats.charisma}</span></div>
+              <div className="flex justify-between col-span-2"><span>幸運:</span> <span className="text-yellow-400 font-bold font-mono">{targetEnemy.stats.luck}</span></div>
+            </div>
+
+            <div className="mt-4 text-xs text-purple-400 tracking-widest bg-purple-950/20 px-4 py-2 rounded border border-purple-900/30 w-full text-center">
+              期望賞金: <strong className="text-yellow-500">${expectedReward}</strong> 
+              {charismaBonusMultiplier > 1 && <span className="text-3xs text-gray-600 ml-1">(含魅力)</span>}
+              {targetEnemy.rewardPrestige > 0 && <span className="ml-2">| 威望: <strong className="text-blue-400">+{targetEnemy.rewardPrestige}</strong></span>}
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="text-xs text-purple-400 font-bold tracking-widest border-l-2 border-purple-600 pl-2">［派遣挑戰者］</label>
-          {idleSlaves.length > 0 ? <CustomSelect options={fighterOptions} value={selectedFighterId} onChange={setSelectedFighterId} focusColor="purple" /> : <div className="text-xs text-red-500 p-2 border border-red-900/30 rounded bg-red-950/20">無閒置成員可參賽。</div>}
-        </div>
+        <div className="w-full md:w-1/2 flex flex-col gap-4 bg-gray-900/60 p-4 rounded-lg border border-gray-800">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs text-purple-400 font-bold tracking-widest border-l-2 border-purple-600 pl-2">［派遣挑戰者］</label>
+            {idleSlaves.length > 0 ? <CustomSelect options={fighterOptions} value={selectedFighterId} onChange={setSelectedFighterId} focusColor="purple" /> : <div className="text-xs text-red-500 p-2 border border-red-900/30 rounded bg-red-950/20">無閒置成員可參賽。</div>}
+          </div>
 
-        <div className="text-xs text-gray-500 italic mt-1 leading-relaxed">※ 深淵挑戰將消耗 1 點行動力與 <strong className="text-purple-400">30 點體力</strong>。請確保您的試驗體配有精良的武器裝備。</div>
-        
-        <button onClick={startBattle} disabled={!selectedFighterId || actionPoints < 1} className={`w-full py-3.5 rounded font-bold text-xs tracking-widest border transition-all shadow-lg ${!selectedFighterId || actionPoints < 1 ? 'bg-gray-800 text-gray-600 border-gray-700' : 'bg-purple-900/30 text-purple-300 border-purple-700/50 hover:bg-purple-900/50 active:scale-98'}`}>
-          ［開啟深淵之門］
-        </button>
+          <div className="text-xs text-gray-500 italic mt-1 leading-relaxed">
+            ※ 深淵挑戰將消耗 1 點行動力與 <strong className="text-purple-400">30 點體力</strong>。高層深淵將考驗戰鬥極限與幸運直覺。
+          </div>
+          
+          <button onClick={startBattle} disabled={!selectedFighterId || actionPoints < 1} className={`w-full py-3 rounded font-bold text-xs tracking-widest border transition-all mt-auto ${(!selectedFighterId || actionPoints < 1) ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed' : 'bg-purple-900/40 hover:bg-purple-900/60 text-purple-400 border-purple-800 hover:border-purple-600 shadow-md'}`}>
+            ［踏入深淵階梯］
+          </button>
+        </div>
       </div>
     </div>
   );
