@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import { GameStore } from '../../types/storeTypes';
+import { Slave, Role } from '../../types';
 import { fetchIdentityBatch } from '../../services/aiService';
 import { supabase } from '../../services/supabaseClient';
 import { generateBaseMarketSlave } from '../../utils/generators';
@@ -10,7 +11,7 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
   isMarketGenerating: false,
   isPoolGenerating: false,
 
-  appointRole: (slaveId, role) => set(state => {
+  appointRole: (slaveId: string, role: Role) => set((state: GameStore) => {
     const target = state.slaves.find(s => s.id === slaveId);
     if (!target) return state;
     if (role !== 'none' && target.primaryStats.obedience < 80) {
@@ -24,16 +25,16 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
     return { slaves: updated };
   }),
 
-  addSlave: (slave) => { 
-    set((state) => ({ slaves: [...state.slaves, slave] })); 
+  addSlave: (slave: Slave) => { 
+    set((state: GameStore) => ({ slaves: [...state.slaves, slave] })); 
     get().checkQuestCompletion(); 
   },
 
-  updateSlave: (id, updates) => set((state) => ({ 
+  updateSlave: (id: string, updates: Partial<Slave>) => set((state: GameStore) => ({ 
     slaves: state.slaves.map(s => s.id === id ? { ...s, ...updates, conditionStats: { ...s.conditionStats, ...(updates.conditionStats || {}) } } : s) 
   })),
 
-  sellSlave: (slaveId) => set((state) => {
+  sellSlave: (slaveId: string) => set((state: GameStore) => {
     const slave = state.slaves.find(s => s.id === slaveId); if (!slave || slave.activityStatus !== '閒置') return state;
     const sellPrice = 50 + Math.floor((slave.primaryStats.combat + slave.primaryStats.endurance + slave.primaryStats.intelligence + slave.primaryStats.obedience) * 1.5) + ((slave.skills.combat + slave.skills.housework + slave.skills.survival) * 200);
     return { slaves: state.slaves.filter(s => s.id !== slaveId), player: { ...state.player, gold: state.player.gold + sellPrice } };
@@ -88,7 +89,7 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
       if (logError) console.warn("［寫入紀錄失敗］", logError); 
       
       const newUsedIds = [...get().player.usedIdentityIds, identity.id];
-      set(s => ({ player: { ...s.player, usedIdentityIds: newUsedIds } }));
+      set((s: GameStore) => ({ player: { ...s.player, usedIdentityIds: newUsedIds } }));
       
       return { name: identity.name, story: identity.story || "" };
     } catch (e) {
@@ -99,7 +100,7 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
     }
   },
 
-  fulfillEvent: (slaveId) => {
+  fulfillEvent: (slaveId: string) => {
     const state = get(); const evt = state.activeEvent; const slave = state.slaves.find(s => s.id === slaveId);
     if (!evt || !slave || slave.activityStatus !== '閒置') return false;
     if (evt.reqRace && slave.race !== evt.reqRace) return false;
@@ -107,7 +108,7 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
     if (evt.reqStat && evt.reqStat.key === 'obedience' && slave.primaryStats.obedience < evt.reqStat.val) return false;
     if (evt.reqStat && evt.reqStat.key === 'combat' && slave.primaryStats.combat < evt.reqStat.val) return false;
 
-    const newSlaves = state.slaves.filter(s => s.id !== slaveId); const newInv = { ...state.player.inventory };
+    const newSlaves = state.slaves.filter(s => s.id !== slaveId); const newInv: Record<string, number> = { ...state.player.inventory };
     if (evt.reward.item) newInv[evt.reward.item] = (newInv[evt.reward.item] || 0) + 1;
     set({ slaves: newSlaves, activeEvent: null, player: { ...state.player, gold: state.player.gold + evt.reward.gold, prestige: state.player.prestige + evt.reward.prestige, inventory: newInv } });
     get().syncProfileToCloud(); return true;
