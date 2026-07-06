@@ -46,7 +46,7 @@ export interface Slave {
   primaryStats: PrimaryStats;
   conditionStats: ConditionStats;
   traits: string[];
-  backgroundStory?: string; // ★ V2.9.1 改為可選，向下相容舊存檔
+  backgroundStory?: string;
   parents?: {
     fatherId: string;
     motherId: string;
@@ -59,6 +59,12 @@ export interface Slave {
 }
 
 export interface Player {
+  // ★ V2.9.4 新增：首領本體實體化數據
+  leaderName: string;
+  leaderGender: Gender;
+  leaderStamina: number;
+  leaderFaintTurns: number;
+
   day: number;
   timePhase: TimePhase;
   gold: number;
@@ -109,3 +115,11 @@ export interface CombatPlaybackData {
   rewardPrestige: number;
   isAbyss: boolean;
 }
+
+// ★ V2.9.4 新增：全域數值進位格式化工具 (供 UI 端統一呼叫)
+export const formatK = (num: number): string => {
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  return num.toString();
+};
