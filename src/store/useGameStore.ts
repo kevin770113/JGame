@@ -345,7 +345,6 @@ export const useGameStore = create<GameStore>()(
             let healAmount = item.effect.stamina || 0;
             const newInv = { ...state.player.inventory, [itemId]: qty - 1 }; if (newInv[itemId] <= 0) delete newInv[itemId];
             
-            // ★ V2.9.4 新增：藥水可對首領使用，並自動解除昏厥狀態
             if (slaveId === 'LEADER') {
                 const newStamina = Math.min(100, state.player.leaderStamina + healAmount);
                 return { player: { ...state.player, leaderStamina: newStamina, leaderFaintTurns: 0, inventory: newInv } };
@@ -463,7 +462,6 @@ export const useGameStore = create<GameStore>()(
         if (loc === 'Capital') { capacity = 20; cost = 40000; }
         if (loc === 'Frontlines') { capacity = 5; cost = 0; }
         
-        // ★ V2.9.4 向上搬遷收費機制
         const currentRank = state.player.location === 'Capital' ? 3 : state.player.location === 'NeutralHub' ? 2 : 1;
         const targetRank = loc === 'Capital' ? 3 : loc === 'NeutralHub' ? 2 : 1;
         
@@ -479,7 +477,6 @@ export const useGameStore = create<GameStore>()(
       
       navigate: (scene, subView) => set({ currentScene: scene, currentSubView: subView }),
       
-      // ★ V2.9.4 雙軌打掃制
       cleanRoom: (useLeaderStamina = false) => set((state) => { 
         if (useLeaderStamina) {
           if (state.player.leaderStamina >= 20) {
@@ -537,12 +534,10 @@ export const useGameStore = create<GameStore>()(
            nextPhase = TIME_PHASES[currentPhaseIndex + 1]; 
         }
 
-        // 首領狀態更新
         let leaderFTurns = player.leaderFaintTurns || 0;
         if (leaderFTurns > 0) leaderFTurns -= 1;
         let leaderStamina = player.leaderStamina;
         const isLeaderDispatched = activeDispatches.some(d => d.slaveId === 'LEADER');
-        // ★ V2.9.4 首領自然恢復體力
         if (!isLeaderDispatched && leaderFTurns === 0) {
            leaderStamina = Math.min(100, leaderStamina + 10);
         }
@@ -556,7 +551,6 @@ export const useGameStore = create<GameStore>()(
         const overpopulation = Math.max(0, updatedSlaves.length - player.maxSlaveCapacity);
         let newDirtiness = Math.min(100, player.roomDirtiness + Math.ceil(updatedSlaves.length * (player.location === 'Capital' ? 1 : player.location === 'NeutralHub' ? 1.5 : 2)) + Math.pow(overpopulation, 2) * 5);
         
-        // 即時外派結算
         const newDispatches: ActiveDispatch[] = []; let earnedGold = 0; let earnedPrestige = 0; let earnedFood = 0;
         let phaseLogs: string[] = [];
 
@@ -569,7 +563,7 @@ export const useGameStore = create<GameStore>()(
             if (dispatch.slaveId === 'LEADER') {
                const isSuccess = Math.random() < (dispatch.mission.successRate ?? 1.0);
                if (isSuccess) {
-                 const successChance = 45 / 200; // 首領固定智力 45
+                 const successChance = 45 / 200; 
                  if (Math.random() < successChance) {
                     baseReward = Math.floor(baseReward * 1.5);
                     phaseLogs.push(`［大捷］您親自出馬，完美規避風險，帶回額外 1.5 倍收益！`);
@@ -658,7 +652,7 @@ export const useGameStore = create<GameStore>()(
           newArenaNPCs = generateArenaNPCs();
           
           let isBankrupt = false;
-          let rentCost = location === 'Frontlines' ? 500 : location === 'NeutralHub' ? 3000 : 10000;
+          let rentCost = player.location === 'Frontlines' ? 500 : player.location === 'NeutralHub' ? 3000 : 10000;
           
           if (triggerWeeklyRent) {
              if (get().player.gold >= rentCost) {
@@ -692,7 +686,7 @@ export const useGameStore = create<GameStore>()(
             const foodUnitPrice = Math.floor(20 * (1 - discount));
             const foodMissing = Math.max(0, foodNeeded - get().player.food);
             
-            if (foodMissing > 0) {
+            if (foodMissing > 0 && !isBankrupt) {
                const cost = foodMissing * foodUnitPrice;
                if (get().player.gold >= cost) {
                   get().deductGold(cost);
@@ -932,7 +926,6 @@ export const useGameStore = create<GameStore>()(
           get().addGold(finalRewardGold); 
           if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige);
           
-          // ★ V2.9.4 角鬥場戰利品(糧食)與即時換怪
           const foodReward = Math.floor(Math.random() * 11) + 5;
           get().addFood(foodReward);
           logs.push({ round: round - 1, message: `［戰利品附加］在對手身上搜刮到口糧 ${foodReward} 單位。`, type: 'system', sHp, nHp });
@@ -950,7 +943,6 @@ export const useGameStore = create<GameStore>()(
             logs.push({ round: round - 1, message: `歷練突破！${slave.name} 累積淨勝場達 ${netWins} 場，【${nameMap[picked]}】永久提升 1 點！`, type: 'skill', sHp, nHp });
           }
           
-          // 即時替補新對手
           const newNpcs = get().arenaNPCs.filter(n => n.id !== npcId);
           const baseMatch = BASE_ARENA_NPCS.find(b => b.location === npc.location) || BASE_ARENA_NPCS[0];
           const rand = Math.random();
