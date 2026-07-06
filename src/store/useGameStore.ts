@@ -217,7 +217,7 @@ const generateBaseMarketSlave = (idSuffix: string, identity: {name: string, stor
     },
     conditionStats: { stamina: 100, stress: 0, rebellion: Math.floor(Math.random() * 20) },
     traits: [], 
-    backgroundStory: "", // ★ V2.9.1 徹底拔除列傳
+    backgroundStory: "", 
     combatRecord: { wins: 0, losses: 0 },
     isInjured: false
   };
@@ -399,27 +399,44 @@ export const useGameStore = create<GameStore>()(
       consumeIdentity: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return { name: "無名幽影", story: "" };
+        
         set({ isPoolGenerating: true });
+        
         try {
           const usedIds = get().player.usedIdentityIds;
-          const { data: poolData, error: poolError } = await supabase.from('global_identities').select('*').limit(50);
+          
+          // ★ V2.9.2 優化：動態排除已使用名字，徹底解決無限呼叫 AI 造成的卡頓問題
+          let query = supabase.from('global_identities').select('*');
+          if (usedIds.length > 0) {
+             query = query.not('id', 'in', `(${usedIds.join(',')})`);
+          }
+          
+          const { data: poolData, error: poolError } = await query.limit(50);
           if (poolError) throw poolError;
-          const availableIdentities = (poolData || []).filter(d => !usedIds.includes(d.id));
+          
+          const availableIdentities = poolData || [];
           let identity = availableIdentities.length > 0 ? availableIdentities[0] : null;
+          
           if (!identity) {
              const newAiData = await fetchIdentityBatch(); 
              const { data: insertedData, error: insertError } = await supabase.from('global_identities').insert(newAiData).select();
              if (insertError) throw insertError;
              if (insertedData && insertedData.length > 0) identity = insertedData[0];
           }
+          
           if (!identity) throw new Error('AI 與資料庫雙重潰堤');
+          
           const { error: logError } = await supabase.from('user_identity_logs').insert({ user_id: session.user.id, identity_id: identity.id });
           if (logError) console.warn("［寫入紀錄失敗］", logError); 
+          
           const newUsedIds = [...get().player.usedIdentityIds, identity.id];
           set(s => ({ player: { ...s.player, usedIdentityIds: newUsedIds } }));
+          
           return { name: identity.name, story: identity.story || "" };
         } catch (e) {
-          console.error("［系統攔截］", e); return { name: "罪業之軀", story: "" };
+          console.error("［系統攔截］", e); 
+          // ★ V2.9.2 防禦：如果徹底潰堤，回傳預設代號，且這筆資料絕對不會被寫入 Supabase
+          return { name: `代號 ${Math.floor(Math.random() * 9000 + 1000)}`, story: "" };
         } finally {
           set({ isPoolGenerating: false });
         }
