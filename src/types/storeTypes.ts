@@ -1,4 +1,4 @@
-import { Slave, Player, Location, TimePhase, Race, Gender, Scene, SubView, CombatLog, ActiveWindow, CombatPlaybackData, Role } from './index';
+import { Slave, Player, Location, Race, Gender, Scene, SubView, CombatLog, ActiveWindow, CombatPlaybackData, Role } from './index';
 
 export interface Mission {
   id: string; title: string; rank: '黃金' | '紫色' | '蔚藍' | '翠綠';
