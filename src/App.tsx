@@ -20,7 +20,7 @@ import { ITEMS_DATA, getSlavePortraitUrl } from './utils/gameData';
 
 const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 
-// ★ V2.9.0 新增：動態 SVG 菱形雷達圖渲染引擎
+// ★ V2.9.0：動態 SVG 菱形雷達圖渲染引擎
 const renderRadar = (slave: Slave) => {
   const getP = (val: number, angleIndex: number, maxR = 40) => {
      // 五個頂點：0(頂), 72(右上), 144(右下), 216(左下), 288(左上)
@@ -205,7 +205,7 @@ function App() {
       
       <SystemPanel /> 
       <QuestPanel />
-      {/* ★ 確保這裡完整傳遞 onSelectSlave */}
+      {/* ★ 請確認此行確實帶有 onSelectSlave={setActiveSlave} 屬性 */}
       <SlavePanel onSelectSlave={setActiveSlave} />
       <CombatTheater /> 
 
