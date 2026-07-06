@@ -1,13 +1,13 @@
 import { StateCreator } from 'zustand';
 import { GameStore, ActiveDispatch } from '../../types/storeTypes';
-import { TimePhase } from '../../types';
+import { TimePhase, ActiveWindow, GlobalModal, CombatPlaybackData, Scene, SubView } from '../../types';
 import { GAME_CONSTANTS } from '../../utils/constants';
 import { supabase } from '../../services/supabaseClient';
 import { QUESTS_DATA } from '../../utils/gameData';
 import { generateDailyMissions, generateArenaNPCs } from '../../utils/generators';
 
 const TIME_PHASES: TimePhase[] = ['早上', '中午', '下午', '晚上', '深夜'];
-const DEFAULT_SHOP_STOCK = { 'potion_heal_small': 5, 'weapon_iron_sword': 1 }; 
+const DEFAULT_SHOP_STOCK: Record<string, number> = { 'potion_heal_small': 5, 'weapon_iron_sword': 1 }; 
 
 export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get) => ({
   arenaNPCs: generateArenaNPCs(),
@@ -23,14 +23,14 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
   _hasHydrated: false,
   activeCombat: null,
 
-  setActiveWindow: (win) => set({ activeWindow: win }),
-  setGlobalModal: (modal) => set({ globalModal: modal }),
-  setIsSaving: (val) => set({ isSaving: val }),
-  setHasHydrated: (val) => set({ _hasHydrated: val }),
-  setActiveCombat: (combat) => set({ activeCombat: combat }),
-  navigate: (scene, subView) => set({ currentScene: scene, currentSubView: subView }),
+  setActiveWindow: (win: ActiveWindow | null) => set({ activeWindow: win }),
+  setGlobalModal: (modal: GlobalModal | null) => set({ globalModal: modal }),
+  setIsSaving: (val: boolean) => set({ isSaving: val }),
+  setHasHydrated: (val: boolean) => set({ _hasHydrated: val }),
+  setActiveCombat: (combat: CombatPlaybackData | null) => set({ activeCombat: combat }),
+  navigate: (scene: Scene, subView: SubView) => set({ currentScene: scene, currentSubView: subView }),
 
-  triggerQuest: (questId) => set(state => {
+  triggerQuest: (questId: string) => set((state: GameStore) => {
     if (!state.player.quests[questId]) {
        const newQuests = { ...state.player.quests, [questId]: 'active' as const };
        const qData = QUESTS_DATA[questId as keyof typeof QUESTS_DATA];
@@ -85,7 +85,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
 
     if (!forceLoad && cloudVersion <= currentLocalVersion) { return; }
 
-    set((state) => ({
+    set((state: GameStore) => ({
       localSaveVersion: cloudVersion,
       player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor, shopStock: sData.shopStock || state.player.shopStock, leaderName: sData.leaderName || state.player.leaderName, leaderGender: sData.leaderGender || state.player.leaderGender, leaderStamina: sData.leaderStamina ?? state.player.leaderStamina ?? 100, leaderFaintTurns: sData.leaderFaintTurns ?? state.player.leaderFaintTurns ?? 0 },
       slaves: sData.slaves || state.slaves, marketSlaves: sData.marketSlaves || state.marketSlaves, activeDispatches: sData.activeDispatches || state.activeDispatches, activeEvent: sData.activeEvent || state.activeEvent,
@@ -104,7 +104,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
       if (currentStamina < 20) return;
       dirtinessReduction = 40;
       
-      set(s => ({
+      set((s: GameStore) => ({
         player: { 
           ...s.player, 
           leaderStamina: (s.player.leaderStamina ?? 100) - 20, 
@@ -118,7 +118,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
       const houseworkSkill = slave.isInjured ? Math.floor((slave.skills.housework || 1) * 0.5) : (slave.skills.housework || 1);
       dirtinessReduction = 20 + (houseworkSkill * 5); 
       
-      set(s => ({
+      set((s: GameStore) => ({
         slaves: s.slaves.map(sl => sl.id === workerId ? { ...sl, conditionStats: { ...sl.conditionStats, stamina: sl.conditionStats.stamina - 15 } } : sl),
         player: { ...s.player, roomDirtiness: Math.max(0, s.player.roomDirtiness - dirtinessReduction) }
       }));
@@ -127,7 +127,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
     get().processTurn();
   },
 
-  dispatchSlave: (slaveId, missionId) => {
+  dispatchSlave: (slaveId: string, missionId: string) => {
     const state = get(); const mission = state.dailyMissions.find(m => m.id === missionId); if (!mission) return;
     if (slaveId !== 'LEADER') {
       state.updateSlave(slaveId, { activityStatus: '外派中' });
@@ -135,7 +135,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
     set({ activeDispatches: [...state.activeDispatches, { slaveId, mission, remainingPhases: mission.requiredPhases }], dailyMissions: state.dailyMissions.filter(m => m.id !== missionId) });
   },
 
-  checkApRecovery: () => set((state) => {
+  checkApRecovery: () => set((state: GameStore) => {
     const { actionPoints, lastApUpdateTime } = state.player; if (actionPoints >= 50) return state;
     const now = Date.now(); const elapsed = now - lastApUpdateTime; const recoverAmount = Math.floor(elapsed / 60000); 
     if (recoverAmount > 0) { const newAp = Math.min(50, actionPoints + recoverAmount); return { player: { ...state.player, actionPoints: newAp, lastApUpdateTime: newAp === 50 ? now : lastApUpdateTime + (recoverAmount * 60000) } }; }
@@ -266,7 +266,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
     if (earnedFood > 0) get().addFood(earnedFood);
     set({ activeDispatches: newDispatches });
 
-    let newShopStock = { ...player.shopStock };
+    let newShopStock: Record<string, number> = { ...player.shopStock };
     let newArenaNPCs = state.arenaNPCs;
     
     let dailyLogs: string[] = [];
@@ -412,7 +412,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
 
       if (escapedNames.length > 0) {
          const actualStolen = Math.min(get().player.gold, totalStolenGold); const actualPrestigeLoss = Math.min(get().player.prestige, totalPrestigeLoss);
-         set(s => ({ player: { ...s.player, gold: Math.max(0, s.player.gold - actualStolen), prestige: Math.max(0, s.player.prestige - actualPrestigeLoss) } }));
+         set((s: GameStore) => ({ player: { ...s.player, gold: Math.max(0, s.player.gold - actualStolen), prestige: Math.max(0, s.player.prestige - actualPrestigeLoss) } }));
          dailyLogs.push(`［越獄成功］以下成員逃離據點：【${escapedNames.join('】、【')}】\n商會損失資金：$${actualStolen}，威望降低 ${actualPrestigeLoss} 點。`);
       }
 
@@ -433,7 +433,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
       set({ slaves: updatedSlaves });
     }
 
-    set(s => ({ 
+    set((s: GameStore) => ({ 
       player: { ...s.player, day: nextDay, timePhase: nextPhase, actionPoints: newAp, lastApUpdateTime: newApUpdateTime, roomDirtiness: newDirtiness, shopStock: newShopStock, leaderStamina, leaderFaintTurns: leaderFTurns }, 
       arenaNPCs: triggerDailySettlement ? newArenaNPCs : s.arenaNPCs 
     }));
