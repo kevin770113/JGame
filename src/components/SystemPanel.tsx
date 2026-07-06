@@ -13,6 +13,11 @@ export default function SystemPanel() {
   const isOpen = activeWindow === 'system';
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'cooldown'>('idle');
 
+  // ★ V2.9.2 新增：開發者除錯狀態
+  const [dbIdentities, setDbIdentities] = useState<{id: string, name: string}[]>([]);
+  const [isFetchingDb, setIsFetchingDb] = useState(false);
+  const [showDb, setShowDb] = useState(false);
+
   const handleToggle = () => {
     setActiveWindow(isOpen ? null : 'system');
   };
@@ -56,6 +61,36 @@ export default function SystemPanel() {
     });
   };
 
+  // ★ V2.9.2 新增：除錯功能 - 獲取資料庫全清單
+  const fetchDbIdentities = async () => {
+    setIsFetchingDb(true);
+    const { data, error } = await supabase.from('global_identities').select('id, name');
+    if (!error && data) {
+      setDbIdentities(data);
+      setShowDb(true);
+    }
+    setIsFetchingDb(false);
+  };
+
+  // ★ V2.9.2 新增：除錯功能 - 一鍵核爆清空資料庫
+  const handleClearDb = () => {
+    setGlobalModal({
+      title: '［☢️ 核爆警告：清空遠端資料庫］',
+      message: '此操作將徹底刪除 Supabase 中 global_identities 的所有資料，包含被污染的無名氏。\n\n若資料庫已被大量無效資料塞滿，強烈建議使用此功能清洗。確定要執行嗎？',
+      isConfirm: true,
+      action: async () => {
+         // Supabase API 限制 delete() 必須帶條件，所以我們用 neq 排除一個絕對不存在的名字，達成全刪除效果
+         const { error } = await supabase.from('global_identities').delete().neq('name', 'DELETE_ALL_TRIGGER_999');
+         if (!error) {
+           setDbIdentities([]);
+           setGlobalModal({ title: '［系統］', message: '遠端資料庫 global_identities 已徹底清空。接下來遇到缺人時，系統將重新呼叫 AI 乾淨生成。', isConfirm: false });
+         } else {
+           setGlobalModal({ title: '［系統錯誤］', message: `清除失敗: ${error.message}`, isConfirm: false });
+         }
+      }
+    });
+  };
+
   return (
     <>
       {/* 呼出按鈕：放置在右側，位於名單抽屜下方 */}
@@ -95,9 +130,9 @@ export default function SystemPanel() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 scrollbar-none">
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 scrollbar-none pb-12">
           
-          {/* 原功能還原：手動存檔 */}
+          {/* 手動存檔 */}
           <div className="bg-gray-900/80 p-3 rounded-lg border border-gray-800 flex flex-col gap-2.5 shadow-inner">
             <div className="flex flex-col gap-1">
               <span className="text-sm font-bold text-gray-300 tracking-widest">資料同步</span>
@@ -116,7 +151,7 @@ export default function SystemPanel() {
             </button>
           </div>
 
-          {/* 原功能還原：急救覆蓋 */}
+          {/* 急救覆蓋 */}
           <div className="bg-red-950/20 p-3 rounded-lg border border-red-900/30 flex flex-col gap-2.5 shadow-inner">
             <div className="flex flex-col gap-1">
               <span className="text-sm font-bold text-red-400 tracking-widest">系統急救：強制覆蓋</span>
@@ -132,7 +167,51 @@ export default function SystemPanel() {
 
           <div className="h-px bg-gray-800 my-1 w-full"></div>
 
-          {/* 原功能還原：四格按鈕，並優化適應側邊欄寬度 */}
+          {/* ★ V2.9.2 新增：開發者專屬除錯面板 */}
+          <div className="bg-purple-950/20 p-3 rounded-lg border border-purple-900/30 flex flex-col gap-2.5 shadow-inner mt-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-bold text-purple-400 tracking-widest flex items-center gap-1">
+                <span>🚧</span> 開發者除錯模式
+              </span>
+              <span className="text-xs text-purple-500/70">遠端資料庫全球總覽與操控</span>
+            </div>
+            
+            <div className="flex gap-2">
+              <button 
+                onClick={fetchDbIdentities}
+                disabled={isFetchingDb}
+                className="flex-1 py-2 bg-purple-900/50 hover:bg-purple-800 border border-purple-700 text-purple-300 rounded text-xs font-bold tracking-widest transition-colors shadow shrink-0 active:scale-95"
+              >
+                {isFetchingDb ? '讀取中...' : '［查看全資料］'}
+              </button>
+              <button 
+                onClick={handleClearDb}
+                className="flex-1 py-2 bg-blood-red/40 hover:bg-blood-red/70 border border-red-900 text-red-400 rounded text-xs font-bold tracking-widest transition-colors shadow shrink-0 active:scale-95"
+              >
+                ［一鍵核爆］
+              </button>
+            </div>
+
+            {/* 資料庫清單展開區塊 */}
+            {showDb && (
+               <div className="max-h-48 overflow-y-auto bg-black/60 p-2.5 rounded border border-purple-900/50 text-xs font-mono flex flex-col gap-1.5 scrollbar-none mt-1">
+                  {dbIdentities.length === 0 ? (
+                    <span className="text-gray-500 text-center py-2">［資料庫目前為空］</span>
+                  ) : (
+                    dbIdentities.map(d => (
+                       <div key={d.id} className="flex justify-between items-center border-b border-gray-800/80 pb-1.5 hover:bg-gray-900 px-1 rounded">
+                          <span className="text-gray-300 font-bold max-w-[100px] truncate">{d.name}</span>
+                          <span className="text-gray-600 text-[10px] truncate w-28 text-right">{d.id}</span>
+                       </div>
+                    ))
+                  )}
+               </div>
+            )}
+          </div>
+
+          <div className="h-px bg-gray-800 my-1 w-full"></div>
+
+          {/* 一般系統按鈕 */}
           <div className="grid grid-cols-2 gap-2">
             <button disabled className="py-2.5 bg-gray-900/40 border border-gray-800/50 text-gray-600 rounded text-xs font-bold tracking-widest cursor-not-allowed">
               ［改版日誌］
@@ -152,7 +231,7 @@ export default function SystemPanel() {
           </div>
           
           <div className="text-center mt-auto pt-4 pb-2">
-            <span className="text-gray-600 text-2xs tracking-widest font-mono">Dark Fantasy Trader v2.9.0</span>
+            <span className="text-gray-600 text-2xs tracking-widest font-mono">Dark Fantasy Trader v2.9.2</span>
           </div>
         </div>
       </div>
