@@ -1,16 +1,9 @@
 import { useGameStore } from '../store/useGameStore';
 
 export default function BaseView() {
-  const { location, roomDirtiness, gold, leaderStamina, leaderFaintTurns } = useGameStore((state) => state.player);
-  const activeDispatches = useGameStore(state => state.activeDispatches);
-  const cleanRoom = useGameStore((state) => state.cleanRoom);
+  const { location, roomDirtiness } = useGameStore((state) => state.player);
   const navigate = useGameStore((state) => state.navigate);
   
-  // 首領狀態判定
-  const isLeaderDispatched = activeDispatches.some(d => d.slaveId === 'LEADER');
-  const canLeaderClean = leaderStamina >= 20 && leaderFaintTurns === 0 && !isLeaderDispatched;
-  const canOutsourceClean = gold >= 50;
-
   const getLocationName = () => {
     switch (location) {
       case 'Frontlines': return '混亂前線邊境大廳';
@@ -27,38 +20,15 @@ export default function BaseView() {
         <p className="text-xs text-gray-400 mt-1">商會的核心調度中樞，掌控所有內部設施與據點動態。</p>
       </div>
 
-      <div className="flex-1 min-h-[150px] flex flex-col justify-center items-center">
+      <div className="flex-1 min-h-[150px] flex flex-col items-center">
         {roomDirtiness > 50 && (
           <div className="p-3 bg-red-950/40 border border-red-900/60 rounded text-xs text-red-400 leading-relaxed animate-pulse tracking-wide backdrop-blur-xs my-4 w-full max-w-sm text-center">
-            ［環境惡化］據點的髒亂度已達危險臨界點，成員壓力與反抗心正在急劇飆升。
-          </div>
-        )}
-
-        {/* ★ V2.9.4 雙軌打掃制：首領親自下海或花錢消災 */}
-        {roomDirtiness > 0 && (
-          <div className="flex flex-col gap-2 w-full max-w-sm mt-4">
-            <button
-              onClick={() => cleanRoom(true)}
-              disabled={!canLeaderClean}
-              className={`py-3 rounded border font-bold text-xs tracking-widest shadow transition-colors ${
-                canLeaderClean ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-500' : 'bg-gray-900 text-gray-600 border-gray-800 cursor-not-allowed'
-              }`}
-            >
-              ［首領親自打掃 (消耗 20 體力)］
-            </button>
-            <button
-              onClick={() => cleanRoom(false)}
-              disabled={!canOutsourceClean}
-              className={`py-3 rounded border font-bold text-xs tracking-widest shadow transition-colors ${
-                canOutsourceClean ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-500' : 'bg-gray-900 text-gray-600 border-gray-800 cursor-not-allowed'
-              }`}
-            >
-              ［外包清潔 (消耗 $50)］
-            </button>
+            ［系統警告］環境過於髒亂！成員睡眠恢復效率已大打折扣。請儘速指派人員進行整頓打掃。
           </div>
         )}
       </div>
 
+      {/* ★ V2.9.5 將家政獨立，並放大佈局 */}
       <div className="grid grid-cols-2 gap-3 w-full max-w-sm mx-auto mt-6">
         <button
           onClick={() => navigate('Home', 'Interaction')}
@@ -79,10 +49,16 @@ export default function BaseView() {
           ［遷移系統］
         </button>
         <button
-          onClick={() => navigate('Town', 'Main')}
+          onClick={() => navigate('Home', 'Housekeeping')}
           className="py-4 sm:py-5 bg-gray-900 hover:bg-gray-800 border border-gray-700 rounded-lg text-gray-300 font-bold text-sm tracking-widest shadow-lg transition-transform active:scale-95 flex items-center justify-center"
         >
-          ［外出城鎮］
+          ［家政管理］
+        </button>
+        <button
+          onClick={() => navigate('Town', 'Main')}
+          className="col-span-2 py-4 sm:py-5 bg-blood-red/90 hover:bg-red-700 border border-red-900 rounded-lg text-white font-bold text-sm tracking-widest shadow-lg transition-transform active:scale-95 flex items-center justify-center"
+        >
+          ［ 外 出 ］
         </button>
       </div>
     </div>
