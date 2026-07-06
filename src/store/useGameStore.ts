@@ -217,7 +217,7 @@ const generateBaseMarketSlave = (idSuffix: string, identity: {name: string, stor
     },
     conditionStats: { stamina: 100, stress: 0, rebellion: Math.floor(Math.random() * 20) },
     traits: [], 
-    backgroundStory: "", // ★ V2.9.1 徹底拔除列傳，賦予空字串保持資料庫相容性
+    backgroundStory: "", // ★ V2.9.1 徹底拔除列傳
     combatRecord: { wins: 0, losses: 0 },
     isInjured: false
   };
@@ -735,8 +735,7 @@ export const useGameStore = create<GameStore>()(
         const survivalSkill = slave.isInjured ? Math.floor((slave.skills?.survival || 1) * 0.5) : (slave.skills?.survival || 1);
 
         const sLuck = slave.primaryStats.luck ?? 10;
-        const sCharisma = slave.primaryStats.charisma ?? 10;
-
+        
         let sHpMax = Math.floor(enduranceStat * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
         let sAtk = combatStat + weaponAtk; let sDef = Math.floor(enduranceStat * 0.5 + survivalSkill * 2); let sSpd = intelligenceStat;
         let sDmgMulti = 1 + (combatSkill * 0.05); let sDmgReduc = combatSkill * 0.03;
@@ -886,8 +885,7 @@ export const useGameStore = create<GameStore>()(
         const survivalSkill = slave.isInjured ? Math.floor((slave.skills?.survival || 1) * 0.5) : (slave.skills?.survival || 1);
 
         const sLuck = slave.primaryStats.luck ?? 10;
-        const sCharisma = slave.primaryStats.charisma ?? 10;
-
+        
         let sHpMax = Math.floor(enduranceStat * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
         let sAtk = combatStat + weaponAtk; let sDef = Math.floor(enduranceStat * 0.5 + survivalSkill * 2); let sSpd = intelligenceStat;
         let sDmgMulti = 1 + (combatSkill * 0.05); let sDmgReduc = combatSkill * 0.03;
