@@ -2,9 +2,10 @@ import { Slave } from '../types';
 
 export type ItemType = 'potion' | 'weapon';
 
+// ★ V2.9.0 重構：古代英靈全面五維化（符合歷史人設）
 export const HEROES_DATA = [
-  { floor: 5, name: '狂戰士・斯巴達克斯', stats: { hp: 1000, attack: 80, defense: 40, speed: 50 }, quote: '血...我要更多的血！', rewardGold: 3000, rewardPrestige: 50 },
-  { floor: 10, name: '深淵暴君・項羽', stats: { hp: 3000, attack: 150, defense: 80, speed: 70 }, quote: '力拔山兮氣蓋世！', rewardGold: 10000, rewardPrestige: 200 }
+  { floor: 5, name: '狂戰士・斯巴達克斯', stats: { combat: 90, endurance: 90, intelligence: 30, charisma: 70, luck: 60 }, quote: '血...我要更多的血！', rewardGold: 3000, rewardPrestige: 50 },
+  { floor: 10, name: '深淵暴君・項羽', stats: { combat: 160, endurance: 110, intelligence: 65, charisma: 95, luck: 10 }, quote: '力拔山兮氣蓋世！', rewardGold: 10000, rewardPrestige: 200 }
 ];
 
 export const QUESTS_DATA = {
@@ -18,7 +19,6 @@ export const ITEMS_DATA: Record<string, { name: string, type: ItemType, effect: 
   'weapon_iron_sword': { name: '精鋼長劍', type: 'weapon', effect: { attack: 10 }, price: 2000, desc: '標準的步兵武器，戰鬥時武力判定 +10。' },
 };
 
-// ★ V2.8.1 新增：立繪網址生成器 (使用 djb2 Hash 演算法確保唯一性與平均分配)
 export const getSlavePortraitUrl = (slave: Slave): string => {
   const RACE_MAP: Record<string, string> = {
     '人類': 'human',
