@@ -216,7 +216,8 @@ const generateBaseMarketSlave = (idSuffix: string, identity: {name: string, stor
       luck: Math.floor(Math.random() * 80) + 10
     },
     conditionStats: { stamina: 100, stress: 0, rebellion: Math.floor(Math.random() * 20) },
-    traits: [], backgroundStory: identity.story,
+    traits: [], 
+    backgroundStory: "", // ★ V2.9.1 徹底拔除列傳，賦予空字串保持資料庫相容性
     combatRecord: { wins: 0, losses: 0 },
     isInjured: false
   };
@@ -397,7 +398,7 @@ export const useGameStore = create<GameStore>()(
 
       consumeIdentity: async () => {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return { name: "無名幽影", story: "未與深淵建立正式連結的幻影。" };
+        if (!session) return { name: "無名幽影", story: "" };
         set({ isPoolGenerating: true });
         try {
           const usedIds = get().player.usedIdentityIds;
@@ -416,9 +417,9 @@ export const useGameStore = create<GameStore>()(
           if (logError) console.warn("［寫入紀錄失敗］", logError); 
           const newUsedIds = [...get().player.usedIdentityIds, identity.id];
           set(s => ({ player: { ...s.player, usedIdentityIds: newUsedIds } }));
-          return { name: identity.name, story: identity.story };
+          return { name: identity.name, story: identity.story || "" };
         } catch (e) {
-          console.error("［系統攔截］", e); return { name: "罪業之軀", story: "來自深淵的亂碼碎片。" };
+          console.error("［系統攔截］", e); return { name: "罪業之軀", story: "" };
         } finally {
           set({ isPoolGenerating: false });
         }
@@ -734,6 +735,7 @@ export const useGameStore = create<GameStore>()(
         const survivalSkill = slave.isInjured ? Math.floor((slave.skills?.survival || 1) * 0.5) : (slave.skills?.survival || 1);
 
         const sLuck = slave.primaryStats.luck ?? 10;
+        const sCharisma = slave.primaryStats.charisma ?? 10;
 
         let sHpMax = Math.floor(enduranceStat * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
         let sAtk = combatStat + weaponAtk; let sDef = Math.floor(enduranceStat * 0.5 + survivalSkill * 2); let sSpd = intelligenceStat;
@@ -884,6 +886,7 @@ export const useGameStore = create<GameStore>()(
         const survivalSkill = slave.isInjured ? Math.floor((slave.skills?.survival || 1) * 0.5) : (slave.skills?.survival || 1);
 
         const sLuck = slave.primaryStats.luck ?? 10;
+        const sCharisma = slave.primaryStats.charisma ?? 10;
 
         let sHpMax = Math.floor(enduranceStat * 5); let sHp = Math.floor(sHpMax * (slave.conditionStats.stamina / 100));
         let sAtk = combatStat + weaponAtk; let sDef = Math.floor(enduranceStat * 0.5 + survivalSkill * 2); let sSpd = intelligenceStat;
