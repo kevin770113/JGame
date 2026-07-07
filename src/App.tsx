@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import BaseView from './views/BaseView';
-import TownMainView from './views/TownMainView'; // ★ V2.9.8 新增街道場景
+import TownMainView from './views/TownMainView'; 
 import MarketView from './views/MarketView';
 import BreedingView from './views/BreedingView'; 
 import DispatchView from './views/DispatchView'; 
@@ -22,7 +22,6 @@ import { ITEMS_DATA, getSlavePortraitUrl } from './utils/gameData';
 
 const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 
-// (保留既有 renderRadar)
 const renderRadar = (slave: Slave) => {
   const getP = (val: number, angleIndex: number, maxR = 40) => {
      const angle = (angleIndex * 72 - 90) * (Math.PI / 180);
@@ -89,7 +88,6 @@ function App() {
 
   const [slaveTab, setSlaveTab] = useState<'ability' | 'status'>('ability');
   
-  // ★ V2.9.8 競技小抽屜狀態
   const [showCombatDrawer, setShowCombatDrawer] = useState(false);
 
   useEffect(() => {
@@ -161,7 +159,7 @@ function App() {
       }
     } else {
       switch (currentSubView) {
-        case 'TownMain': return <TownMainView />; // ★ V2.9.8 新增街道入口
+        case 'TownMain': return <TownMainView />; 
         case 'Tavern': return <DispatchView />;
         case 'Arena': return <ArenaView />; 
         case 'Abyss': return <AbyssView />; 
@@ -173,24 +171,24 @@ function App() {
     }
   };
 
-  // ★ V2.9.8 底部全域導航列淨化 (移除 Emoji、安全高度防擋)
+  // ★ V2.9.9 導航列字體全面放大 (text-sm font-bold)
   const renderBottomNav = () => {
     if (currentScene === 'Home') {
       return (
         <div className="fixed bottom-0 left-0 right-0 h-16 sm:h-18 pb-safe pt-1 bg-gray-950 border-t border-gray-800 flex items-center justify-around px-1 z-40 shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
-          <button onClick={() => navigate('Home', 'Interaction')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Interaction' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">互動</span></button>
-          <button onClick={() => navigate('Home', 'Room')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Room' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">育成</span></button>
-          <button onClick={() => navigate('Home', 'Map')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Map' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">遷移</span></button>
-          <button onClick={() => navigate('Home', 'Housekeeping')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Housekeeping' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">家政</span></button>
-          <button onClick={() => navigate('Town', 'TownMain')} className="flex flex-col items-center justify-center w-1/5 h-full text-blood-red/80 hover:text-blood-red transition-colors"><span className="text-xs tracking-widest font-bold">外出</span></button>
+          <button onClick={() => navigate('Home', 'Interaction')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Interaction' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-sm font-bold tracking-widest">互動</span></button>
+          <button onClick={() => navigate('Home', 'Room')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Room' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-sm font-bold tracking-widest">育成</span></button>
+          <button onClick={() => navigate('Home', 'Map')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Map' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-sm font-bold tracking-widest">遷移</span></button>
+          <button onClick={() => navigate('Home', 'Housekeeping')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Housekeeping' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-sm font-bold tracking-widest">家政</span></button>
+          <button onClick={() => navigate('Town', 'TownMain')} className="flex flex-col items-center justify-center w-1/5 h-full text-blood-red/80 hover:text-blood-red transition-colors"><span className="text-sm font-bold tracking-widest">外出</span></button>
         </div>
       );
     } else {
       return (
         <div className="fixed bottom-0 left-0 right-0 h-16 sm:h-18 pb-safe pt-1 bg-gray-950 border-t border-gray-800 flex items-center justify-around px-1 z-40 shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
-          <button onClick={() => navigate('Town', 'TownMain')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'TownMain' || currentSubView === 'Main' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">街道</span></button>
-          <button onClick={() => navigate('Town', 'Market')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Market' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">市集</span></button>
-          <button onClick={() => navigate('Town', 'Tavern')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Tavern' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">酒館</span></button>
+          <button onClick={() => navigate('Town', 'TownMain')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'TownMain' || currentSubView === 'Main' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-sm font-bold tracking-widest">街道</span></button>
+          <button onClick={() => navigate('Town', 'Market')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Market' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-sm font-bold tracking-widest">市集</span></button>
+          <button onClick={() => navigate('Town', 'Tavern')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Tavern' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-sm font-bold tracking-widest">酒館</span></button>
           <button onClick={() => {
               if (location === 'Capital') {
                 setShowCombatDrawer(true);
@@ -198,8 +196,8 @@ function App() {
                 navigate('Town', 'Arena');
               }
             }} 
-            className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Arena' || currentSubView === 'Abyss' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">競技</span></button>
-          <button onClick={() => navigate('Home', 'Main')} className={`flex flex-col items-center justify-center w-1/5 h-full text-blood-red/80 hover:text-blood-red transition-colors`}><span className="text-xs tracking-widest font-bold">返回</span></button>
+            className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Arena' || currentSubView === 'Abyss' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-sm font-bold tracking-widest">競技</span></button>
+          <button onClick={() => navigate('Home', 'Main')} className={`flex flex-col items-center justify-center w-1/5 h-full text-blood-red/80 hover:text-blood-red transition-colors`}><span className="text-sm font-bold tracking-widest">返回</span></button>
         </div>
       );
     }
@@ -228,7 +226,6 @@ function App() {
 
       {renderBottomNav()}
 
-      {/* ★ V2.9.8 競技多功能小抽屜 */}
       {showCombatDrawer && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end animate-fade-in">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setShowCombatDrawer(false)}></div>
