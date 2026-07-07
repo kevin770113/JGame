@@ -64,10 +64,9 @@ export default function BreedingView() {
       return Math.max(1, Math.min(100, base + mutation));
     };
 
-    const childRace = p1.race; 
+    const childRace = p1.race;
     const childGender: Gender = Math.random() > 0.5 ? 'Male' : 'Female';
     const childId = 'child-' + Math.random().toString(36).substring(2, 9);
-
     const aiData = await consumeIdentity();
     
     const genderSuffix = childGender === 'Male' ? '之子' : '之女';
@@ -88,13 +87,16 @@ export default function BreedingView() {
         endurance: calcStat(p1.primaryStats.endurance, p2.primaryStats.endurance),
         intelligence: calcStat(p1.primaryStats.intelligence, p2.primaryStats.intelligence),
         obedience: calcStat(p1.primaryStats.obedience, p2.primaryStats.obedience),
+        // ★ V2.9.10 補齊魅力與幸運的遺傳計算
+        charisma: calcStat(p1.primaryStats.charisma ?? 10, p2.primaryStats.charisma ?? 10),
+        luck: calcStat(p1.primaryStats.luck ?? 10, p2.primaryStats.luck ?? 10),
       },
       conditionStats: { stamina: 100, stress: 0, rebellion: 0 },
       traits: [],
       backgroundStory: `［密室誕生］${fatherName} 與 ${motherName} ${genderSuffix}。${aiData.story}`,
       parents: { fatherId: p1.gender === 'Male' ? p1.id : p2.id, motherId: p1.gender === 'Female' ? p1.id : p2.id },
-      combatRecord: { wins: 0, losses: 0 }, // ★ V2.3 初始化戰鬥紀錄
-      isInjured: false // ★ V2.3 初始化負傷狀態
+      combatRecord: { wins: 0, losses: 0 }, 
+      isInjured: false 
     };
 
     addSlave(newChild);
@@ -104,8 +106,6 @@ export default function BreedingView() {
   };
 
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
-  
-  // ★ V2.3 動態防呆篩選邏輯
   const alphaSlave = slaves.find(s => s.id === alphaId);
 
   const alphaOptions: Option[] = idleSlaves.map(s => ({
@@ -149,7 +149,6 @@ export default function BreedingView() {
 
         <div className="flex flex-col gap-1.5 mt-2">
           <label className="text-xs text-gray-400 font-bold tracking-widest">［注入試驗體 Alpha］</label>
-          {/* 選擇 Alpha 時，清空 Beta */}
           <CustomSelect options={alphaOptions} value={alphaId} onChange={(val) => { setAlphaId(val); setBetaId(''); }} focusColor="gray" />
         </div>
 
