@@ -6,6 +6,8 @@ type DispatchCandidate = {
   isLeader: boolean;
   name: string;
   stamina: number;
+  stress: number;
+  obedience: number;
   combat: number;
   intelligence: number;
   isInjured: boolean;
@@ -37,12 +39,14 @@ export default function DispatchView() {
   if (isLeaderIdle) {
     candidates.push({
       id: 'LEADER', isLeader: true, name: leaderName, stamina: safeLeaderStamina,
+      stress: 0, obedience: 100, // 首領無壓力與服從度問題
       combat: 25, intelligence: 45, isInjured: false, faintTurns: 0, race: '人類(首領)', gender: leaderGender
     });
   }
   idleSlaves.forEach(s => {
     candidates.push({
       id: s.id, isLeader: false, name: s.name, stamina: s.conditionStats.stamina,
+      stress: s.conditionStats.stress, obedience: s.primaryStats.obedience,
       combat: s.primaryStats.combat, intelligence: s.primaryStats.intelligence,
       isInjured: s.isInjured, faintTurns: s.faintTurns || 0, race: s.race, gender: s.gender
     });
@@ -76,6 +80,15 @@ export default function DispatchView() {
   const prevCarousel = () => setCarouselIndex(prev => (prev === 0 ? candidates.length - 1 : prev - 1));
   const nextCarousel = () => setCarouselIndex(prev => (prev === candidates.length - 1 ? 0 : prev + 1));
 
+  const getObedienceBonus = (rank: string) => {
+    switch (rank) {
+      case '黃金': return '+5';
+      case '紫色': return '+3';
+      case '蔚藍': return '+2';
+      default: return '+1';
+    }
+  };
+
   return (
     <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in relative z-10">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2 shrink-0">
@@ -93,7 +106,7 @@ export default function DispatchView() {
         </div>
       )}
 
-      {/* 第一段：懸賞任務卡牌清單 (直立式 3:4 橫向滑動) */}
+      {/* 第一段：懸賞任務卡牌清單 (直立式解放高度) */}
       <div className="flex flex-col gap-2 shrink-0">
         <h3 className="text-sm font-bold text-gray-400 border-l-2 border-blood-red pl-2 tracking-widest">［今日懸賞佈告欄］</h3>
         
@@ -117,41 +130,53 @@ export default function DispatchView() {
                 <button
                   key={mission.id}
                   onClick={() => setSelectedMissionId(mission.id)}
-                  className={`relative w-[180px] sm:w-[200px] aspect-[3/4] shrink-0 snap-center rounded-xl p-3 flex flex-col justify-between border transition-all duration-300 text-left overflow-hidden ${
+                  className={`relative w-[240px] sm:w-[260px] h-[340px] shrink-0 snap-center rounded-xl p-4 flex flex-col justify-between border transition-all duration-300 text-left overflow-hidden ${
                     isSelected 
                       ? `border-gray-300 bg-gray-800 shadow-[0_0_20px_rgba(255,255,255,0.15)] transform scale-[1.03]` 
                       : `border-gray-800 hover:border-gray-600 bg-gray-900/90 opacity-80 hover:opacity-100 ${colorClass}`
                   }`}
                 >
                   {/* 懸賞階級與報酬 */}
-                  <div className="flex justify-between items-center border-b border-gray-800/50 pb-2">
-                    <span className="text-3xs font-bold tracking-widest">{mission.rank}級委託</span>
-                    <span className="text-yellow-500 font-mono text-sm font-black">${mission.reward}</span>
+                  <div className="flex justify-between items-center border-b border-gray-800/50 pb-2 shrink-0">
+                    <span className="text-xs font-bold tracking-widest">{mission.rank}級委託</span>
+                    <span className="text-yellow-500 font-mono text-base font-black">${mission.reward}</span>
                   </div>
 
-                  {/* 標題與內文 (防溢出設計) */}
-                  <div className="flex-1 py-3 flex flex-col gap-1.5 overflow-hidden">
-                    <h4 className={`text-sm font-bold leading-snug ${isSelected ? 'text-white' : 'text-gray-200'}`}>
+                  {/* 標題與內文 (解放高度，改為可滑動) */}
+                  <div className="flex-1 py-3 flex flex-col gap-2 overflow-y-auto scrollbar-none border-b border-transparent">
+                    <h4 className={`text-sm sm:text-base font-bold leading-snug ${isSelected ? 'text-white' : 'text-gray-200'}`}>
                       {mission.title}
                     </h4>
-                    <p className="text-xs text-gray-500 leading-relaxed overflow-hidden break-words line-clamp-3">
+                    <p className="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap">
                       「{mission.description}」
                     </p>
                   </div>
 
-                  {/* 消耗資訊面板 (內聚設計) */}
-                  <div className="grid grid-cols-3 gap-1 border-t border-gray-800/50 pt-2 bg-gray-950/40 -mx-3 -mb-3 px-3 pb-3 rounded-b-xl">
-                    <div className="flex flex-col items-center">
-                       <span className="text-[9px] text-gray-500 font-bold mb-0.5">時段</span>
-                       <span className="font-mono text-gray-300 font-bold text-xs">{mission.requiredPhases}</span>
+                  {/* ★ V2.9.9 擴充五大情報網格 */}
+                  <div className="flex flex-col gap-1 border-t border-gray-800/50 pt-3 bg-gray-950/60 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl shrink-0">
+                    <div className="grid grid-cols-3 gap-1 mb-1">
+                      <div className="flex flex-col items-center">
+                         <span className="text-[10px] text-gray-500 font-bold mb-0.5">時段</span>
+                         <span className="font-mono text-gray-300 font-bold text-xs">{mission.requiredPhases}</span>
+                      </div>
+                      <div className="flex flex-col items-center border-x border-gray-800/50">
+                         <span className="text-[10px] text-gray-500 font-bold mb-0.5">體力</span>
+                         <span className="font-mono text-red-400 font-bold text-xs">-{mission.staminaCost}</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                         <span className="text-[10px] text-gray-500 font-bold mb-0.5">壓力</span>
+                         <span className="font-mono text-yellow-500 font-bold text-xs">+{mission.stressGain}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-center border-x border-gray-800/50">
-                       <span className="text-[9px] text-gray-500 font-bold mb-0.5">體力</span>
-                       <span className="font-mono text-red-400 font-bold text-xs">-{mission.staminaCost}</span>
-                    </div>
-                    <div className="flex flex-col items-center">
-                       <span className="text-[9px] text-gray-500 font-bold mb-0.5">壓力</span>
-                       <span className="font-mono text-yellow-500 font-bold text-xs">+{mission.stressGain}</span>
+                    <div className="grid grid-cols-2 gap-1 border-t border-gray-800/50 pt-2">
+                      <div className="flex justify-between items-center px-1 border-r border-gray-800/50 pr-2">
+                         <span className="text-[10px] text-gray-500 font-bold">服從度</span>
+                         <span className="font-mono text-blue-400 font-bold text-xs">{getObedienceBonus(mission.rank)}</span>
+                      </div>
+                      <div className="flex justify-between items-center px-1 pl-2">
+                         <span className="text-[10px] text-gray-500 font-bold">成功率</span>
+                         <span className="font-mono text-purple-400 font-bold text-xs">視執行者</span>
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -182,7 +207,7 @@ export default function DispatchView() {
       {isSelectingSlave && selectedMission && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-fade-in">
           
-          <div className="text-center mb-6 z-[110]">
+          <div className="text-center mb-4 z-[110]">
              <h3 className="text-xl font-bold text-gray-200 mb-2 tracking-widest">指派執行者</h3>
              <p className="text-xs text-red-400 font-bold bg-red-950/40 px-3 py-1.5 rounded-full border border-red-900/50 inline-block">
                此委託將強制消耗 <span className="text-base">{selectedMission.staminaCost}</span> 點體力
@@ -191,8 +216,8 @@ export default function DispatchView() {
 
           <div className="w-full max-w-lg relative flex flex-col items-center z-[110]">
              
-            {/* 3D 輪播區塊 */}
-            <div className="flex items-center justify-center w-full h-[240px] relative overflow-hidden perspective-1000 pointer-events-none">
+            {/* ★ V2.9.9 拉高 3D 輪播區塊以容納更多進度條 */}
+            <div className="flex items-center justify-center w-full h-[320px] relative overflow-hidden perspective-1000 pointer-events-none">
               {candidates.map((cand, index) => {
                 const diff = index - carouselIndex;
                 const isCenter = diff === 0;
@@ -234,32 +259,59 @@ export default function DispatchView() {
                       {cand.isLeader && <span className="text-4xs px-1.5 py-0.5 bg-yellow-900/40 border border-yellow-700/50 text-yellow-500 font-bold rounded">首領</span>}
                     </div>
 
-                    <div className="flex-1 flex flex-col justify-center gap-2 text-xs">
-                       <div className="flex justify-between items-center bg-gray-950 p-2 rounded border border-gray-800">
-                          <span className="text-gray-500 text-3xs font-bold">武力</span>
-                          <span className="text-red-400 font-bold font-mono">{cand.combat}</span>
+                    {/* ★ V2.9.9 情報補齊：武力、智力、體力、壓力、服從度 */}
+                    <div className="flex-1 flex flex-col justify-center gap-2.5 text-xs mt-2">
+                       <div className="grid grid-cols-2 gap-2 mb-1">
+                         <div className="flex justify-between items-center bg-gray-950 p-1.5 rounded border border-gray-800">
+                            <span className="text-gray-500 text-3xs font-bold">武力</span>
+                            <span className="text-red-400 font-bold font-mono">{cand.combat}</span>
+                         </div>
+                         <div className="flex justify-between items-center bg-gray-950 p-1.5 rounded border border-gray-800">
+                            <span className="text-gray-500 text-3xs font-bold">智力</span>
+                            <span className="text-blue-400 font-bold font-mono">{cand.intelligence}</span>
+                         </div>
                        </div>
-                       <div className="flex justify-between items-center bg-gray-950 p-2 rounded border border-gray-800">
-                          <span className="text-gray-500 text-3xs font-bold">智力</span>
-                          <span className="text-blue-400 font-bold font-mono">{cand.intelligence}</span>
-                       </div>
-                    </div>
 
-                    <div className="w-full flex flex-col gap-1 mt-2">
-                      <div className="flex justify-between text-4xs text-gray-500">
-                        <span>當前體力</span>
-                        <span className={isStaminaInsufficient ? 'text-red-500 font-bold font-mono' : 'font-mono text-green-400'}>{cand.stamina}/100</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-gray-950 rounded-full overflow-hidden border border-gray-800">
-                         <div className={`h-full transition-all duration-300 ${isStaminaInsufficient ? 'bg-red-600' : 'bg-green-600'}`} style={{ width: `${cand.stamina}%` }}></div>
-                      </div>
+                       <div className="w-full flex flex-col gap-1">
+                         <div className="flex justify-between text-[10px] text-gray-400 font-bold">
+                           <span>體力 (Stamina)</span>
+                           <span className={isStaminaInsufficient ? 'text-red-500 font-bold font-mono' : 'font-mono text-green-400'}>{cand.stamina}/100</span>
+                         </div>
+                         <div className="w-full h-1.5 bg-gray-950 rounded-full overflow-hidden border border-gray-800">
+                            <div className={`h-full transition-all duration-300 ${isStaminaInsufficient ? 'bg-red-600' : 'bg-green-600'}`} style={{ width: `${cand.stamina}%` }}></div>
+                         </div>
+                       </div>
+
+                       {!cand.isLeader && (
+                         <div className="w-full flex flex-col gap-1">
+                           <div className="flex justify-between text-[10px] text-gray-400 font-bold">
+                             <span>壓力 (Stress)</span>
+                             <span className="text-yellow-500 font-mono">{cand.stress}/100</span>
+                           </div>
+                           <div className="w-full h-1.5 bg-gray-950 rounded-full overflow-hidden border border-gray-800">
+                              <div className="h-full bg-yellow-600 transition-all duration-300" style={{ width: `${cand.stress}%` }}></div>
+                           </div>
+                         </div>
+                       )}
+
+                       {!cand.isLeader && (
+                         <div className="w-full flex flex-col gap-1">
+                           <div className="flex justify-between text-[10px] text-gray-400 font-bold">
+                             <span>服從度 (Obedience)</span>
+                             <span className="text-blue-400 font-mono">{cand.obedience}/100</span>
+                           </div>
+                           <div className="w-full h-1.5 bg-gray-950 rounded-full overflow-hidden border border-gray-800">
+                              <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${cand.obedience}%` }}></div>
+                           </div>
+                         </div>
+                       )}
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="flex gap-8 mt-5 z-[110] relative">
+            <div className="flex gap-8 mt-4 z-[110] relative">
               <button onClick={prevCarousel} className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors active:scale-95 shadow-md cursor-pointer">
                 〈 上一位
               </button>
@@ -274,18 +326,17 @@ export default function DispatchView() {
               </div>
             )}
 
-            {/* ★ V2.9.8 補齊安全退出與指派的並排按鈕 */}
             <div className="w-full flex gap-3 mt-6 z-[110]">
               <button 
                 onClick={() => setIsSelectingSlave(false)}
-                className="flex-1 py-3.5 rounded border bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-600 font-bold text-sm tracking-widest shadow-lg transition-all"
+                className="flex-1 py-3.5 rounded-lg border bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-600 font-bold text-sm tracking-widest shadow-lg transition-all"
               >
                 ［取消］
               </button>
               <button 
                 onClick={handleDispatch}
                 disabled={!activeCandidate || activeCandidate.stamina < selectedMission.staminaCost}
-                className={`flex-1 py-3.5 rounded border font-bold text-sm tracking-widest shadow-xl transition-all ${
+                className={`flex-1 py-3.5 rounded-lg border font-bold text-sm tracking-widest shadow-xl transition-all ${
                   !activeCandidate || activeCandidate.stamina < selectedMission.staminaCost
                     ? 'bg-gray-900 text-gray-600 border-gray-800 cursor-not-allowed'
                     : 'bg-blood-red/80 hover:bg-blood-red text-white border-red-900 hover:scale-[1.02]'
