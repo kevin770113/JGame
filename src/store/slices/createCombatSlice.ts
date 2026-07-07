@@ -142,7 +142,7 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
       logs.push({ round: round - 1, message: `［結算］${slave.name} 遭受重創倒地，體力耗盡並陷入【負傷】狀態！`, type: 'system', sHp, nHp });
     }
 
-    set((s: GameStore) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
+    // ★ V2.9.10 移除手動扣減 actionPoints 與 processTurn，交由 View 統一推進時段
     let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
     if (slave.race !== '不死族') {
       newStress = Math.min(100, newStress + (isWin ? 5 : 15)); newRebellion = Math.min(100, newRebellion + (isWin ? 2 : 10));
@@ -159,7 +159,7 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
     };
     set({ activeCombat: playbackData });
 
-    get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
+    get().syncProfileToCloud(); return { logs, isWin };
   },
 
   executeAbyssBattle: (slaveId: string) => {
@@ -287,7 +287,7 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
       logs.push({ round: round - 1, message: `［結算］${slave.name} 不支倒地，被深淵無情吞噬並陷入【負傷】狀態！`, type: 'system', sHp, nHp });
     }
 
-    set((s: GameStore) => ({ player: { ...s.player, actionPoints: s.player.actionPoints - 1 } }));
+    // ★ V2.9.10 移除手動扣減 actionPoints 與 processTurn，交由 View 統一推進時段
     let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
     if (slave.race !== '不死族') {
       newStress = Math.min(100, newStress + (isWin ? 10 : 25)); newRebellion = Math.min(100, newRebellion + (isWin ? 5 : 15));
@@ -304,6 +304,6 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
     };
     set({ activeCombat: playbackData });
 
-    get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
+    get().syncProfileToCloud(); return { logs, isWin };
   }
 });
