@@ -77,18 +77,26 @@ export default function CombatTheater() {
     }
   };
 
+  // ★ V2.9.11 名字長度自適應算式與安全上限鎖定
+  const sNameLong = activeCombat.slaveName.length > 8;
+  const sNameClass = sNameLong 
+    ? "text-sm md:text-base tracking-normal leading-tight whitespace-nowrap" 
+    : "text-base md:text-xl tracking-widest leading-snug whitespace-nowrap";
+
+  const nNameLong = activeCombat.npcName.length > 8;
+  const nNameClass = nNameLong 
+    ? "text-sm md:text-base tracking-normal leading-tight text-right whitespace-nowrap" 
+    : "text-base md:text-xl tracking-widest leading-snug text-right whitespace-nowrap";
+
   return (
     <div className="fixed inset-0 z-[100] bg-black bg-[url('https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/bg-abyss-capital.webp')] bg-cover bg-center bg-no-repeat flex flex-col animate-fade-in overflow-hidden select-none font-mono">
       
-      {/* 1. 基礎環境暗度 */}
       <div className="absolute inset-0 bg-black/50 z-0 pointer-events-none"></div>
 
-      {/* 2. 全域底層呼吸燈 (z-0) - 完全滿版 */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className={`absolute inset-0 transform-gpu will-change-opacity transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(220,20,20,0.6)_100%)] ${!isFinished ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
       </div>
 
-      {/* 3. 頂部毛玻璃舞台 (z-10) */}
       <div className="bg-gray-950/60 backdrop-blur-md border-b-2 border-blood-red/50 pt-6 pb-6 px-4 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)] relative z-10 min-h-[25vh] md:min-h-[30vh] flex flex-col justify-center">
         <div className="text-center mb-6">
           <span className="text-red-600 font-black tracking-[0.3em] text-xl md:text-2xl drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]">
@@ -97,9 +105,9 @@ export default function CombatTheater() {
         </div>
         
         <div className="flex justify-between items-start gap-4 max-w-4xl mx-auto w-full">
-          {/* 左側：玩家角色 (V2.9.10 垂直堆疊，解開截斷限制) */}
+          {/* 左側：玩家角色 */}
           <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'slave-hit' ? 'translate-x-[-10px] md:translate-x-[-20px]' : activeEffect === 'slave-skill' ? 'scale-105' : ''}`}>
-            <span className="text-blue-400 font-bold text-base md:text-lg tracking-widest break-all leading-snug">
+            <span className={`text-blue-400 font-bold break-all ${sNameClass}`}>
               {activeCombat.slaveName}
             </span>
             <div className="w-full h-5 md:h-6 bg-gray-900 border border-gray-700 rounded-sm overflow-hidden relative">
@@ -118,9 +126,9 @@ export default function CombatTheater() {
              <span className="text-gray-600 font-black italic text-3xl md:text-4xl">VS</span>
           </div>
 
-          {/* 右側：敵方角色 (V2.9.10 垂直堆疊，解開截斷限制) */}
+          {/* 右側：敵方角色 */}
           <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'npc-hit' ? 'translate-x-[10px] md:translate-x-[20px]' : ''}`}>
-            <span className="text-red-400 font-bold text-base md:text-lg tracking-widest break-all leading-snug text-right">
+            <span className={`text-red-400 font-bold break-all ${nNameClass}`}>
               {activeCombat.npcName}
             </span>
             <div className="w-full h-5 md:h-6 bg-gray-900 border border-gray-700 rounded-sm overflow-hidden relative rotate-180">
@@ -137,13 +145,9 @@ export default function CombatTheater() {
         </div>
       </div>
 
-      {/* 4. 中央主展演區 (z-10) */}
       <div className="flex-1 relative overflow-hidden z-10 flex flex-col">
-        
-        {/* 日誌區專屬護眼黑底，完美壓制紅光避免染色文字 (50% + 70% = 85% 總黑度) */}
         <div className="absolute inset-0 bg-black/70 z-0 pointer-events-none"></div>
         
-        {/* 羽化遮罩父容器 */}
         <div 
           className="absolute inset-0 z-10"
           style={{ 
@@ -151,7 +155,6 @@ export default function CombatTheater() {
             WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' 
           }}
         >
-          {/* 戰鬥日誌層 */}
           <div 
             ref={scrollContainerRef}
             className="absolute inset-0 overflow-y-auto scrollbar-none z-20 p-4 md:p-8"
@@ -168,7 +171,6 @@ export default function CombatTheater() {
         </div>
       </div>
 
-      {/* 5. 結算面板 (z-20) ★ V2.9.10 修正底部異常高度 CSS 覆蓋問題 */}
       <div className={`bg-gray-950/90 backdrop-blur-md border-t border-gray-800 relative z-20 flex justify-center items-center transition-all duration-1000 ${isFinished ? 'h-40 md:h-44 opacity-100 translate-y-0 px-4 pt-4 pb-12' : 'h-0 opacity-0 translate-y-full overflow-hidden p-0'}`}>
         {isFinished && (
           <div className="flex flex-col items-center gap-3 w-full max-w-md animate-fade-in mt-2">
