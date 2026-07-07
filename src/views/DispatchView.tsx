@@ -39,7 +39,7 @@ export default function DispatchView() {
   if (isLeaderIdle) {
     candidates.push({
       id: 'LEADER', isLeader: true, name: leaderName, stamina: safeLeaderStamina,
-      stress: 0, obedience: 100, // 首領無壓力與服從度問題
+      stress: 0, obedience: 100, 
       combat: 25, intelligence: 45, isInjured: false, faintTurns: 0, race: '人類(首領)', gender: leaderGender
     });
   }
@@ -106,7 +106,6 @@ export default function DispatchView() {
         </div>
       )}
 
-      {/* 第一段：懸賞任務卡牌清單 (直立式解放高度) */}
       <div className="flex flex-col gap-2 shrink-0">
         <h3 className="text-sm font-bold text-gray-400 border-l-2 border-blood-red pl-2 tracking-widest">［今日懸賞佈告欄］</h3>
         
@@ -118,8 +117,9 @@ export default function DispatchView() {
           <div className="flex gap-4 overflow-x-auto snap-x scrollbar-none py-4 px-2">
             {dailyMissions.map((mission) => {
               const isSelected = selectedMissionId === mission.id;
+              // ★ V2.9.10 強化綠卡外框與底色辨識度
               const rankColors = {
-                '翠綠': 'text-green-400 border-green-900/50 bg-green-950/20',
+                '翠綠': 'text-green-400 border-green-500/80 bg-green-950/40 shadow-[0_0_10px_rgba(34,197,94,0.1)]',
                 '蔚藍': 'text-blue-400 border-blue-900/50 bg-blue-950/20',
                 '紫色': 'text-purple-400 border-purple-900/50 bg-purple-950/20',
                 '黃金': 'text-yellow-400 border-yellow-900/50 bg-yellow-950/20'
@@ -133,16 +133,14 @@ export default function DispatchView() {
                   className={`relative w-[240px] sm:w-[260px] h-[340px] shrink-0 snap-center rounded-xl p-4 flex flex-col justify-between border transition-all duration-300 text-left overflow-hidden ${
                     isSelected 
                       ? `border-gray-300 bg-gray-800 shadow-[0_0_20px_rgba(255,255,255,0.15)] transform scale-[1.03]` 
-                      : `border-gray-800 hover:border-gray-600 bg-gray-900/90 opacity-80 hover:opacity-100 ${colorClass}`
+                      : `border-gray-800 hover:border-gray-500 bg-gray-900/90 opacity-90 hover:opacity-100 ${colorClass}`
                   }`}
                 >
-                  {/* 懸賞階級與報酬 */}
                   <div className="flex justify-between items-center border-b border-gray-800/50 pb-2 shrink-0">
                     <span className="text-xs font-bold tracking-widest">{mission.rank}級委託</span>
                     <span className="text-yellow-500 font-mono text-base font-black">${mission.reward}</span>
                   </div>
 
-                  {/* 標題與內文 (解放高度，改為可滑動) */}
                   <div className="flex-1 py-3 flex flex-col gap-2 overflow-y-auto scrollbar-none border-b border-transparent">
                     <h4 className={`text-sm sm:text-base font-bold leading-snug ${isSelected ? 'text-white' : 'text-gray-200'}`}>
                       {mission.title}
@@ -152,7 +150,6 @@ export default function DispatchView() {
                     </p>
                   </div>
 
-                  {/* ★ V2.9.9 擴充五大情報網格 */}
                   <div className="flex flex-col gap-1 border-t border-gray-800/50 pt-3 bg-gray-950/60 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl shrink-0">
                     <div className="grid grid-cols-3 gap-1 mb-1">
                       <div className="flex flex-col items-center">
@@ -175,7 +172,8 @@ export default function DispatchView() {
                       </div>
                       <div className="flex justify-between items-center px-1 pl-2">
                          <span className="text-[10px] text-gray-500 font-bold">成功率</span>
-                         <span className="font-mono text-purple-400 font-bold text-xs">視執行者</span>
+                         {/* ★ V2.9.10 確實讀取底層機率並轉換為直觀的百分比 */}
+                         <span className="font-mono text-purple-400 font-bold text-xs">{Math.round((mission.successRate || 1) * 100)}%</span>
                       </div>
                     </div>
                   </div>
@@ -186,7 +184,6 @@ export default function DispatchView() {
         )}
       </div>
 
-      {/* 承接按鈕 */}
       {selectedMission && (
         <div className="mt-2 shrink-0 animate-fade-in">
           <button 
@@ -203,7 +200,6 @@ export default function DispatchView() {
         </div>
       )}
 
-      {/* 第二段：指派人員彈窗 (3D Carousel) */}
       {isSelectingSlave && selectedMission && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-fade-in">
           
@@ -216,7 +212,6 @@ export default function DispatchView() {
 
           <div className="w-full max-w-lg relative flex flex-col items-center z-[110]">
              
-            {/* ★ V2.9.9 拉高 3D 輪播區塊以容納更多進度條 */}
             <div className="flex items-center justify-center w-full h-[320px] relative overflow-hidden perspective-1000 pointer-events-none">
               {candidates.map((cand, index) => {
                 const diff = index - carouselIndex;
@@ -259,7 +254,6 @@ export default function DispatchView() {
                       {cand.isLeader && <span className="text-4xs px-1.5 py-0.5 bg-yellow-900/40 border border-yellow-700/50 text-yellow-500 font-bold rounded">首領</span>}
                     </div>
 
-                    {/* ★ V2.9.9 情報補齊：武力、智力、體力、壓力、服從度 */}
                     <div className="flex-1 flex flex-col justify-center gap-2.5 text-xs mt-2">
                        <div className="grid grid-cols-2 gap-2 mb-1">
                          <div className="flex justify-between items-center bg-gray-950 p-1.5 rounded border border-gray-800">
