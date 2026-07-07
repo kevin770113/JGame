@@ -97,12 +97,14 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
     let isInjuredNow = slave.isInjured || false;
     let newStamina = Math.max(0, slave.conditionStats.stamina - 20);
 
+    let finalRewardGold = 0; // ★ V2.9.11 同步修正
+
     if (isWin) {
       newWins++;
       logs.push({ round: round - 1, message: `［結算］${slave.name} 屹立到了最後，取得勝利。`, type: 'system', sHp, nHp });
       
       const charismaBonus = 1 + Math.floor(nCharisma / 10) * 0.05;
-      const finalRewardGold = Math.floor(npc.rewardGold * charismaBonus);
+      finalRewardGold = Math.floor(npc.rewardGold * charismaBonus);
       get().addGold(finalRewardGold); 
       if (npc.rewardPrestige > 0) get().addPrestige(npc.rewardPrestige);
       
@@ -142,7 +144,6 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
       logs.push({ round: round - 1, message: `［結算］${slave.name} 遭受重創倒地，體力耗盡並陷入【負傷】狀態！`, type: 'system', sHp, nHp });
     }
 
-    // ★ V2.9.10 移除手動扣減 actionPoints 與 processTurn，交由 View 統一推進時段
     let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
     if (slave.race !== '不死族') {
       newStress = Math.min(100, newStress + (isWin ? 5 : 15)); newRebellion = Math.min(100, newRebellion + (isWin ? 2 : 10));
@@ -155,7 +156,8 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
     const playbackData: CombatPlaybackData = {
        slaveId: slave.id, slaveName: slave.name, slaveMaxHp: sHpMax,
        npcName: npc.name, npcMaxHp: nHpMax, logs, isWin,
-       rewardGold: isWin ? npc.rewardGold : 0, rewardPrestige: isWin ? npc.rewardPrestige : 0, isAbyss: false
+       rewardGold: finalRewardGold, // ★ V2.9.11 同步 UI 獎勵顯示
+       rewardPrestige: isWin ? npc.rewardPrestige : 0, isAbyss: false
     };
     set({ activeCombat: playbackData });
 
@@ -257,12 +259,14 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
     let isInjuredNow = slave.isInjured || false;
     let newStamina = Math.max(0, slave.conditionStats.stamina - 30);
 
+    let finalRewardGold = 0; // ★ V2.9.11 同步修正
+
     if (isWin) {
       newWins++;
       logs.push({ round: round - 1, message: `［結算］${slave.name} 擊潰了深淵的阻礙，成功晉級！`, type: 'system', sHp, nHp });
       
       const charismaBonus = 1 + Math.floor(nCharisma / 10) * 0.05;
-      const finalRewardGold = Math.floor(enemy.rewardGold * charismaBonus);
+      finalRewardGold = Math.floor(enemy.rewardGold * charismaBonus);
       get().addGold(finalRewardGold); 
       if (enemy.rewardPrestige > 0) get().addPrestige(enemy.rewardPrestige);
       
@@ -287,7 +291,6 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
       logs.push({ round: round - 1, message: `［結算］${slave.name} 不支倒地，被深淵無情吞噬並陷入【負傷】狀態！`, type: 'system', sHp, nHp });
     }
 
-    // ★ V2.9.10 移除手動扣減 actionPoints 與 processTurn，交由 View 統一推進時段
     let newStress = slave.conditionStats.stress; let newRebellion = slave.conditionStats.rebellion;
     if (slave.race !== '不死族') {
       newStress = Math.min(100, newStress + (isWin ? 10 : 25)); newRebellion = Math.min(100, newRebellion + (isWin ? 5 : 15));
@@ -300,7 +303,8 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
     const playbackData: CombatPlaybackData = {
        slaveId: slave.id, slaveName: slave.name, slaveMaxHp: sHpMax,
        npcName: enemy.name, npcMaxHp: nHpMax, logs, isWin,
-       rewardGold: isWin ? enemy.rewardGold : 0, rewardPrestige: isWin ? enemy.rewardPrestige : 0, isAbyss: true
+       rewardGold: finalRewardGold, // ★ V2.9.11 同步 UI 獎勵顯示
+       rewardPrestige: isWin ? enemy.rewardPrestige : 0, isAbyss: true
     };
     set({ activeCombat: playbackData });
 
