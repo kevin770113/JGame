@@ -96,12 +96,12 @@ export default function CombatTheater() {
           </span>
         </div>
         
-        <div className="flex justify-between items-center gap-4 max-w-4xl mx-auto w-full">
-          <div className={`flex-1 flex flex-col gap-2 transition-transform duration-75 overflow-hidden ${activeEffect === 'slave-hit' ? 'translate-x-[-10px] md:translate-x-[-20px]' : activeEffect === 'slave-skill' ? 'scale-105' : ''}`}>
-            <div className="flex justify-between items-end gap-3">
-              <span className="text-blue-400 font-bold text-base md:text-xl tracking-widest truncate">{activeCombat.slaveName}</span>
-              <span className="text-gray-400 text-sm md:text-base font-bold shrink-0 whitespace-nowrap">{slaveHp} / {activeCombat.slaveMaxHp}</span>
-            </div>
+        <div className="flex justify-between items-start gap-4 max-w-4xl mx-auto w-full">
+          {/* 左側：玩家角色 (V2.9.10 垂直堆疊，解開截斷限制) */}
+          <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'slave-hit' ? 'translate-x-[-10px] md:translate-x-[-20px]' : activeEffect === 'slave-skill' ? 'scale-105' : ''}`}>
+            <span className="text-blue-400 font-bold text-base md:text-lg tracking-widest break-all leading-snug">
+              {activeCombat.slaveName}
+            </span>
             <div className="w-full h-5 md:h-6 bg-gray-900 border border-gray-700 rounded-sm overflow-hidden relative">
               <div 
                 className={`h-full transition-all duration-500 ease-out ${slaveHpPercent < 30 ? 'bg-red-600 animate-pulse' : 'bg-blue-600'}`}
@@ -109,17 +109,20 @@ export default function CombatTheater() {
               />
               <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent mix-blend-overlay"></div>
             </div>
+            <span className="text-gray-400 text-xs md:text-sm font-bold font-mono text-left">
+              {slaveHp} / {activeCombat.slaveMaxHp}
+            </span>
           </div>
 
-          <div className="shrink-0 flex flex-col items-center justify-center w-12 md:w-16">
-            <span className="text-gray-600 font-black italic text-3xl md:text-4xl">VS</span>
+          <div className="shrink-0 flex flex-col items-center justify-center w-12 md:w-16 mt-6">
+             <span className="text-gray-600 font-black italic text-3xl md:text-4xl">VS</span>
           </div>
 
-          <div className={`flex-1 flex flex-col gap-2 transition-transform duration-75 overflow-hidden ${activeEffect === 'npc-hit' ? 'translate-x-[10px] md:translate-x-[20px]' : ''}`}>
-            <div className="flex justify-between items-end flex-row-reverse gap-3">
-              <span className="text-red-400 font-bold text-base md:text-xl tracking-widest truncate">{activeCombat.npcName}</span>
-              <span className="text-gray-400 text-sm md:text-base font-bold shrink-0 whitespace-nowrap">{npcHp} / {activeCombat.npcMaxHp}</span>
-            </div>
+          {/* 右側：敵方角色 (V2.9.10 垂直堆疊，解開截斷限制) */}
+          <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'npc-hit' ? 'translate-x-[10px] md:translate-x-[20px]' : ''}`}>
+            <span className="text-red-400 font-bold text-base md:text-lg tracking-widest break-all leading-snug text-right">
+              {activeCombat.npcName}
+            </span>
             <div className="w-full h-5 md:h-6 bg-gray-900 border border-gray-700 rounded-sm overflow-hidden relative rotate-180">
               <div 
                 className="h-full bg-red-800 transition-all duration-500 ease-out"
@@ -127,6 +130,9 @@ export default function CombatTheater() {
               />
               <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent mix-blend-overlay"></div>
             </div>
+            <span className="text-gray-400 text-xs md:text-sm font-bold font-mono text-right">
+              {npcHp} / {activeCombat.npcMaxHp}
+            </span>
           </div>
         </div>
       </div>
@@ -145,12 +151,6 @@ export default function CombatTheater() {
             WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' 
           }}
         >
-          {/* 勝利與失敗底光 */}
-          <div className="absolute inset-0 pointer-events-none z-10">
-            <div className={`absolute bottom-0 left-0 right-0 h-[70%] transform-gpu will-change-opacity transition-opacity duration-1000 ease-in-out bg-gradient-to-t from-yellow-500/40 to-transparent ${isFinished && activeCombat.isWin ? 'opacity-100' : 'opacity-0'}`}></div>
-            <div className={`absolute bottom-0 left-0 right-0 h-[70%] transform-gpu will-change-opacity transition-opacity duration-1000 ease-in-out bg-gradient-to-t from-red-600/40 to-transparent ${isFinished && !activeCombat.isWin ? 'opacity-100' : 'opacity-0'}`}></div>
-          </div>
-
           {/* 戰鬥日誌層 */}
           <div 
             ref={scrollContainerRef}
@@ -168,13 +168,14 @@ export default function CombatTheater() {
         </div>
       </div>
 
-      {/* 5. 結算面板 (z-20) */}
-      <div className={`bg-gray-950/90 backdrop-blur-md px-4 pt-4 pb-12 border-t border-gray-800 relative z-20 flex justify-center items-center transition-all duration-1000 ${isFinished ? 'h-40 md:h-44 opacity-100 translate-y-0' : 'h-0 opacity-0 translate-y-full overflow-hidden p-0'}`}>
+      {/* 5. 結算面板 (z-20) ★ V2.9.10 修正底部異常高度 CSS 覆蓋問題 */}
+      <div className={`bg-gray-950/90 backdrop-blur-md border-t border-gray-800 relative z-20 flex justify-center items-center transition-all duration-1000 ${isFinished ? 'h-40 md:h-44 opacity-100 translate-y-0 px-4 pt-4 pb-12' : 'h-0 opacity-0 translate-y-full overflow-hidden p-0'}`}>
         {isFinished && (
           <div className="flex flex-col items-center gap-3 w-full max-w-md animate-fade-in mt-2">
             <div className={`text-xl font-black tracking-[0.2em] drop-shadow-md ${activeCombat.isWin ? 'text-yellow-500' : 'text-red-600'}`}>
               {activeCombat.isWin ? '［討伐成功］' : '［試驗體倒下］'}
             </div>
+            
             {activeCombat.isWin && (
               <div className="text-xs text-gray-400 flex gap-4">
                 <span>獲得資金: <strong className="text-yellow-500">${activeCombat.rewardGold}</strong></span>
