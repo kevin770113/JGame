@@ -35,7 +35,6 @@ export default function ArenaView() {
     const result = executeArenaBattle(fighter.id, targetNPC.id);
     if (result) {
       setSelectedFighterId('');
-      // ★ V2.9.10 戰鬥成功觸發後，強制推進時段並扣除 AP
       processTurn();
     }
   };
@@ -61,7 +60,8 @@ export default function ArenaView() {
   const expectedReward = Math.floor(targetNPC.rewardGold * charismaBonusMultiplier);
 
   return (
-    <div className="w-full flex flex-col gap-5 pb-10 animate-fade-in relative z-10">
+    {/* ★ V2.9.11 修正：加大底部留白 pb-32 以防下拉選單被導航列遮擋 */}
+    <div className="w-full flex flex-col gap-5 pb-32 animate-fade-in relative z-10">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
           <h2 className="text-xl font-bold text-gray-300">血腥角鬥場</h2>
