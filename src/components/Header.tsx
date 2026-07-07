@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { formatK } from '../types';
 
-// ★ V2.9.8 獨立的 AP 倒數計時元件 (避免觸發全域重渲染)
+// ★ V2.9.9 獨立的 AP 倒數計時元件 (避免觸發全域重渲染)
 const ApCountdown = ({ actionPoints, lastApUpdateTime }: { actionPoints: number, lastApUpdateTime: number }) => {
   const [timeLeft, setTimeLeft] = useState(0);
 
@@ -47,10 +47,11 @@ export default function Header() {
 
   const safeLeaderStamina = isNaN(leaderStamina) ? 100 : leaderStamina;
 
+  // ★ V2.9.9 將 AP 檢查頻率提升至每秒 1 次，與 UI 完美同步
   useEffect(() => {
     const timer = setInterval(() => {
       checkApRecovery();
-    }, 10000);
+    }, 1000);
     return () => clearInterval(timer);
   }, [checkApRecovery]);
 
@@ -95,14 +96,16 @@ export default function Header() {
     <>
       <div className="bg-gray-950 border-b border-gray-800 p-2 flex items-stretch shadow-md select-none sticky top-0 z-30 min-h-[4rem]">
         
-        {/* ★ V2.9.8 1:1 微圓角方形頭像 */}
-        <div 
-          onClick={openLeaderPanel}
-          className="aspect-square w-12 sm:w-14 shrink-0 bg-gray-900 border-2 border-gray-700 rounded-md flex items-center justify-center cursor-pointer hover:border-gray-500 transition-colors shadow-inner mr-2 sm:mr-3"
-        >
-          <span className="text-xs font-bold text-gray-500 text-center leading-tight">
-            {leaderGender === 'Male' ? '首領\n(男)' : '首領\n(女)'}
-          </span>
+        {/* ★ V2.9.9 增加 items-center 容器與 object-cover 強制鎖死 1:1 正方形 */}
+        <div className="flex items-center h-full mr-2 sm:mr-3 shrink-0">
+          <div 
+            onClick={openLeaderPanel}
+            className="aspect-square w-12 sm:w-14 bg-gray-900 border-2 border-gray-700 rounded-md flex items-center justify-center cursor-pointer hover:border-gray-500 transition-colors shadow-inner overflow-hidden"
+          >
+            <span className="text-xs font-bold text-gray-500 text-center leading-tight">
+              {leaderGender === 'Male' ? '首領\n(男)' : '首領\n(女)'}
+            </span>
+          </div>
         </div>
 
         <div className="flex-1 flex flex-col justify-between text-[11px] sm:text-xs font-bold tracking-widest py-0.5">
@@ -132,7 +135,6 @@ export default function Header() {
               <span>
                 AP: <span className={actionPoints < 10 ? 'text-red-500 font-mono animate-pulse' : 'text-blue-400 font-mono'}>{actionPoints}/50</span>
               </span>
-              {/* ★ V2.9.8 效能安全的倒數計時器 */}
               <ApCountdown actionPoints={actionPoints} lastApUpdateTime={lastApUpdateTime} />
               <button 
                 onClick={processTurn}
