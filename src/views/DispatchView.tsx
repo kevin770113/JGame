@@ -18,7 +18,6 @@ export default function DispatchView() {
   const slaves = useGameStore((state) => state.slaves);
   const dailyMissions = useGameStore((state) => state.dailyMissions);
   const dispatchSlave = useGameStore((state) => state.dispatchSlave);
-  const navigate = useGameStore((state) => state.navigate);
   const activeDispatches = useGameStore((state) => state.activeDispatches);
   const { leaderName, leaderGender, leaderStamina, leaderFaintTurns } = useGameStore((state) => state.player);
 
