@@ -6,7 +6,7 @@ import BreedingView from './views/BreedingView';
 import DispatchView from './views/DispatchView'; 
 import MapView from './views/MapView';
 import InteractionView from './views/InteractionView';
-import HousekeepingView from './views/HousekeepingView'; // ★ V2.9.5 補齊：引入家政視圖
+import HousekeepingView from './views/HousekeepingView'; 
 import ArenaView from './views/ArenaView';
 import AbyssView from './views/AbyssView'; 
 import LoginView from './views/LoginView';
@@ -151,41 +151,45 @@ function App() {
         case 'Room': return <BreedingView />; 
         case 'Interaction': return <InteractionView />;
         case 'Map': return <MapView />;
-        case 'Housekeeping': return <HousekeepingView />; // ★ V2.9.5 補齊：家政系統路由註冊
+        case 'Housekeeping': return <HousekeepingView />; 
         default: return <BaseView />;
       }
     } else {
       switch (currentSubView) {
-        case 'Main':
-          return (
-            <div className="w-full min-h-[75vh] flex flex-col justify-between pb-10 animate-fade-in">
-              <div className="border-b border-gray-700 pb-2 bg-gray-950/70 p-3 rounded backdrop-blur-xs">
-                <h2 className="text-xl font-bold text-gray-300">城鎮市集</h2>
-                <p className="text-xs text-gray-400 mt-1">喧鬧的灰色地帶，充斥著酒精、金錢與血統的地下交易。</p>
-              </div>
-              <div className="flex-1"></div>
-              <div className="flex flex-col gap-3 bg-gray-950/50 p-3 rounded backdrop-blur-xs">
-                <button onClick={() => navigate('Town', 'Market')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"><span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［訪問地下商隊］</span><span className="text-xs text-gray-500 font-normal">引進與變現血統資產</span></button>
-                <button onClick={() => navigate('Town', 'Tavern')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"><span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［前往深淵酒館］</span><span className="text-xs text-gray-500 font-normal">查閱地區懸賞與傳說委託</span></button>
-                <button onClick={() => navigate('Town', 'Arena')} className="py-4 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group"><span className="flex items-center gap-2 text-gray-300 group-hover:text-white tracking-widest">［前往角鬥場］</span><span className="text-xs text-gray-500 font-normal">參與血腥競技與死鬥</span></button>
-                
-                {location === 'Capital' && (
-                  <button onClick={() => navigate('Town', 'Abyss')} className="py-4 bg-purple-900/20 hover:bg-purple-900/40 border border-purple-800/50 rounded-lg font-bold text-left px-6 flex justify-between items-center transition-all shadow active:scale-98 group mt-1">
-                     <span className="flex items-center gap-2 text-purple-400 group-hover:text-purple-300 tracking-widest">［挑戰深淵之塔］</span>
-                     <span className="text-xs text-purple-600 font-normal">無盡階梯與古代英靈</span>
-                  </button>
-                )}
-
-                <button onClick={() => navigate('Home', 'Main')} className="py-3 bg-blood-red/20 hover:bg-blood-red/30 border border-blood-red/50 text-red-400 font-bold rounded-lg text-center transition-colors shadow mt-2 tracking-widest">［返回安全據點］</button>
-              </div>
-            </div>
-          );
-        case 'Market': return <MarketView />;
         case 'Tavern': return <DispatchView />;
         case 'Arena': return <ArenaView />; 
         case 'Abyss': return <AbyssView />; 
-        default: return <BaseView />;
+        case 'Market':
+        case 'Main': // 廢除原先的大廳過場，強制跳轉市集
+        default: 
+          return <MarketView />;
       }
+    }
+  };
+
+  const renderBottomNav = () => {
+    if (currentScene === 'Home') {
+      return (
+        <div className="fixed bottom-0 left-0 right-0 h-16 bg-gray-950 border-t border-gray-800 flex items-center justify-around px-1 z-40 pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
+          <button onClick={() => navigate('Home', 'Interaction')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Interaction' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">💬</span><span className="text-3xs font-bold mt-1 tracking-widest">互動</span></button>
+          <button onClick={() => navigate('Home', 'Room')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Room' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">🧬</span><span className="text-3xs font-bold mt-1 tracking-widest">育成</span></button>
+          <button onClick={() => navigate('Home', 'Map')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Map' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">🗺️</span><span className="text-3xs font-bold mt-1 tracking-widest">遷移</span></button>
+          <button onClick={() => navigate('Home', 'Housekeeping')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Housekeeping' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">🧹</span><span className="text-3xs font-bold mt-1 tracking-widest">家政</span></button>
+          <button onClick={() => navigate('Town', 'Market')} className="flex flex-col items-center justify-center w-1/5 h-full text-blood-red/80 hover:text-blood-red transition-colors"><span className="text-xl">🚪</span><span className="text-3xs font-bold mt-1 tracking-widest">外出</span></button>
+        </div>
+      );
+    } else {
+      return (
+        <div className="fixed bottom-0 left-0 right-0 h-16 bg-gray-950 border-t border-gray-800 flex items-center justify-around px-1 z-40 pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
+          <button onClick={() => navigate('Town', 'Market')} className={`flex flex-col items-center justify-center ${location === 'Capital' ? 'w-1/5' : 'w-1/4'} h-full transition-colors ${currentSubView === 'Market' || currentSubView === 'Main' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">⚖️</span><span className="text-3xs font-bold mt-1 tracking-widest">市集</span></button>
+          <button onClick={() => navigate('Town', 'Tavern')} className={`flex flex-col items-center justify-center ${location === 'Capital' ? 'w-1/5' : 'w-1/4'} h-full transition-colors ${currentSubView === 'Tavern' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">🍺</span><span className="text-3xs font-bold mt-1 tracking-widest">酒館</span></button>
+          <button onClick={() => navigate('Town', 'Arena')} className={`flex flex-col items-center justify-center ${location === 'Capital' ? 'w-1/5' : 'w-1/4'} h-full transition-colors ${currentSubView === 'Arena' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">⚔️</span><span className="text-3xs font-bold mt-1 tracking-widest">角鬥</span></button>
+          {location === 'Capital' && (
+            <button onClick={() => navigate('Town', 'Abyss')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Abyss' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">🌀</span><span className="text-3xs font-bold mt-1 tracking-widest">深淵</span></button>
+          )}
+          <button onClick={() => navigate('Home', 'Main')} className={`flex flex-col items-center justify-center ${location === 'Capital' ? 'w-1/5' : 'w-1/4'} h-full text-blood-red/80 hover:text-blood-red transition-colors`}><span className="text-xl">🏠</span><span className="text-3xs font-bold mt-1 tracking-widest">返回</span></button>
+        </div>
+      );
     }
   };
 
@@ -205,10 +209,13 @@ function App() {
       <CombatTheater /> 
 
       <div className="flex-1 flex overflow-hidden relative z-10">
-        <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center z-10 overscroll-contain">
+        <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center z-10 overscroll-contain pb-24">
           <div className={`w-full transition-all duration-300 ${currentScene === 'Town' ? 'max-w-3xl' : 'max-w-lg'}`}>{renderMainStage()}</div>
         </main>
       </div>
+
+      {/* ★ V2.9.7 底部全局導航列 */}
+      {renderBottomNav()}
 
       {activeSlave && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
@@ -405,9 +412,21 @@ function App() {
             <h3 className={`text-lg font-bold tracking-widest flex items-center gap-2 mb-2 ${globalModal.title.includes('警告') || globalModal.title.includes('錯誤') || globalModal.title.includes('急救') ? 'text-red-500' : 'text-yellow-500'}`}>
               {globalModal.title}
             </h3>
-            <div className="text-sm text-gray-300 leading-relaxed mb-6 bg-gray-950 p-4 rounded border border-gray-800 whitespace-pre-wrap shadow-inner">
-              {globalModal.message}
+            
+            {/* ★ V2.9.7 經濟結算結果高對比渲染 (Regex) */}
+            <div className="text-sm text-gray-300 leading-relaxed mb-6 bg-gray-950 p-4 rounded border border-gray-800 whitespace-pre-wrap shadow-inner overflow-y-auto max-h-[50vh]">
+              {globalModal.message.split('\n').map((line, index) => {
+                if (!line.trim()) return <br key={index} />;
+                let lineClass = "mb-1";
+                if (/(大捷|捷報|成功|平安歸隊)/.test(line)) {
+                  lineClass = "text-green-400 font-bold mb-1";
+                } else if (/(慘敗|重傷|越獄|過勞)/.test(line)) {
+                  lineClass = "text-red-500 animate-pulse font-bold mb-1";
+                }
+                return <div key={index} className={lineClass}>{line}</div>;
+              })}
             </div>
+            
             <div className="flex gap-3">
               {globalModal.isConfirm && (
                 <button 
