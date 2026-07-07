@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import BaseView from './views/BaseView';
+import TownMainView from './views/TownMainView'; // ★ V2.9.8 新增街道場景
 import MarketView from './views/MarketView';
 import BreedingView from './views/BreedingView'; 
 import DispatchView from './views/DispatchView'; 
@@ -21,6 +22,7 @@ import { ITEMS_DATA, getSlavePortraitUrl } from './utils/gameData';
 
 const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 
+// (保留既有 renderRadar)
 const renderRadar = (slave: Slave) => {
   const getP = (val: number, angleIndex: number, maxR = 40) => {
      const angle = (angleIndex * 72 - 90) * (Math.PI / 180);
@@ -86,6 +88,9 @@ function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   const [slaveTab, setSlaveTab] = useState<'ability' | 'status'>('ability');
+  
+  // ★ V2.9.8 競技小抽屜狀態
+  const [showCombatDrawer, setShowCombatDrawer] = useState(false);
 
   useEffect(() => {
     if (activeSlave) setSlaveTab('ability');
@@ -156,38 +161,45 @@ function App() {
       }
     } else {
       switch (currentSubView) {
+        case 'TownMain': return <TownMainView />; // ★ V2.9.8 新增街道入口
         case 'Tavern': return <DispatchView />;
         case 'Arena': return <ArenaView />; 
         case 'Abyss': return <AbyssView />; 
         case 'Market':
-        case 'Main': // 廢除原先的大廳過場，強制跳轉市集
+        case 'Main': 
         default: 
           return <MarketView />;
       }
     }
   };
 
+  // ★ V2.9.8 底部全域導航列淨化 (移除 Emoji、安全高度防擋)
   const renderBottomNav = () => {
     if (currentScene === 'Home') {
       return (
-        <div className="fixed bottom-0 left-0 right-0 h-16 bg-gray-950 border-t border-gray-800 flex items-center justify-around px-1 z-40 pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
-          <button onClick={() => navigate('Home', 'Interaction')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Interaction' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">💬</span><span className="text-3xs font-bold mt-1 tracking-widest">互動</span></button>
-          <button onClick={() => navigate('Home', 'Room')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Room' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">🧬</span><span className="text-3xs font-bold mt-1 tracking-widest">育成</span></button>
-          <button onClick={() => navigate('Home', 'Map')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Map' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">🗺️</span><span className="text-3xs font-bold mt-1 tracking-widest">遷移</span></button>
-          <button onClick={() => navigate('Home', 'Housekeeping')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Housekeeping' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">🧹</span><span className="text-3xs font-bold mt-1 tracking-widest">家政</span></button>
-          <button onClick={() => navigate('Town', 'Market')} className="flex flex-col items-center justify-center w-1/5 h-full text-blood-red/80 hover:text-blood-red transition-colors"><span className="text-xl">🚪</span><span className="text-3xs font-bold mt-1 tracking-widest">外出</span></button>
+        <div className="fixed bottom-0 left-0 right-0 h-16 sm:h-18 pb-safe pt-1 bg-gray-950 border-t border-gray-800 flex items-center justify-around px-1 z-40 shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
+          <button onClick={() => navigate('Home', 'Interaction')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Interaction' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">互動</span></button>
+          <button onClick={() => navigate('Home', 'Room')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Room' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">育成</span></button>
+          <button onClick={() => navigate('Home', 'Map')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Map' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">遷移</span></button>
+          <button onClick={() => navigate('Home', 'Housekeeping')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Housekeeping' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">家政</span></button>
+          <button onClick={() => navigate('Town', 'TownMain')} className="flex flex-col items-center justify-center w-1/5 h-full text-blood-red/80 hover:text-blood-red transition-colors"><span className="text-xs tracking-widest font-bold">外出</span></button>
         </div>
       );
     } else {
       return (
-        <div className="fixed bottom-0 left-0 right-0 h-16 bg-gray-950 border-t border-gray-800 flex items-center justify-around px-1 z-40 pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
-          <button onClick={() => navigate('Town', 'Market')} className={`flex flex-col items-center justify-center ${location === 'Capital' ? 'w-1/5' : 'w-1/4'} h-full transition-colors ${currentSubView === 'Market' || currentSubView === 'Main' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">⚖️</span><span className="text-3xs font-bold mt-1 tracking-widest">市集</span></button>
-          <button onClick={() => navigate('Town', 'Tavern')} className={`flex flex-col items-center justify-center ${location === 'Capital' ? 'w-1/5' : 'w-1/4'} h-full transition-colors ${currentSubView === 'Tavern' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">🍺</span><span className="text-3xs font-bold mt-1 tracking-widest">酒館</span></button>
-          <button onClick={() => navigate('Town', 'Arena')} className={`flex flex-col items-center justify-center ${location === 'Capital' ? 'w-1/5' : 'w-1/4'} h-full transition-colors ${currentSubView === 'Arena' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">⚔️</span><span className="text-3xs font-bold mt-1 tracking-widest">角鬥</span></button>
-          {location === 'Capital' && (
-            <button onClick={() => navigate('Town', 'Abyss')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Abyss' ? 'text-purple-400' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xl">🌀</span><span className="text-3xs font-bold mt-1 tracking-widest">深淵</span></button>
-          )}
-          <button onClick={() => navigate('Home', 'Main')} className={`flex flex-col items-center justify-center ${location === 'Capital' ? 'w-1/5' : 'w-1/4'} h-full text-blood-red/80 hover:text-blood-red transition-colors`}><span className="text-xl">🏠</span><span className="text-3xs font-bold mt-1 tracking-widest">返回</span></button>
+        <div className="fixed bottom-0 left-0 right-0 h-16 sm:h-18 pb-safe pt-1 bg-gray-950 border-t border-gray-800 flex items-center justify-around px-1 z-40 shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
+          <button onClick={() => navigate('Town', 'TownMain')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'TownMain' || currentSubView === 'Main' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">街道</span></button>
+          <button onClick={() => navigate('Town', 'Market')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Market' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">市集</span></button>
+          <button onClick={() => navigate('Town', 'Tavern')} className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Tavern' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">酒館</span></button>
+          <button onClick={() => {
+              if (location === 'Capital') {
+                setShowCombatDrawer(true);
+              } else {
+                navigate('Town', 'Arena');
+              }
+            }} 
+            className={`flex flex-col items-center justify-center w-1/5 h-full transition-colors ${currentSubView === 'Arena' || currentSubView === 'Abyss' ? 'text-purple-400 font-bold' : 'text-gray-500 hover:text-gray-400'}`}><span className="text-xs tracking-widest">競技</span></button>
+          <button onClick={() => navigate('Home', 'Main')} className={`flex flex-col items-center justify-center w-1/5 h-full text-blood-red/80 hover:text-blood-red transition-colors`}><span className="text-xs tracking-widest font-bold">返回</span></button>
         </div>
       );
     }
@@ -209,18 +221,31 @@ function App() {
       <CombatTheater /> 
 
       <div className="flex-1 flex overflow-hidden relative z-10">
-        <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center z-10 overscroll-contain pb-24">
+        <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center z-10 overscroll-contain pb-28 sm:pb-32">
           <div className={`w-full transition-all duration-300 ${currentScene === 'Town' ? 'max-w-3xl' : 'max-w-lg'}`}>{renderMainStage()}</div>
         </main>
       </div>
 
-      {/* ★ V2.9.7 底部全局導航列 */}
       {renderBottomNav()}
 
+      {/* ★ V2.9.8 競技多功能小抽屜 */}
+      {showCombatDrawer && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end animate-fade-in">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setShowCombatDrawer(false)}></div>
+          <div className="relative bg-gray-950 border-t-2 border-purple-900 rounded-t-2xl p-6 pb-[calc(env(safe-area-inset-bottom)+1rem)] flex flex-col gap-4 animate-slide-up shadow-[0_-10px_40px_rgba(0,0,0,0.9)] z-50">
+             <h3 className="text-gray-500 font-bold tracking-widest text-xs mb-1 text-center">［選擇競技場域］</h3>
+             <button onClick={() => { setShowCombatDrawer(false); navigate('Town', 'Arena'); }} className="py-4 bg-gray-900 hover:bg-gray-800 border border-gray-700 rounded-xl text-gray-300 font-bold tracking-widest transition-colors shadow">血腥角鬥場</button>
+             {location === 'Capital' && (
+               <button onClick={() => { setShowCombatDrawer(false); navigate('Town', 'Abyss'); }} className="py-4 bg-purple-950 hover:bg-purple-900 border border-purple-800 rounded-xl text-purple-400 font-bold tracking-widest transition-colors shadow">深淵之塔</button>
+             )}
+          </div>
+        </div>
+      )}
+
       {activeSlave && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-[60] transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
           <div className="w-full max-w-3xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setActiveSlave(null)} className="absolute top-0 right-0 z-[60] text-gray-400 hover:text-white text-sm font-bold transition-colors bg-red-950/80 hover:bg-red-900/90 rounded-bl-xl px-4 py-2 shadow-md border-b border-l border-red-900">［關閉］</button>
+            <button onClick={() => setActiveSlave(null)} className="absolute top-0 right-0 z-[70] text-gray-400 hover:text-white text-sm font-bold transition-colors bg-red-950/80 hover:bg-red-900/90 rounded-bl-xl px-4 py-2 shadow-md border-b border-l border-red-900">［關閉］</button>
             
             <div className="w-full sm:w-2/5 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[220px] sm:min-h-[420px] relative overflow-hidden group shrink-0">
               <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-0">
@@ -413,7 +438,6 @@ function App() {
               {globalModal.title}
             </h3>
             
-            {/* ★ V2.9.7 經濟結算結果高對比渲染 (Regex) */}
             <div className="text-sm text-gray-300 leading-relaxed mb-6 bg-gray-950 p-4 rounded border border-gray-800 whitespace-pre-wrap shadow-inner overflow-y-auto max-h-[50vh]">
               {globalModal.message.split('\n').map((line, index) => {
                 if (!line.trim()) return <br key={index} />;
