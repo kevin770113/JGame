@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { getAbyssEnemy } from '../utils/generators'; 
-import CustomSelect, { Option } from '../components/CustomSelect';
+import WheelPicker, { WheelOption } from '../components/WheelPicker';
 
 export default function AbyssView() {
   const { actionPoints, abyssFloor } = useGameStore((state) => state.player);
@@ -17,32 +17,38 @@ export default function AbyssView() {
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
   const targetEnemy = getAbyssEnemy(abyssFloor);
 
+  // ★ V2.9.12 當可用奴隸名冊更新時，若無選擇者則預設指向滾輪首位
+  useEffect(() => {
+    if (idleSlaves.length > 0 && !selectedFighterId) {
+      setSelectedFighterId(idleSlaves[0].id);
+    }
+  }, [idleSlaves, selectedFighterId]);
+
+  const currentFighter = slaves.find(s => s.id === selectedFighterId);
+  const isStaminaInsufficient = currentFighter ? currentFighter.conditionStats.stamina < 30 : true;
+
   const startBattle = () => {
     if (!selectedFighterId) return;
-    const fighter = slaves.find(s => s.id === selectedFighterId);
-    if (!fighter) return;
+    if (isStaminaInsufficient) return;
     
     if (actionPoints < 1) { 
       setGlobalModal({ title: '［系統警告］', message: '目前行動力不足。', isConfirm: false }); 
       return; 
     }
-    if (fighter.conditionStats.stamina < 30) { 
-      setGlobalModal({ title: '［系統警告］', message: '深淵極度消耗體力，該成員體力不足 30，強行進入將會暴斃。', isConfirm: false });
-      return; 
-    }
 
-    const result = executeAbyssBattle(fighter.id);
+    const result = executeAbyssBattle(selectedFighterId);
     if (result) {
       setSelectedFighterId('');
       processTurn();
     }
   };
 
-  const fighterOptions: Option[] = idleSlaves.map(s => {
+  // ★ V2.9.12 轉換為符合 3D 滾輪的單行簡潔格式
+  const fighterOptions: WheelOption[] = idleSlaves.map(s => {
     const isExhausted = s.conditionStats.stamina < 30;
     return {
       value: s.id,
-      label: `${s.name} (體力: ${s.conditionStats.stamina}) ${isExhausted ? '［體力透支］' : ''}`,
+      label: `${s.name} (體力: ${s.conditionStats.stamina}) ${isExhausted ? '［體力不足］' : ''}`,
       disabled: isExhausted
     };
   });
@@ -50,7 +56,9 @@ export default function AbyssView() {
   const charismaBonusMultiplier = 1 + Math.floor(targetEnemy.stats.charisma / 10) * 0.05;
   const expectedReward = Math.floor(targetEnemy.rewardGold * charismaBonusMultiplier);
 
-  // ★ V2.9.11 加大底部留白 pb-32 以防下拉選單被導航列遮擋
+  // 判定按鈕是否需要完全反灰鎖死
+  const isButtonDisabled = !selectedFighterId || actionPoints < 1 || isStaminaInsufficient;
+
   return (
     <div className="w-full flex flex-col gap-5 pb-32 animate-fade-in relative z-10">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
@@ -104,19 +112,38 @@ export default function AbyssView() {
           </div>
         </div>
 
-        <div className="w-full md:w-1/2 flex flex-col gap-4 bg-gray-900/60 p-4 rounded-lg border border-gray-800">
+        <div className="w-full md:w-1/2 flex flex-col gap-4 bg-gray-900/60 p-4 rounded-lg border border-gray-800 justify-between min-h-[220px]">
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-purple-400 font-bold tracking-widest border-l-2 border-purple-600 pl-2">［派遣挑戰者］</label>
-            {idleSlaves.length > 0 ? <CustomSelect options={fighterOptions} value={selectedFighterId} onChange={setSelectedFighterId} focusColor="purple" /> : <div className="text-xs text-red-500 p-2 border border-red-900/30 rounded bg-red-950/20">無閒置成員可參賽。</div>}
+            <label className="text-xs text-purple-400 font-bold tracking-widest border-l-2 border-purple-600 pl-2 mb-1">［派遣挑戰者］</label>
+            
+            {/* ★ V2.9.12 替換為全新 3D 垂直翻轉手勢滾輪 */}
+            {idleSlaves.length > 0 ? (
+              <WheelPicker options={fighterOptions} value={selectedFighterId} onChange={setSelectedFighterId} />
+            ) : (
+              <div className="text-xs text-red-500 p-3 border border-red-900/30 rounded bg-red-950/20 text-center tracking-widest">
+                無閒置成員可參賽。
+              </div>
+            )}
           </div>
 
-          <div className="text-xs text-gray-500 italic mt-1 leading-relaxed">
-            ※ 深淵挑戰將 <strong className="text-yellow-500">強制消耗 1 點行動力推進時段</strong>，並消耗 <strong className="text-purple-400">30 點體力</strong>。
+          <div className="flex flex-col gap-3 mt-auto">
+            <div className="text-xs text-gray-500 italic mt-1 leading-relaxed">
+              ※ 深淵挑戰將 <strong className="text-yellow-500">強制消耗 1 點行動力推進時段</strong>，並消耗該挑戰者 <strong className="text-purple-400">30 點體力</strong>。
+            </div>
+            
+            {/* ★ V2.9.12 簡化按鈕文字，加強體力不足反灰鎖死邏輯 */}
+            <button 
+              onClick={startBattle} 
+              disabled={isButtonDisabled} 
+              className={`w-full py-3.5 rounded font-bold text-xs tracking-widest border transition-all ${
+                isButtonDisabled 
+                  ? 'bg-gray-950 text-gray-600 border-gray-850 cursor-not-allowed shadow-none opacity-50' 
+                  : 'bg-purple-900/40 hover:bg-purple-900/60 text-purple-400 border-purple-800 hover:border-purple-600 shadow-md middle:scale-98'
+              }`}
+            >
+              {isStaminaInsufficient && idleSlaves.length > 0 ? '［體力不足，無法戰鬥］' : '［開始戰鬥］'}
+            </button>
           </div>
-          
-          <button onClick={startBattle} disabled={!selectedFighterId || actionPoints < 1} className={`w-full py-3 rounded font-bold text-xs tracking-widest border transition-all mt-auto ${(!selectedFighterId || actionPoints < 1) ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed' : 'bg-purple-900/40 hover:bg-purple-900/60 text-purple-400 border-purple-800 hover:border-purple-600 shadow-md'}`}>
-            ［踏入深淵階梯］
-          </button>
         </div>
       </div>
     </div>
