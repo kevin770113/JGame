@@ -50,8 +50,8 @@ export default function AbyssView() {
   const charismaBonusMultiplier = 1 + Math.floor(targetEnemy.stats.charisma / 10) * 0.05;
   const expectedReward = Math.floor(targetEnemy.rewardGold * charismaBonusMultiplier);
 
+  // ★ V2.9.11 加大底部留白 pb-32 以防下拉選單被導航列遮擋
   return (
-    {/* ★ V2.9.11 修正：加大底部留白 pb-32 以防下拉選單被導航列遮擋 */}
     <div className="w-full flex flex-col gap-5 pb-32 animate-fade-in relative z-10">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
