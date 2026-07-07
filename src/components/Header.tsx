@@ -2,10 +2,36 @@ import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { formatK } from '../types';
 
+// ★ V2.9.8 獨立的 AP 倒數計時元件 (避免觸發全域重渲染)
+const ApCountdown = ({ actionPoints, lastApUpdateTime }: { actionPoints: number, lastApUpdateTime: number }) => {
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  useEffect(() => {
+    if (actionPoints >= 50) return;
+    const updateTimer = () => {
+      const now = Date.now();
+      const elapsed = now - lastApUpdateTime;
+      const remaining = Math.max(0, 60000 - (elapsed % 60000));
+      setTimeLeft(remaining);
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [actionPoints, lastApUpdateTime]);
+
+  if (actionPoints >= 50) return null;
+
+  const seconds = Math.floor(timeLeft / 1000);
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = (seconds % 60).toString().padStart(2, '0');
+  
+  return <span className="text-gray-500 text-3xs ml-1 font-mono tracking-tighter">({m}:{s})</span>;
+};
+
 export default function Header() {
   const { 
     day, timePhase, gold, food, location, roomDirtiness, maxSlaveCapacity, prestige, actionPoints,
-    leaderName, leaderGender, leaderStamina, leaderFaintTurns
+    leaderName, leaderGender, leaderStamina, leaderFaintTurns, lastApUpdateTime
   } = useGameStore((state) => state.player);
   
   const slaves = useGameStore((state) => state.slaves);
@@ -19,7 +45,6 @@ export default function Header() {
   const [showLeaderPanel, setShowLeaderPanel] = useState(false);
   const [editName, setEditName] = useState('');
 
-  // 防護 NaN
   const safeLeaderStamina = isNaN(leaderStamina) ? 100 : leaderStamina;
 
   useEffect(() => {
@@ -38,7 +63,6 @@ export default function Header() {
     }
   };
 
-  // ★ V2.9.5 恢復百分比顯示
   const getDirtinessDisplay = () => {
     if (roomDirtiness < 20) return <span className="text-green-400">乾淨({roomDirtiness}%)</span>;
     if (roomDirtiness < 50) return <span className="text-yellow-400">尚可({roomDirtiness}%)</span>;
@@ -69,12 +93,12 @@ export default function Header() {
 
   return (
     <>
-      {/* ★ V2.9.5 釋放排版空間，Avatar 完美等高 1:1 */}
       <div className="bg-gray-950 border-b border-gray-800 p-2 flex items-stretch shadow-md select-none sticky top-0 z-30 min-h-[4rem]">
         
+        {/* ★ V2.9.8 1:1 微圓角方形頭像 */}
         <div 
           onClick={openLeaderPanel}
-          className="aspect-square flex-shrink-0 bg-gray-900 border border-gray-700 rounded flex items-center justify-center cursor-pointer hover:border-gray-500 transition-colors shadow-inner mr-2 sm:mr-3"
+          className="aspect-square w-12 sm:w-14 shrink-0 bg-gray-900 border-2 border-gray-700 rounded-md flex items-center justify-center cursor-pointer hover:border-gray-500 transition-colors shadow-inner mr-2 sm:mr-3"
         >
           <span className="text-xs font-bold text-gray-500 text-center leading-tight">
             {leaderGender === 'Male' ? '首領\n(男)' : '首領\n(女)'}
@@ -82,8 +106,6 @@ export default function Header() {
         </div>
 
         <div className="flex-1 flex flex-col justify-between text-[11px] sm:text-xs font-bold tracking-widest py-0.5">
-          
-          {/* 第一行 */}
           <div className="flex justify-between items-center text-gray-400 border-b border-gray-800/50 pb-0.5">
             <span className="flex items-center gap-1">
               <span>[第{day}天 - <span className="text-gray-200">{timePhase}</span>]</span>
@@ -95,7 +117,6 @@ export default function Header() {
             </span>
           </div>
 
-          {/* 第二行 */}
           <div className="flex justify-between items-center text-gray-500 border-b border-gray-800/50 pb-0.5">
             <span className="flex gap-2 sm:gap-3">
               <span>資金: <span className="text-yellow-500 font-mono">${formatK(gold)}</span></span>
@@ -106,10 +127,13 @@ export default function Header() {
             </span>
           </div>
 
-          {/* 第三行 */}
           <div className="flex justify-between items-center text-gray-500">
             <span className="flex items-center gap-1">
-              <span>AP: <span className={actionPoints < 10 ? 'text-red-500 font-mono animate-pulse' : 'text-blue-400 font-mono'}>{actionPoints}/50</span></span>
+              <span>
+                AP: <span className={actionPoints < 10 ? 'text-red-500 font-mono animate-pulse' : 'text-blue-400 font-mono'}>{actionPoints}/50</span>
+              </span>
+              {/* ★ V2.9.8 效能安全的倒數計時器 */}
+              <ApCountdown actionPoints={actionPoints} lastApUpdateTime={lastApUpdateTime} />
               <button 
                 onClick={processTurn}
                 disabled={actionPoints < 1}
@@ -122,7 +146,6 @@ export default function Header() {
             </span>
             <span>環境: {getDirtinessDisplay()}</span>
           </div>
-
         </div>
       </div>
 
@@ -136,7 +159,6 @@ export default function Header() {
             </div>
 
             <div className="p-4 flex flex-col gap-4">
-              
               <div className="flex flex-col gap-2">
                 <label className="text-xs text-gray-400 font-bold tracking-widest">首領稱呼</label>
                 <div className="flex gap-2">
@@ -149,9 +171,7 @@ export default function Header() {
                     placeholder="輸入名稱"
                   />
                   <button 
-                    onClick={() => {
-                      setPlayerNameAndGender(leaderName, leaderGender === 'Male' ? 'Female' : 'Male');
-                    }}
+                    onClick={() => setPlayerNameAndGender(leaderName, leaderGender === 'Male' ? 'Female' : 'Male')}
                     className="px-3 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-300 rounded text-xs font-bold transition-colors whitespace-nowrap tracking-widest"
                   >
                     切換: {leaderGender === 'Male' ? '男性' : '女性'}
@@ -207,7 +227,6 @@ export default function Header() {
                   <span className="px-2 py-0.5 bg-gray-800 text-gray-400 border border-gray-700 rounded text-3xs font-bold tracking-widest">內政管家 Lv.1</span>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
