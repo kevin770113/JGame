@@ -22,7 +22,11 @@ import { ITEMS_DATA, getSlavePortraitUrl } from './utils/gameData';
 
 const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 
+// ★ V2.9.10 使雷達圖亦能反映裝備帶來的武力加成
 const renderRadar = (slave: Slave) => {
+  const weaponAtk = (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) 
+    ? (ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0) : 0;
+
   const getP = (val: number, angleIndex: number, maxR = 40) => {
      const angle = (angleIndex * 72 - 90) * (Math.PI / 180);
      const r = (Math.min(100, Math.max(0, val)) / 100) * maxR;
@@ -30,7 +34,7 @@ const renderRadar = (slave: Slave) => {
   };
   
   const stats = [
-     slave.primaryStats.combat,
+     slave.primaryStats.combat + weaponAtk, 
      slave.primaryStats.intelligence,
      slave.primaryStats.charisma ?? 10,
      slave.primaryStats.luck ?? 10,
@@ -171,7 +175,6 @@ function App() {
     }
   };
 
-  // ★ V2.9.9 導航列字體全面放大 (text-sm font-bold)
   const renderBottomNav = () => {
     if (currentScene === 'Home') {
       return (
@@ -295,7 +298,19 @@ function App() {
                              <span className="text-gray-500 font-bold">武力:</span>
                              {activeSlave.isInjured ? 
                                 <span><span className="text-red-500 font-mono font-bold">{Math.floor(activeSlave.primaryStats.combat * 0.5)}</span> <span className="text-gray-600 text-3xs font-mono">(原:{activeSlave.primaryStats.combat})</span></span> 
-                                : <span className="text-red-400 font-mono font-bold">{activeSlave.primaryStats.combat}</span>}
+                                : (
+                                  <span>
+                                    <span className="text-red-400 font-mono font-bold">
+                                      {activeSlave.primaryStats.combat + ((activeSlave.equipment?.weaponId && ITEMS_DATA[activeSlave.equipment.weaponId]) ? (ITEMS_DATA[activeSlave.equipment.weaponId].effect.attack || 0) : 0)}
+                                    </span>
+                                    {activeSlave.equipment?.weaponId && ITEMS_DATA[activeSlave.equipment.weaponId] && (
+                                      <span className="text-green-400 text-xs font-mono ml-1">
+                                        (+{ITEMS_DATA[activeSlave.equipment.weaponId].effect.attack})
+                                      </span>
+                                    )}
+                                  </span>
+                                )
+                             }
                           </div>
                           <div className="flex justify-between items-center bg-gray-900/80 px-2 py-1.5 rounded border border-gray-800">
                              <span className="text-gray-500 font-bold">體質:</span>
