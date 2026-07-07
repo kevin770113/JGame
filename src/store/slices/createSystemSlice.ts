@@ -194,14 +194,19 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
              }
              earnedGold += baseReward;
              earnedFood += foodReward;
-             if (dispatch.mission.rank === '紫色' && Math.random() > 0.5) earnedPrestige += Math.floor(Math.random() * 20) + 10;
+             
+             // ★ V2.9.10 金卡紫卡高階獎勵重構 (首領本身不可升級技能，僅獲得威望)
+             if (dispatch.mission.rank === '紫色') earnedPrestige += Math.floor(Math.random() * 21) + 10;
+             if (dispatch.mission.rank === '黃金') earnedPrestige += Math.floor(Math.random() * 21) + 30;
              
              leaderStamina = Math.max(0, leaderStamina - dispatch.mission.staminaCost);
              phaseLogs.push(`［平安歸隊］您已安全完成 ${dispatch.mission.title} 並帶回物資與資金。`);
              if (leaderStamina <= 0) { leaderStamina = 0; leaderFTurns = 3; phaseLogs.push(`［過勞］您耗盡了最後一絲體力，陷入重傷昏厥 (3時段)！`); }
            } else {
-             leaderStamina = Math.max(0, leaderStamina - 40);
-             phaseLogs.push(`［慘敗］您在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫！`);
+             // ★ V2.9.10 失敗懲罰階梯化：扣除該任務 80% 的體力
+             const failStamina = Math.floor(dispatch.mission.staminaCost * 0.8);
+             leaderStamina = Math.max(0, leaderStamina - failStamina);
+             phaseLogs.push(`［慘敗］您在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫 (-${failStamina})！`);
              if (leaderStamina <= 0) { leaderStamina = 0; leaderFTurns = 3; phaseLogs.push(`［重傷］您傷勢過重，陷入重傷昏厥 (3時段)！`); }
            }
         } else {
@@ -219,9 +224,18 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
                 earnedFood += foodReward;
 
                 let updatedSkills = { ...slave.skills };
+                // ★ V2.9.10 奴隸高階獎勵重構：紫卡給威望，金卡給威望+技能突破
                 if (dispatch.mission.rank === '紫色') {
-                  if (Math.random() > 0.5) earnedPrestige += Math.floor(Math.random() * 20) + 10;
-                  else { const keys = ['combat', 'housework', 'survival'] as const; const k = keys[Math.floor(Math.random() * keys.length)]; if (updatedSkills[k] < 10) updatedSkills[k] += 1; }
+                  earnedPrestige += Math.floor(Math.random() * 21) + 10;
+                }
+                if (dispatch.mission.rank === '黃金') {
+                  earnedPrestige += Math.floor(Math.random() * 21) + 30;
+                  const keys = ['combat', 'housework', 'survival'] as const; 
+                  const k = keys[Math.floor(Math.random() * keys.length)]; 
+                  if (updatedSkills[k] < 10) {
+                     updatedSkills[k] += 1;
+                     phaseLogs.push(`［突破］${slave.name} 經歷生死交關，【${k === 'combat' ? '戰鬥專精' : k === 'housework' ? '內政管家' : '生存本能'}】提升至 Lv.${updatedSkills[k]}！`);
+                  }
                 }
                 
                 const finalStamina = Math.max(0, slave.conditionStats.stamina - Math.max(10, dispatch.mission.staminaCost - ((slave.isInjured ? Math.floor(slave.skills.combat * 0.5) : slave.skills.combat) * 2)));
@@ -245,10 +259,13 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
                   slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 15);
                 }
               } else {
-                slave.conditionStats.stamina = Math.max(0, slave.conditionStats.stamina - 40);
-                slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 20);
+                // ★ V2.9.10 失敗懲罰階梯化：扣除該任務 80% 的體力與壓力
+                const failStamina = Math.floor(dispatch.mission.staminaCost * 0.8);
+                const failStress = Math.floor(dispatch.mission.stressGain * 0.8);
+                slave.conditionStats.stamina = Math.max(0, slave.conditionStats.stamina - failStamina);
+                slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + failStress);
                 slave.activityStatus = '閒置';
-                phaseLogs.push(`［慘敗］${slave.name} 在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫！`);
+                phaseLogs.push(`［慘敗］${slave.name} 在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫 (-${failStamina})，壓力激增 (+${failStress})！`);
 
                 if (slave.conditionStats.stamina <= 0) {
                   slave.faintTurns = 5;
