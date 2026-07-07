@@ -7,6 +7,8 @@ export default function HousekeepingView() {
   const slaves = useGameStore((state) => state.slaves);
   const activeDispatches = useGameStore((state) => state.activeDispatches);
   const performHousekeeping = useGameStore((state) => state.performHousekeeping);
+  
+  // 由於加入底部全局導航，這裡不需要自行控制 navigate
   const navigate = useGameStore((state) => state.navigate);
 
   const [selectedWorkerId, setSelectedWorkerId] = useState<string>('');
@@ -20,7 +22,6 @@ export default function HousekeepingView() {
 
   const workerOptions: Option[] = [];
 
-  // 首領選項
   if (isLeaderIdle) {
     const leaderExhausted = safeLeaderStamina < 20;
     workerOptions.push({
@@ -30,7 +31,6 @@ export default function HousekeepingView() {
     });
   }
 
-  // 奴隸選項
   idleSlaves.forEach(s => {
     const isExhausted = s.conditionStats.stamina < 15;
     workerOptions.push({
@@ -65,9 +65,10 @@ export default function HousekeepingView() {
           <h2 className="text-xl font-bold text-gray-300">家政管理</h2>
           <p className="text-2xs text-gray-500 mt-0.5">指派成員打掃據點，維持環境整潔以保障恢復效率。</p>
         </div>
+        {/* ★ V2.9.7 修正返回按鈕斷行問題 */}
         <button 
           onClick={() => navigate('Home', 'Main')}
-          className="px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
+          className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
         >
           ［返回大廳］
         </button>
@@ -75,7 +76,6 @@ export default function HousekeepingView() {
 
       <div className="bg-gray-900/80 p-4 sm:p-5 rounded-lg border border-gray-800 shadow-lg flex flex-col gap-5 mt-2">
         
-        {/* 完美適配截圖 6216.png 的警告區塊 */}
         <div className="bg-gray-950 p-4 rounded border border-gray-800 flex flex-col gap-3">
           <div className="text-gray-400 text-sm font-bold tracking-widest">
             當前據點環境總髒亂度：<span className="text-yellow-500 ml-1">{roomDirtiness}%</span>
