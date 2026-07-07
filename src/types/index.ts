@@ -1,6 +1,6 @@
 export type Scene = 'Home' | 'Town';
-// ★ V2.9.5 新增 'Housekeeping' 頁面
-export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map' | 'Interaction' | 'Arena' | 'Abyss' | 'Housekeeping';
+// ★ V2.9.5 新增 'Housekeeping' 頁面 / V2.9.8 新增 'TownMain' 街道
+export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map' | 'Interaction' | 'Arena' | 'Abyss' | 'Housekeeping' | 'TownMain';
 
 export type Race = '人類' | '精靈' | '半獸人' | '矮人' | '不死族' | '龍族';
 export type Gender = 'Male' | 'Female';
