@@ -23,7 +23,7 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
 
   return (
     <>
-      <div className="fixed right-0 top-1/4 z-40 flex items-start pointer-events-none animate-fade-in">
+      <div className="fixed right-0 top-[40%] z-40 flex items-start pointer-events-none animate-fade-in">
         <button
           onClick={handleToggle}
           className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-300 py-3 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
@@ -47,7 +47,7 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
       >
         <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/80 shrink-0">
           <h3 className="text-sm font-bold text-gray-200 tracking-widest flex items-center gap-2">
-             <span className="text-purple-400">👁️</span> ［試驗體名冊］ 
+             ［試驗體名冊］ 
              <span className="text-xs font-mono text-gray-500">({slaves.length}/{useGameStore.getState().player.maxSlaveCapacity})</span>
           </h3>
           <button 
@@ -71,7 +71,6 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
                 {slave.name}
               </div>
               
-              {/* ★ V2.9.0 移除 DNA emoji，保持介面冷峻 */}
               <div className="text-2xs text-gray-400 flex items-center gap-2">
                 <span className="text-purple-300 font-bold">{slave.race}</span>
                 <span className="text-gray-700">｜</span>
