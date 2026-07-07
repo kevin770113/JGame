@@ -35,7 +35,7 @@ export default function SystemPanel() {
 
   const handleForceLoad = () => {
     setGlobalModal({
-      title: '［⚠️ 系統急救：強制覆蓋警告］',
+      title: '［系統急救：強制覆蓋警告］',
       message: '此操作將無視存檔保護鎖，直接從雲端下載最後一次成功的存檔並覆蓋本地進度。\n\n如果您目前遇到本地快取異常或畫面卡死，請使用此功能進行急救。\n\n確定要強制讀取雲端存檔嗎？',
       isConfirm: true,
       action: async () => {
@@ -48,7 +48,7 @@ export default function SystemPanel() {
 
   const handleForceLogout = () => {
     setGlobalModal({
-      title: '［⚠️ 徹底登出與清除快取］',
+      title: '［徹底登出與清除快取］',
       message: '這將清除您裝置上的所有本地快取，並切斷深淵連線。\n若您未手動存檔，尚未同步的最新進度將會遺失。\n\n確定要執行嗎？',
       isConfirm: true,
       action: async () => {
@@ -70,16 +70,16 @@ export default function SystemPanel() {
     setIsFetchingDb(false);
   };
 
-  // ★ V2.9.3 安全化重構：清空本地 canConsume 記憶紀錄，實現無痛名字循環測試
   const handleClearDb = () => {
     setGlobalModal({
-      title: '［🔄 除錯功能：重置本地已用名單］',
+      title: '［除錯功能：重置本地已用名單］',
       message: '此操作將清空本地存檔中的「已抽取名字紀錄」。\n\n執行後，地下商隊將無阻礙地重新抓取您之前看過的名字。適合用來測試資料庫拉取流程，不會引發資料庫異常。確定要執行嗎？',
       isConfirm: true,
       action: async () => {
          useGameStore.setState(state => ({
            player: { ...state.player, usedIdentityIds: [] }
          }));
+         
          await syncProfileToCloud();
          setDbIdentities([]);
          setGlobalModal({ title: '［系統］', message: '已用名單記憶已成功清除！市場將可重新拉取舊名單。', isConfirm: false });
@@ -89,7 +89,7 @@ export default function SystemPanel() {
 
   return (
     <>
-      <div className="fixed right-0 top-[45%] z-40 flex items-start pointer-events-none animate-fade-in">
+      <div className="fixed right-0 top-[65%] z-40 flex items-start pointer-events-none animate-fade-in">
         <button
           onClick={handleToggle}
           className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-400 py-3 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
@@ -113,7 +113,7 @@ export default function SystemPanel() {
       >
         <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/80 shrink-0">
           <h3 className="text-sm font-bold text-gray-200 tracking-widest flex items-center gap-2">
-             <span className="text-purple-400">⚙️</span> ［系統控制樞紐］
+             ［系統控制樞紐］
           </h3>
           <button 
             onClick={() => setActiveWindow(null)}
@@ -161,7 +161,7 @@ export default function SystemPanel() {
           <div className="bg-purple-950/20 p-3 rounded-lg border border-purple-900/30 flex flex-col gap-2.5 shadow-inner mt-2">
             <div className="flex flex-col gap-1">
               <span className="text-sm font-bold text-purple-400 tracking-widest flex items-center gap-1">
-                <span>🚧</span> 開發者除錯模式
+                ［開發者除錯模式］
               </span>
               <span className="text-xs text-purple-500/70">遠端資料庫總覽與本地記憶清除</span>
             </div>
@@ -219,7 +219,7 @@ export default function SystemPanel() {
           </div>
           
           <div className="text-center mt-auto pt-4 pb-2">
-            <span className="text-gray-600 text-2xs tracking-widest font-mono">Dark Fantasy Trader v2.9.3</span>
+            <span className="text-gray-600 text-2xs tracking-widest font-mono">Dark Fantasy Trader v2.9.9</span>
           </div>
         </div>
       </div>
