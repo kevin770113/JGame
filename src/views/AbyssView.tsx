@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
-import { getAbyssEnemy } from '../utils/generators'; // ★ 修復：正確引入生成器
+import { getAbyssEnemy } from '../utils/generators'; 
 import CustomSelect, { Option } from '../components/CustomSelect';
 
 export default function AbyssView() {
   const { actionPoints, abyssFloor } = useGameStore((state) => state.player);
   const navigate = useGameStore((state) => state.navigate);
   const executeAbyssBattle = useGameStore((state) => state.executeAbyssBattle);
+  const processTurn = useGameStore((state) => state.processTurn);
   
   const setGlobalModal = useGameStore((state) => state.setGlobalModal);
   const slaves = useGameStore((state) => state.slaves);
@@ -26,13 +27,15 @@ export default function AbyssView() {
       return; 
     }
     if (fighter.conditionStats.stamina < 30) { 
-      setGlobalModal({ title: '［系統警告］', message: '深淵極度消耗體力，該成員體力不足 30，強行進入將會暴斃。', isConfirm: false }); 
+      setGlobalModal({ title: '［系統警告］', message: '深淵極度消耗體力，該成員體力不足 30，強行進入將會暴斃。', isConfirm: false });
       return; 
     }
 
     const result = executeAbyssBattle(fighter.id);
     if (result) {
       setSelectedFighterId('');
+      // ★ V2.9.10 戰鬥成功觸發後，強制推進時段並扣除 AP
+      processTurn();
     }
   };
 
@@ -66,6 +69,7 @@ export default function AbyssView() {
       <div className="flex flex-col md:flex-row gap-5 mt-2">
         <div className="w-full md:w-1/2 flex flex-col gap-3">
           <div className="bg-gray-900/80 p-5 rounded-lg border border-purple-900/50 shadow-xl relative overflow-hidden group flex flex-col items-center text-center">
+        
             <div className="absolute top-0 right-0 p-2 opacity-10">
               <span className="text-6xl text-purple-500">🌀</span>
             </div>
@@ -107,7 +111,7 @@ export default function AbyssView() {
           </div>
 
           <div className="text-xs text-gray-500 italic mt-1 leading-relaxed">
-            ※ 深淵挑戰將消耗 1 點行動力與 <strong className="text-purple-400">30 點體力</strong>。高層深淵將考驗戰鬥極限與幸運直覺。
+            ※ 深淵挑戰將 <strong className="text-yellow-500">強制消耗 1 點行動力推進時段</strong>，並消耗 <strong className="text-purple-400">30 點體力</strong>。
           </div>
           
           <button onClick={startBattle} disabled={!selectedFighterId || actionPoints < 1} className={`w-full py-3 rounded font-bold text-xs tracking-widest border transition-all mt-auto ${(!selectedFighterId || actionPoints < 1) ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed' : 'bg-purple-900/40 hover:bg-purple-900/60 text-purple-400 border-purple-800 hover:border-purple-600 shadow-md'}`}>
