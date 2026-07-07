@@ -6,6 +6,7 @@ export default function ArenaView() {
   const { location } = useGameStore((state) => state.player);
   const navigate = useGameStore((state) => state.navigate);
   const executeArenaBattle = useGameStore((state) => state.executeArenaBattle);
+  const processTurn = useGameStore((state) => state.processTurn);
   
   const setGlobalModal = useGameStore((state) => state.setGlobalModal);
   const slaves = useGameStore((state) => state.slaves);
@@ -14,7 +15,6 @@ export default function ArenaView() {
   const [selectedFighterId, setSelectedFighterId] = useState<string>('');
 
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
-  // ★ V2.9.0 從 Store 讀取每日生成的動態對手
   const arenaNPCs = useGameStore((state) => state.arenaNPCs);
   const targetNPC = arenaNPCs.find(n => n.location === location);
 
@@ -28,13 +28,15 @@ export default function ArenaView() {
       return; 
     }
     if (fighter.conditionStats.stamina < 20) { 
-      setGlobalModal({ title: '［系統警告］', message: '該成員體力嚴重透支，強行上陣必定暴斃，請先進行療養或賞賜藥劑。', isConfirm: false }); 
+      setGlobalModal({ title: '［系統警告］', message: '該成員體力嚴重透支，強行上陣必定暴斃，請先進行療養或賞賜藥劑。', isConfirm: false });
       return; 
     }
 
     const result = executeArenaBattle(fighter.id, targetNPC.id);
     if (result) {
       setSelectedFighterId('');
+      // ★ V2.9.10 戰鬥成功觸發後，強制推進時段並扣除 AP
+      processTurn();
     }
   };
 
@@ -55,7 +57,6 @@ export default function ArenaView() {
     );
   }
 
-  // 計算因魅力帶來的賞金加成期望值
   const charismaBonusMultiplier = 1 + Math.floor(targetNPC.stats.charisma / 10) * 0.05;
   const expectedReward = Math.floor(targetNPC.rewardGold * charismaBonusMultiplier);
 
@@ -88,7 +89,6 @@ export default function ArenaView() {
               「{targetNPC.description}」
             </p>
             
-            {/* ★ V2.9.0 全新五維對手面板 */}
             <div className="grid grid-cols-2 gap-2 mt-2 bg-gray-950 p-3 rounded border border-gray-800 text-xs">
               <div className="flex justify-between"><span>武力:</span> <span className="text-red-400 font-bold font-mono">{targetNPC.stats.combat}</span></div>
               <div className="flex justify-between"><span>體質:</span> <span className="text-green-400 font-bold font-mono">{targetNPC.stats.endurance}</span></div>
@@ -112,7 +112,7 @@ export default function ArenaView() {
           </div>
 
           <div className="text-xs text-gray-500 italic mt-2">
-            ※ 參賽將消耗 1 點行動力與 20 點體力。戰鬥表現將受五大素質影響，高幸運將帶來爆擊與閃避的奇蹟。
+            ※ 參賽將 <strong className="text-yellow-500">強制消耗 1 點行動力推進時段</strong>，並消耗 20 點體力。
           </div>
           
           <button onClick={startBattle} disabled={!selectedFighterId || actionPoints < 1} className={`w-full py-3 rounded font-bold text-xs tracking-widest border transition-all mt-auto ${(!selectedFighterId || actionPoints < 1) ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed' : 'bg-red-900/40 hover:bg-red-900/60 text-red-400 border-red-800 hover:border-red-600 shadow-md'}`}>
