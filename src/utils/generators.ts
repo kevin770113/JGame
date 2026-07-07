@@ -78,28 +78,29 @@ export const generateDailyMissions = (): Mission[] => {
   const targets = ['私掠物資', '深淵礦脈', '異端營地', '帝國商隊', '地下黑市', '古老遺跡'];
   const getName = () => `【${actions[Math.floor(Math.random() * actions.length)]}${targets[Math.floor(Math.random() * targets.length)]}】`;
 
+  // ★ V2.9.10 重新平衡任務難度、消耗與報酬階梯
   for (let i = 0; i < Math.floor(Math.random() * 2) + 3; i++) {
     missions.push({ 
-      id: `m-grn-${baseId}-${i}`, title: `［常規］${getName()}`, rank: '翠綠', requiredPhases: 1, staminaCost: 20, stressGain: 10, reward: 300 + Math.floor(Math.random() * 100), 
-      description: '常規安全外派，勞動性質溫和。', successRate: 1.0, obedienceReward: 0 
+      id: `m-grn-${baseId}-${i}`, title: `［常規］${getName()}`, rank: '翠綠', requiredPhases: 1, staminaCost: 20, stressGain: 10, reward: 250 + Math.floor(Math.random() * 100), 
+      description: '常規安全外派，勞動性質溫和。', successRate: 1.0, obedienceReward: 1 
     });
   }
   for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
     missions.push({ 
-      id: `m-blu-${baseId}-${i}`, title: `［進階］${getName()}`, rank: '蔚藍', requiredPhases: 2, staminaCost: 45, stressGain: 25, reward: 800 + Math.floor(Math.random() * 200), 
-      description: '危險差事。［失敗懲罰］若不幸失敗，酬金歸零，體力重挫 40 點，壓力暴增 20 點。', successRate: 0.8, obedienceReward: 2 
+      id: `m-blu-${baseId}-${i}`, title: `［進階］${getName()}`, rank: '蔚藍', requiredPhases: 2, staminaCost: 35, stressGain: 15, reward: 800 + Math.floor(Math.random() * 200), 
+      description: '危險差事。［失敗懲罰］若不幸失敗，酬金歸零，並扣除大量體力與壓力。', successRate: 0.8, obedienceReward: 2 
     });
   }
   if (Math.random() > 0.7) {
     missions.push({ 
-      id: `m-pur-${baseId}`, title: `［特化］${getName()}`, rank: '紫色', requiredPhases: 2, staminaCost: 50, stressGain: 30, reward: 1200 + Math.floor(Math.random() * 300), 
-      description: '特化高危工作。［失敗懲罰］若不幸失敗，酬金歸零，體力重挫 40 點，壓力暴增 20 點。', successRate: 0.6, obedienceReward: 5 
+      id: `m-pur-${baseId}`, title: `［特化］${getName()}`, rank: '紫色', requiredPhases: 3, staminaCost: 50, stressGain: 25, reward: 2000 + Math.floor(Math.random() * 400), 
+      description: '特化高危工作。成功將帶來「高額威望」獎勵。［失敗懲罰］若不幸失敗，酬金歸零，並扣除大量體力與壓力。', successRate: 0.6, obedienceReward: 3 
     });
   }
   if (Math.random() > 0.8) {
     missions.push({ 
-      id: `m-gld-${baseId}`, title: `［傳說］${getName()}`, rank: '黃金', requiredPhases: 5, staminaCost: 90, stressGain: 60, reward: 3500 + Math.floor(Math.random() * 1500), 
-      description: '死亡搏命委託。［失敗懲罰］若不幸失敗，酬金歸零，體力重挫 40 點，壓力暴增 20 點。', successRate: 0.6, obedienceReward: 5 
+      id: `m-gld-${baseId}`, title: `［傳說］${getName()}`, rank: '黃金', requiredPhases: 5, staminaCost: 70, stressGain: 40, reward: 3500 + Math.floor(Math.random() * 800), 
+      description: '死亡搏命委託。成功將獲得「極高威望」與「一項能力突破」。［失敗懲罰］若不幸失敗，酬金歸零，並扣除極大體力與壓力。', successRate: 0.6, obedienceReward: 5 
     });
   }
   return missions;
