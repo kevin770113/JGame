@@ -161,10 +161,11 @@ export default function CombatTheater() {
             <div className="flex flex-col gap-4 max-w-3xl mx-auto w-full pt-12 pb-24 relative">
               {displayedLogs.map((log, idx) => {
                 const logAny = log as any;
-                // ★ V2.10.0 即時攔截 messageKey 並翻譯，若無則降級為原本的字串
                 let text = log.message;
+                
+                // ★ 加入 as string 斷言，解決 TypeScript 嚴格編譯報錯
                 if (logAny.messageKey) {
-                   text = t(logAny.messageKey, { ...logAny.messageParams, defaultValue: log.message });
+                   text = t(logAny.messageKey, { ...logAny.messageParams, defaultValue: log.message }) as string;
                 }
 
                 // 跨語言通用高亮：不論翻譯成哪國語言，皆能精準找出名字並上色
