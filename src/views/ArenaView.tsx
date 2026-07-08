@@ -1,146 +1,139 @@
-import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next'; // ★ V2.10.0 引入翻譯引擎
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGameStore } from '../store/useGameStore';
-import WheelPicker, { WheelOption } from '../components/WheelPicker';
+import CustomSelect, { Option } from '../components/CustomSelect';
+import { parseLocalizedName } from '../utils/i18nUtils';
 
 export default function ArenaView() {
-  const { t } = useTranslation(); // ★ V2.10.0 掛載翻譯函數
-  const { location } = useGameStore((state) => state.player);
-  const navigate = useGameStore((state) => state.navigate);
-  const executeArenaBattle = useGameStore((state) => state.executeArenaBattle);
-  const processTurn = useGameStore((state) => state.processTurn);
-  
-  const setGlobalModal = useGameStore((state) => state.setGlobalModal);
+  const { t } = useTranslation();
   const slaves = useGameStore((state) => state.slaves);
-  const actionPoints = useGameStore((state) => state.player.actionPoints);
-
-  const [selectedFighterId, setSelectedFighterId] = useState<string>('');
-
-  const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
   const arenaNPCs = useGameStore((state) => state.arenaNPCs);
-  const targetNPC = arenaNPCs.find(n => n.location === location);
+  const { actionPoints, location } = useGameStore((state) => state.player);
+  const executeArenaBattle = useGameStore((state) => state.executeArenaBattle);
+  const navigate = useGameStore((state) => state.navigate);
 
-  useEffect(() => {
-    if (idleSlaves.length > 0 && !selectedFighterId) {
-      setSelectedFighterId(idleSlaves[0].id);
+  const [selectedSlaveId, setSelectedSlaveId] = useState<string>('');
+  const [sysMessage, setSysMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
+
+  const localNPCs = arenaNPCs.filter(npc => npc.location === location);
+  const idleSlaves = slaves.filter(s => s.activityStatus === '閒置' && (s.faintTurns || 0) === 0);
+
+  const handleFight = (npcId: string) => {
+    if (!selectedSlaveId) {
+      setSysMessage({ text: t('arena.err_no_fighter', '［錯誤］請先選擇要上陣的試驗體。'), type: 'error' });
+      return;
     }
-  }, [idleSlaves, selectedFighterId]);
-
-  const currentFighter = slaves.find(s => s.id === selectedFighterId);
-  const isStaminaInsufficient = currentFighter ? currentFighter.conditionStats.stamina < 20 : true;
-
-  const startBattle = () => {
-    if (!targetNPC || !selectedFighterId) return;
-    if (isStaminaInsufficient) return;
-    
-    if (actionPoints < 1) { 
-      setGlobalModal({ title: t('ui.system_warning', '［系統警告］'), message: t('ui.no_ap', '目前行動力不足。'), isConfirm: false }); 
-      return; 
+    if (actionPoints < 1) {
+      setSysMessage({ text: t('arena.err_no_ap', '［系統警告］行動力不足。'), type: 'error' });
+      return;
     }
 
-    const result = executeArenaBattle(selectedFighterId, targetNPC.id);
-    if (result) {
-      setSelectedFighterId('');
-      processTurn();
-    }
+    executeArenaBattle(selectedSlaveId, npcId);
   };
 
-  const fighterOptions: WheelOption[] = idleSlaves.map(s => {
-    const isExhausted = s.conditionStats.stamina < 20;
-    return {
-      value: s.id,
-      label: `${s.name} (${t('stats.stamina', '體力')}: ${s.conditionStats.stamina}) ${isExhausted ? t('ui.stamina_low', '［體力不足］') : ''}`,
-      disabled: isExhausted
-    };
-  });
+  const slaveOptions: Option[] = idleSlaves.map(s => ({
+    value: s.id,
+    label: `${parseLocalizedName(s.name)} (${t('stats.combat', '武力')}: ${s.primaryStats.combat} | ${t('stats.endurance', '體質')}: ${s.primaryStats.endurance})`,
+    disabled: s.conditionStats.stamina < 20
+  }));
 
-  if (!targetNPC) {
-    return (
-      <div className="w-full flex flex-col items-center justify-center min-h-[50vh] text-gray-500 font-bold tracking-widest animate-pulse">
-        {t('arena.no_target', '［該地區尚無可挑戰之目標］')}
-      </div>
-    );
-  }
-
-  const charismaBonusMultiplier = 1 + Math.floor(targetNPC.stats.charisma / 10) * 0.05;
-  const expectedReward = Math.floor(targetNPC.rewardGold * charismaBonusMultiplier);
-  const isButtonDisabled = !selectedFighterId || actionPoints < 1 || isStaminaInsufficient;
+  const activeSlave = slaves.find(s => s.id === selectedSlaveId);
 
   return (
-    <div className="w-full flex flex-col gap-5 pb-32 animate-fade-in relative z-10">
+    <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in relative z-10">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
-          <h2 className="text-xl font-bold text-gray-300">{t('arena.title', '血腥角鬥場')}</h2>
-          <p className="text-xs text-gray-500 mt-1">{t('arena.desc', '殘酷的地下死鬥，活下來的人將獲得榮耀與金錢。')}</p>
+          <h2 className="text-xl font-bold text-red-500 tracking-widest">{t('arena.title', '［血腥角鬥場］')}</h2>
+          <p className="text-2xs text-gray-500 mt-1">{t('arena.desc', '帝國高層的殘酷娛樂。贏得勝利以獲取資金與威望。')}</p>
         </div>
-        <button 
-          onClick={() => navigate('Town', 'Main')}
-          className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
-        >
+        <button onClick={() => navigate('Town', 'Main')} className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest">
           {t('ui.return_town', '［返回城鎮］')}
         </button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-5 mt-2">
-        <div className="w-full md:w-1/2 flex flex-col gap-3">
-          <div className="bg-gray-900/80 p-4 rounded-lg border border-red-900 shadow-xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-2 opacity-10">
-              <span className="text-6xl">⚔️</span>
+      <div className="bg-gray-900/80 p-4 sm:p-5 rounded-lg border border-red-900/50 shadow-[0_0_15px_rgba(220,38,38,0.1)] flex flex-col gap-4">
+        
+        <div className="flex flex-col gap-2">
+          <label className="text-xs text-red-400 font-bold tracking-widest border-l-2 border-red-500 pl-2">{t('arena.select_fighter', '［指派上陣鬥士］')}</label>
+          {slaveOptions.length > 0 ? (
+            <CustomSelect options={slaveOptions} value={selectedSlaveId} onChange={setSelectedSlaveId} focusColor="red" />
+          ) : (
+            <div className="text-xs text-gray-500 bg-gray-950 p-3 rounded border border-gray-800">
+              {t('arena.no_fighter', '目前沒有閒置且有戰鬥力的奴隸。')}
             </div>
-            <div className="text-xs text-red-500 font-bold tracking-widest mb-1">{t('arena.current_boss', '［當前地區鎮守者］')}</div>
-            <h3 className="text-xl font-black text-gray-200 mb-2 truncate group-hover:text-red-400 transition-colors">
-              {targetNPC.name}
-            </h3>
-            <p className="text-xs text-gray-400 leading-relaxed italic mb-3 min-h-[40px]">
-              「{targetNPC.description}」
-            </p>
-            
-            <div className="grid grid-cols-2 gap-2 mt-2 bg-gray-950 p-3 rounded border border-gray-800 text-xs">
-              <div className="flex justify-between"><span>{t('stats.combat', '武力')}:</span> <span className="text-red-400 font-bold font-mono">{targetNPC.stats.combat}</span></div>
-              <div className="flex justify-between"><span>{t('stats.endurance', '體質')}:</span> <span className="text-green-400 font-bold font-mono">{targetNPC.stats.endurance}</span></div>
-              <div className="flex justify-between"><span>{t('stats.intelligence', '智力')}:</span> <span className="text-blue-400 font-bold font-mono">{targetNPC.stats.intelligence}</span></div>
-              <div className="flex justify-between"><span>{t('stats.charisma', '魅力')}:</span> <span className="text-pink-400 font-bold font-mono">{targetNPC.stats.charisma}</span></div>
-              <div className="flex justify-between col-span-2"><span>{t('stats.luck', '幸運')}:</span> <span className="text-yellow-400 font-bold font-mono">{targetNPC.stats.luck}</span></div>
+          )}
+          {activeSlave && (
+            <div className="text-3xs text-gray-400 mt-1 flex justify-between px-1">
+              <span>{t('stats.stamina', '體力')}: <strong className={activeSlave.conditionStats.stamina < 30 ? 'text-red-400' : 'text-green-400'}>{activeSlave.conditionStats.stamina}/100</strong> (最低需求: 20)</span>
+              <span>{t('stats.skill_combat', '戰鬥專精')}: <strong className="text-blue-400">Lv.{activeSlave.skills.combat}</strong></span>
             </div>
-
-            <div className="mt-3 text-xs text-gray-500 tracking-widest">
-              {t('arena.expected_reward', '期望賞金:')} <strong className="text-yellow-500">{expectedReward}</strong> {t('ui.gold', '資金')} 
-              {charismaBonusMultiplier > 1 && <span className="text-3xs text-gray-600 ml-1">{t('arena.charisma_bonus', '(含魅力加成)')}</span>}
-              {targetNPC.rewardPrestige > 0 && <span className="ml-2">| {t('ui.prestige', '威望:')} <strong className="text-blue-400">+{targetNPC.rewardPrestige}</strong></span>}
-            </div>
-          </div>
+          )}
         </div>
 
-        <div className="w-full md:w-1/2 flex flex-col gap-4 bg-gray-900/60 p-4 rounded-lg border border-gray-800 justify-between min-h-[220px]">
-          <div className="flex flex-col gap-2">
-            <label className="text-xs text-gray-400 font-bold tracking-widest border-l-2 border-yellow-600 pl-2 mb-1">{t('arena.dispatch_fighter', '［派遣鬥士］')}</label>
-            
-            {idleSlaves.length > 0 ? (
-              <WheelPicker options={fighterOptions} value={selectedFighterId} onChange={setSelectedFighterId} />
-            ) : (
-              <div className="text-xs text-red-500 p-3 border border-red-900/30 rounded bg-red-950/20 text-center tracking-widest">
-                {t('arena.no_idle_fighter', '無閒置成員可參賽。')}
-              </div>
-            )}
+        {sysMessage && (
+          <div className={`p-3 rounded border text-xs font-bold text-center tracking-widest ${sysMessage.type === 'error' ? 'bg-red-950/80 border-red-900 text-red-400' : 'bg-green-950/80 border-green-900 text-green-400'}`}>
+            {sysMessage.text}
           </div>
+        )}
 
-          <div className="flex flex-col gap-3 mt-auto">
-            <div className="text-xs text-gray-500 italic leading-relaxed">
-              ※ {t('arena.warning_cost_1', '參賽將')} <strong className="text-yellow-500">{t('arena.warning_cost_2', '強制消耗 1 點行動力推進時段')}</strong>{t('arena.warning_cost_3', '，並消耗該鬥士 20 點體力。')}
-            </div>
-            
-            <button 
-              onClick={startBattle} 
-              disabled={isButtonDisabled} 
-              className={`w-full py-3.5 rounded font-bold text-xs tracking-widest border transition-all ${
-                isButtonDisabled 
-                  ? 'bg-gray-950 text-gray-600 border-gray-850 cursor-not-allowed shadow-none opacity-50' 
-                  : 'bg-red-900/40 hover:bg-red-900/60 text-red-400 border-red-800 hover:border-red-600 shadow-md active:scale-98'
-              }`}
-            >
-              {isStaminaInsufficient && idleSlaves.length > 0 ? t('ui.stamina_insufficient', '［體力不足，無法戰鬥］') : t('ui.start_battle', '［開始戰鬥］')}
-            </button>
-          </div>
+        <div className="flex flex-col gap-4 mt-2">
+          {localNPCs.length === 0 && (
+            <div className="text-xs text-gray-500 text-center py-4">{t('arena.no_npc', '該區域目前沒有可挑戰的對手。')}</div>
+          )}
+          {localNPCs.map(npc => {
+            let winRate = 0;
+            if (activeSlave) {
+              const pScore = activeSlave.primaryStats.combat * 1.5 + activeSlave.primaryStats.endurance + (activeSlave.skills.combat * 20);
+              const nScore = npc.stats.combat * 1.5 + npc.stats.endurance;
+              winRate = Math.min(95, Math.max(5, Math.floor((pScore / (pScore + nScore)) * 100)));
+            }
+
+            return (
+              <div key={npc.id} className="bg-gray-950 p-4 rounded-lg border border-gray-800 flex flex-col gap-3 relative overflow-hidden group hover:border-red-900/50 transition-colors">
+                <div className="flex justify-between items-start z-10">
+                  <div className="flex flex-col gap-1">
+                    <h4 className="text-sm font-bold text-gray-200 group-hover:text-red-400 transition-colors tracking-widest">{t(`npc.${npc.id}`, npc.name)}</h4>
+                    <p className="text-3xs text-gray-500 leading-relaxed max-w-[200px]">{t(`npc_desc.${npc.id}`, npc.description)}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span className="text-3xs text-gray-500 font-bold tracking-widest">{t('arena.reward', '賞金 / 威望')}</span>
+                    <span className="text-yellow-500 font-bold font-mono text-sm">${npc.rewardGold}</span>
+                    <span className="text-blue-400 font-bold font-mono text-xs">+{npc.rewardPrestige}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-1 bg-gray-900/50 p-2 rounded border border-gray-800 text-center font-mono text-3xs z-10">
+                  <div className="flex flex-col"><span className="text-gray-600">{t('stats.combat', '武力')}</span><span className="text-red-400 font-bold">{npc.stats.combat}</span></div>
+                  <div className="flex flex-col border-l border-gray-800"><span className="text-gray-600">{t('stats.endurance', '體質')}</span><span className="text-green-400 font-bold">{npc.stats.endurance}</span></div>
+                  <div className="flex flex-col border-l border-gray-800"><span className="text-gray-600">{t('stats.intelligence', '智力')}</span><span className="text-blue-400 font-bold">{npc.stats.intelligence}</span></div>
+                  <div className="flex flex-col border-l border-gray-800"><span className="text-gray-600">{t('stats.luck', '幸運')}</span><span className="text-yellow-400 font-bold">{npc.stats.luck}</span></div>
+                </div>
+
+                <div className="flex justify-between items-center mt-1 z-10">
+                  <div className="text-xs text-gray-400 font-bold tracking-widest">
+                    {activeSlave ? (
+                      <>
+                        {t('arena.win_rate', '系統勝率預測')}: <strong className={winRate >= 70 ? 'text-green-400' : winRate >= 40 ? 'text-yellow-400' : 'text-red-500'}>{winRate}%</strong>
+                      </>
+                    ) : (
+                      <span className="text-gray-600 italic text-2xs">{t('arena.select_to_predict', '選擇鬥士以預測勝率')}</span>
+                    )}
+                  </div>
+                  <button 
+                    onClick={() => handleFight(npc.id)}
+                    disabled={!selectedSlaveId || actionPoints < 1}
+                    className={`px-4 py-2.5 rounded font-bold text-xs tracking-widest transition-all shadow-md ${
+                      !selectedSlaveId || actionPoints < 1
+                        ? 'bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed'
+                        : 'bg-red-950/80 hover:bg-red-900 text-red-400 hover:text-red-300 border border-red-800'
+                    }`}
+                  >
+                    {t('arena.btn_fight', '［生死狀簽署］')}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
