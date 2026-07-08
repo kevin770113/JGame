@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next'; // ★ V2.10.0 引入翻譯引擎
 import { useGameStore } from '../store/useGameStore';
 import WheelPicker, { WheelOption } from '../components/WheelPicker';
 
 export default function ArenaView() {
+  const { t } = useTranslation(); // ★ V2.10.0 掛載翻譯函數
   const { location } = useGameStore((state) => state.player);
   const navigate = useGameStore((state) => state.navigate);
   const executeArenaBattle = useGameStore((state) => state.executeArenaBattle);
@@ -18,7 +20,6 @@ export default function ArenaView() {
   const arenaNPCs = useGameStore((state) => state.arenaNPCs);
   const targetNPC = arenaNPCs.find(n => n.location === location);
 
-  // ★ V2.9.12 當可用奴隸名冊更新時，若無選擇者則預設指向滾輪首位
   useEffect(() => {
     if (idleSlaves.length > 0 && !selectedFighterId) {
       setSelectedFighterId(idleSlaves[0].id);
@@ -33,7 +34,7 @@ export default function ArenaView() {
     if (isStaminaInsufficient) return;
     
     if (actionPoints < 1) { 
-      setGlobalModal({ title: '［系統警告］', message: '目前行動力不足。', isConfirm: false }); 
+      setGlobalModal({ title: t('ui.system_warning', '［系統警告］'), message: t('ui.no_ap', '目前行動力不足。'), isConfirm: false }); 
       return; 
     }
 
@@ -44,12 +45,11 @@ export default function ArenaView() {
     }
   };
 
-  // ★ V2.9.12 轉換為符合 3D 滾輪的單行簡潔格式
   const fighterOptions: WheelOption[] = idleSlaves.map(s => {
     const isExhausted = s.conditionStats.stamina < 20;
     return {
       value: s.id,
-      label: `${s.name} (體力: ${s.conditionStats.stamina}) ${isExhausted ? '［體力不足］' : ''}`,
+      label: `${s.name} (${t('stats.stamina', '體力')}: ${s.conditionStats.stamina}) ${isExhausted ? t('ui.stamina_low', '［體力不足］') : ''}`,
       disabled: isExhausted
     };
   });
@@ -57,29 +57,27 @@ export default function ArenaView() {
   if (!targetNPC) {
     return (
       <div className="w-full flex flex-col items-center justify-center min-h-[50vh] text-gray-500 font-bold tracking-widest animate-pulse">
-        ［該地區尚無可挑戰之目標］
+        {t('arena.no_target', '［該地區尚無可挑戰之目標］')}
       </div>
     );
   }
 
   const charismaBonusMultiplier = 1 + Math.floor(targetNPC.stats.charisma / 10) * 0.05;
   const expectedReward = Math.floor(targetNPC.rewardGold * charismaBonusMultiplier);
-
-  // 判定按鈕是否需要完全反灰鎖死
   const isButtonDisabled = !selectedFighterId || actionPoints < 1 || isStaminaInsufficient;
 
   return (
     <div className="w-full flex flex-col gap-5 pb-32 animate-fade-in relative z-10">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
-          <h2 className="text-xl font-bold text-gray-300">血腥角鬥場</h2>
-          <p className="text-xs text-gray-500 mt-1">殘酷的地下死鬥，活下來的人將獲得榮耀與金錢。</p>
+          <h2 className="text-xl font-bold text-gray-300">{t('arena.title', '血腥角鬥場')}</h2>
+          <p className="text-xs text-gray-500 mt-1">{t('arena.desc', '殘酷的地下死鬥，活下來的人將獲得榮耀與金錢。')}</p>
         </div>
         <button 
           onClick={() => navigate('Town', 'Main')}
           className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest"
         >
-          ［返回城鎮］
+          {t('ui.return_town', '［返回城鎮］')}
         </button>
       </div>
 
@@ -89,7 +87,7 @@ export default function ArenaView() {
             <div className="absolute top-0 right-0 p-2 opacity-10">
               <span className="text-6xl">⚔️</span>
             </div>
-            <div className="text-xs text-red-500 font-bold tracking-widest mb-1">［當前地區鎮守者］</div>
+            <div className="text-xs text-red-500 font-bold tracking-widest mb-1">{t('arena.current_boss', '［當前地區鎮守者］')}</div>
             <h3 className="text-xl font-black text-gray-200 mb-2 truncate group-hover:text-red-400 transition-colors">
               {targetNPC.name}
             </h3>
@@ -98,41 +96,39 @@ export default function ArenaView() {
             </p>
             
             <div className="grid grid-cols-2 gap-2 mt-2 bg-gray-950 p-3 rounded border border-gray-800 text-xs">
-              <div className="flex justify-between"><span>武力:</span> <span className="text-red-400 font-bold font-mono">{targetNPC.stats.combat}</span></div>
-              <div className="flex justify-between"><span>體質:</span> <span className="text-green-400 font-bold font-mono">{targetNPC.stats.endurance}</span></div>
-              <div className="flex justify-between"><span>智力:</span> <span className="text-blue-400 font-bold font-mono">{targetNPC.stats.intelligence}</span></div>
-              <div className="flex justify-between"><span>魅力:</span> <span className="text-pink-400 font-bold font-mono">{targetNPC.stats.charisma}</span></div>
-              <div className="flex justify-between col-span-2"><span>幸運:</span> <span className="text-yellow-400 font-bold font-mono">{targetNPC.stats.luck}</span></div>
+              <div className="flex justify-between"><span>{t('stats.combat', '武力')}:</span> <span className="text-red-400 font-bold font-mono">{targetNPC.stats.combat}</span></div>
+              <div className="flex justify-between"><span>{t('stats.endurance', '體質')}:</span> <span className="text-green-400 font-bold font-mono">{targetNPC.stats.endurance}</span></div>
+              <div className="flex justify-between"><span>{t('stats.intelligence', '智力')}:</span> <span className="text-blue-400 font-bold font-mono">{targetNPC.stats.intelligence}</span></div>
+              <div className="flex justify-between"><span>{t('stats.charisma', '魅力')}:</span> <span className="text-pink-400 font-bold font-mono">{targetNPC.stats.charisma}</span></div>
+              <div className="flex justify-between col-span-2"><span>{t('stats.luck', '幸運')}:</span> <span className="text-yellow-400 font-bold font-mono">{targetNPC.stats.luck}</span></div>
             </div>
 
             <div className="mt-3 text-xs text-gray-500 tracking-widest">
-              期望賞金: <strong className="text-yellow-500">{expectedReward}</strong> 資金 
-              {charismaBonusMultiplier > 1 && <span className="text-3xs text-gray-600 ml-1">(含魅力加成)</span>}
-              {targetNPC.rewardPrestige > 0 && <span className="ml-2">| 威望: <strong className="text-blue-400">+{targetNPC.rewardPrestige}</strong></span>}
+              {t('arena.expected_reward', '期望賞金:')} <strong className="text-yellow-500">{expectedReward}</strong> {t('ui.gold', '資金')} 
+              {charismaBonusMultiplier > 1 && <span className="text-3xs text-gray-600 ml-1">{t('arena.charisma_bonus', '(含魅力加成)')}</span>}
+              {targetNPC.rewardPrestige > 0 && <span className="ml-2">| {t('ui.prestige', '威望:')} <strong className="text-blue-400">+{targetNPC.rewardPrestige}</strong></span>}
             </div>
           </div>
         </div>
 
         <div className="w-full md:w-1/2 flex flex-col gap-4 bg-gray-900/60 p-4 rounded-lg border border-gray-800 justify-between min-h-[220px]">
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-gray-400 font-bold tracking-widest border-l-2 border-yellow-600 pl-2 mb-1">［派遣鬥士］</label>
+            <label className="text-xs text-gray-400 font-bold tracking-widest border-l-2 border-yellow-600 pl-2 mb-1">{t('arena.dispatch_fighter', '［派遣鬥士］')}</label>
             
-            {/* ★ V2.9.12 替換為全新 3D 垂直翻轉手勢滾輪 */}
             {idleSlaves.length > 0 ? (
               <WheelPicker options={fighterOptions} value={selectedFighterId} onChange={setSelectedFighterId} />
             ) : (
               <div className="text-xs text-red-500 p-3 border border-red-900/30 rounded bg-red-950/20 text-center tracking-widest">
-                無閒置成員可參賽。
+                {t('arena.no_idle_fighter', '無閒置成員可參賽。')}
               </div>
             )}
           </div>
 
           <div className="flex flex-col gap-3 mt-auto">
             <div className="text-xs text-gray-500 italic leading-relaxed">
-              ※ 參賽將 <strong className="text-yellow-500">強制消耗 1 點行動力推進時段</strong>，並消耗該鬥士 20 點體力。
+              ※ {t('arena.warning_cost_1', '參賽將')} <strong className="text-yellow-500">{t('arena.warning_cost_2', '強制消耗 1 點行動力推進時段')}</strong>{t('arena.warning_cost_3', '，並消耗該鬥士 20 點體力。')}
             </div>
             
-            {/* ★ V2.9.12 簡化按鈕文字，加強體力不足反灰鎖死邏輯 */}
             <button 
               onClick={startBattle} 
               disabled={isButtonDisabled} 
@@ -142,7 +138,7 @@ export default function ArenaView() {
                   : 'bg-red-900/40 hover:bg-red-900/60 text-red-400 border-red-800 hover:border-red-600 shadow-md active:scale-98'
               }`}
             >
-              {isStaminaInsufficient && idleSlaves.length > 0 ? '［體力不足，無法戰鬥］' : '［開始戰鬥］'}
+              {isStaminaInsufficient && idleSlaves.length > 0 ? t('ui.stamina_insufficient', '［體力不足，無法戰鬥］') : t('ui.start_battle', '［開始戰鬥］')}
             </button>
           </div>
         </div>
