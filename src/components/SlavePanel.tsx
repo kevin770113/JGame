@@ -55,7 +55,6 @@ const renderRadar = (slave: Slave, t: any) => {
   );
 };
 
-// ★ 修復：完全移除外部傳入的 onSelectSlave，確保點擊只在內部視窗切換
 export default function SlavePanel() {
   const { t } = useTranslation();
   const activeWindow = useGameStore((state) => state.activeWindow);
@@ -92,10 +91,8 @@ export default function SlavePanel() {
           onClick={handleToggle}
           className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-400 py-3 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
         >
-          <span>成</span>
-          <span>員</span>
-          <span>名</span>
-          <span>冊</span>
+          <span>{t('ui.member', '成')}</span>
+          <span>{t('ui.member', '員')}</span>
           <span className="mt-1 text-2xs px-1 bg-purple-950 text-purple-400 border border-purple-800 rounded-full font-mono">{slaves.length}</span>
         </button>
       </div>
@@ -107,7 +104,6 @@ export default function SlavePanel() {
         ></div>
       )}
 
-      {/* ★ 修復：改為從右側滑入 (right-0, translate-x-full) */}
       <div 
         className={`fixed right-0 top-0 h-full w-full max-w-lg sm:max-w-xl bg-gray-950 border-l border-purple-900/50 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
@@ -132,7 +128,7 @@ export default function SlavePanel() {
                 <button
                   key={slave.id}
                   onClick={() => {
-                    setActiveSlaveId(slave.id); // 只更新內部資料，絕不向外拋出事件
+                    setActiveSlaveId(slave.id);
                   }}
                   className={`w-full p-3 flex flex-col items-left text-left gap-1 transition-all relative overflow-hidden group border-l-2 ${
                     isSelected 
@@ -148,11 +144,11 @@ export default function SlavePanel() {
                       {slave.gender === 'Male' ? t('gender.male_short', '男') : t('gender.female_short', '女')}
                     </span>
                     <span>•</span>
-                    <span className="truncate">{slave.race}</span>
+                    <span className="truncate">{t(`race.${slave.race}`, slave.race)}</span>
                   </div>
                   {slave.activityStatus !== '閒置' && (
                     <span className="absolute bottom-1 right-1 text-[8px] px-1 bg-yellow-950/80 text-yellow-500 border border-yellow-900/50 rounded font-bold scale-90">
-                      {slave.activityStatus}
+                      {t(`activity_status.${slave.activityStatus}`, slave.activityStatus)}
                     </span>
                   )}
                   {slave.isInjured && (
@@ -188,10 +184,10 @@ export default function SlavePanel() {
                     </h4>
                     <div className="flex flex-wrap gap-1">
                       <span className="text-[10px] text-gray-400 bg-gray-950 px-1.5 py-0.5 rounded border border-gray-800">
-                        {activeSlave.race}
+                        {t(`race.${activeSlave.race}`, activeSlave.race)}
                       </span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded border ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-800 text-gray-500' : 'bg-yellow-950 border-yellow-900 text-yellow-500 font-bold'}`}>
-                        {activeSlave.activityStatus}
+                        {t(`activity_status.${activeSlave.activityStatus}`, activeSlave.activityStatus)}
                       </span>
                     </div>
                   </div>
