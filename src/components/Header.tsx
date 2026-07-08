@@ -122,7 +122,8 @@ export default function Header() {
         <div className="flex-1 flex flex-col justify-between text-[11px] sm:text-xs font-bold tracking-widest py-0.5">
           <div className="flex justify-between items-center text-gray-400 border-b border-gray-800/50 pb-0.5">
             <span className="flex items-center gap-1">
-              <span>[{t('ui.day_prefix', '第')}{day}{t('ui.day_suffix', '天')} - <span className="text-gray-200">{timePhase}</span>]</span>
+              {/* ★ 修復：將 {timePhase} 替換為 {getTimeSlotName()} */}
+              <span>[{t('ui.day_prefix', '第')}{day}{t('ui.day_suffix', '天')} - <span className="text-gray-200">{getTimeSlotName()}</span>]</span>
               <span className="border-l border-gray-700 h-2.5 mx-0.5 sm:mx-1"></span>
               <span>[{getSceneName()}]</span>
             </span>
