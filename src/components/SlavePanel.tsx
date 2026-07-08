@@ -68,10 +68,11 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
   const [activeSlaveId, setActiveSlaveId] = useState<string | null>(null);
   const [slaveTab, setSlaveTab] = useState<'ability' | 'status'>('ability');
 
-  const isOpen = activeWindow === 'slaves';
+  // ★ 修復：此處需與 store 的型別對齊
+  const isOpen = activeWindow === 'roster';
 
   const handleToggle = () => {
-    setActiveWindow(isOpen ? null : 'slaves');
+    setActiveWindow(isOpen ? null : 'roster');
   };
 
   useEffect(() => {
