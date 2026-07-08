@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next'; // ★ V2.10.0 多語系引入
+import { useTranslation } from 'react-i18next';
 import { useGameStore } from '../store/useGameStore';
 import { CombatLog } from '../types';
+import { parseLocalizedName } from '../utils/i18nUtils'; // ★ V2.11.0 引入雙語解析
 
 export default function CombatTheater() {
-  const { t } = useTranslation(); // ★ V2.10.0 掛載翻譯函數
+  const { t } = useTranslation();
   const activeCombat = useGameStore((state) => state.activeCombat);
   const setActiveCombat = useGameStore((state) => state.setActiveCombat);
 
@@ -17,6 +18,18 @@ export default function CombatTheater() {
   const [activeEffect, setActiveEffect] = useState<'none' | 'slave-hit' | 'npc-hit' | 'slave-skill'>('none');
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // ★ V2.11.0 建立組件存活狀態 Ref 追蹤
+  const isMounted = useRef<boolean>(true);
+  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current); // ★ 解除安裝時強制截斷計時器
+    };
+  }, []);
 
   useEffect(() => {
     if (activeCombat) {
@@ -32,15 +45,17 @@ export default function CombatTheater() {
   useEffect(() => {
     if (!activeCombat || isFinished) return;
 
-    const timer = setTimeout(() => {
+    const playNextFrame = () => {
+      if (!isMounted.current) return; // ★ 防護：組件已被卸載則終止執行更新
+
       if (currentFrame < activeCombat.logs.length) {
         const log = activeCombat.logs[currentFrame];
         
         setDisplayedLogs(prev => [...prev, log]);
-        
         if (log.sHp !== undefined) setSlaveHp(log.sHp);
         if (log.nHp !== undefined) setNpcHp(log.nHp);
 
+        // 使用原始名稱欄位判定攻擊方
         if (log.type === 'damage') {
           if (log.message.includes(activeCombat.slaveName + ' 發動攻擊')) setActiveEffect('npc-hit');
           else setActiveEffect('slave-hit');
@@ -48,14 +63,20 @@ export default function CombatTheater() {
           setActiveEffect('slave-skill');
         }
 
-        setTimeout(() => setActiveEffect('none'), 300);
+        setTimeout(() => {
+          if (isMounted.current) setActiveEffect('none');
+        }, 300);
+
         setCurrentFrame(prev => prev + 1);
       } else {
         setIsFinished(true);
       }
-    }, 1000); 
+    };
 
-    return () => clearTimeout(timer);
+    timeoutIdRef.current = setTimeout(playNextFrame, 1000);
+    return () => {
+      if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
+    };
   }, [activeCombat, currentFrame, isFinished]);
 
   useEffect(() => {
@@ -79,21 +100,23 @@ export default function CombatTheater() {
     }
   };
 
-  const sNameLong = activeCombat.slaveName.length > 8;
+  // 雙語名字在地化解析
+  const localizedSlaveName = parseLocalizedName(activeCombat.slaveName);
+  const localizedNpcName = parseLocalizedName(activeCombat.npcName);
+
+  const sNameLong = localizedSlaveName.length > 8;
   const sNameClass = sNameLong 
     ? "text-sm md:text-base tracking-normal leading-tight whitespace-nowrap" 
     : "text-base md:text-xl tracking-widest leading-snug whitespace-nowrap";
 
-  const nNameLong = activeCombat.npcName.length > 8;
+  const nNameLong = localizedNpcName.length > 8;
   const nNameClass = nNameLong 
     ? "text-sm md:text-base tracking-normal leading-tight text-right whitespace-nowrap" 
     : "text-base md:text-xl tracking-widest leading-snug text-right whitespace-nowrap";
 
   return (
     <div className="fixed inset-0 z-[100] bg-black bg-[url('https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/bg-abyss-capital.webp')] bg-cover bg-center bg-no-repeat flex flex-col animate-fade-in overflow-hidden select-none font-mono">
-      
       <div className="absolute inset-0 bg-black/50 z-0 pointer-events-none"></div>
-
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className={`absolute inset-0 transform-gpu will-change-opacity transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(220,20,20,0.6)_100%)] ${!isFinished ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
       </div>
@@ -108,7 +131,7 @@ export default function CombatTheater() {
         <div className="flex justify-between items-start gap-4 max-w-4xl mx-auto w-full">
           <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'slave-hit' ? 'translate-x-[-10px] md:translate-x-[-20px]' : activeEffect === 'slave-skill' ? 'scale-105' : ''}`}>
             <span className={`text-blue-400 font-bold break-all ${sNameClass}`}>
-              {activeCombat.slaveName}
+              {localizedSlaveName}
             </span>
             <div className="w-full h-5 md:h-6 bg-gray-900 border border-gray-700 rounded-sm overflow-hidden relative">
               <div 
@@ -128,7 +151,7 @@ export default function CombatTheater() {
 
           <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'npc-hit' ? 'translate-x-[10px] md:translate-x-[20px]' : ''}`}>
             <span className={`text-red-400 font-bold break-all ${nNameClass}`}>
-              {activeCombat.npcName}
+              {localizedNpcName}
             </span>
             <div className="w-full h-5 md:h-6 bg-gray-900 border border-gray-700 rounded-sm overflow-hidden relative rotate-180">
               <div 
@@ -146,7 +169,6 @@ export default function CombatTheater() {
 
       <div className="flex-1 relative overflow-hidden z-10 flex flex-col">
         <div className="absolute inset-0 bg-black/70 z-0 pointer-events-none"></div>
-        
         <div 
           className="absolute inset-0 z-10"
           style={{ 
@@ -154,24 +176,20 @@ export default function CombatTheater() {
             WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' 
           }}
         >
-          <div 
-            ref={scrollContainerRef}
-            className="absolute inset-0 overflow-y-auto scrollbar-none z-20 p-4 md:p-8"
-          >
+          <div ref={scrollContainerRef} className="absolute inset-0 overflow-y-auto scrollbar-none z-20 p-4 md:p-8">
             <div className="flex flex-col gap-4 max-w-3xl mx-auto w-full pt-12 pb-24 relative">
               {displayedLogs.map((log, idx) => {
                 const logAny = log as any;
                 let text = log.message;
                 
-                // ★ 加入 as string 斷言，解決 TypeScript 嚴格編譯報錯
                 if (logAny.messageKey) {
                    text = t(logAny.messageKey, { ...logAny.messageParams, defaultValue: log.message }) as string;
                 }
 
-                // 跨語言通用高亮：不論翻譯成哪國語言，皆能精準找出名字並上色
+                // 進行高亮替換時，一律使用已解析的在地化名字
                 const highlightedText = text
-                  .replace(activeCombat.slaveName, `<strong class="text-blue-300">${activeCombat.slaveName}</strong>`)
-                  .replace(activeCombat.npcName, `<strong class="text-red-400">${activeCombat.npcName}</strong>`);
+                  .replace(activeCombat.slaveName, `<strong class="text-blue-300">${localizedSlaveName}</strong>`)
+                  .replace(activeCombat.npcName, `<strong class="text-red-400">${localizedNpcName}</strong>`);
 
                 return (
                   <div key={idx} className={`animate-slide-up text-sm md:text-base leading-relaxed ${getLogColor(log.type)}`}>
@@ -193,7 +211,6 @@ export default function CombatTheater() {
             <div className={`text-xl font-black tracking-[0.2em] drop-shadow-md ${activeCombat.isWin ? 'text-yellow-500' : 'text-red-600'}`}>
               {activeCombat.isWin ? t('combat.victory', '［討伐成功］') : t('combat.defeat', '［試驗體倒下］')}
             </div>
-            
             {activeCombat.isWin && (
               <div className="text-xs text-gray-400 flex gap-4">
                 <span>{t('combat.reward_gold', '獲得資金:')} <strong className="text-yellow-500">${activeCombat.rewardGold}</strong></span>
