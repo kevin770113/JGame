@@ -56,7 +56,7 @@ export default function ArenaView() {
         <div className="flex flex-col gap-2">
           <label className="text-xs text-red-400 font-bold tracking-widest border-l-2 border-red-500 pl-2">{t('arena.select_fighter', '［指派上陣鬥士］')}</label>
           {slaveOptions.length > 0 ? (
-            <CustomSelect options={slaveOptions} value={selectedSlaveId} onChange={setSelectedSlaveId} focusColor="red" />
+            <CustomSelect options={slaveOptions} value={selectedSlaveId} onChange={setSelectedSlaveId} focusColor="gray" />
           ) : (
             <div className="text-xs text-gray-500 bg-gray-950 p-3 rounded border border-gray-800">
               {t('arena.no_fighter', '目前沒有閒置且有戰鬥力的奴隸。')}
