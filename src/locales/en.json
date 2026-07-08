@@ -1,0 +1,46 @@
+{
+  "ui": {
+    "start_battle": "[Start Battle]",
+    "return_town": "[Return to Town]",
+    "return_base": "[Return to Base]",
+    "close": "[Close]",
+    "cancel": "[Cancel]",
+    "confirm": "[Confirm]",
+    "confirm_execute": "[Execute]",
+    "stamina_insufficient": "[Insufficient Stamina]"
+  },
+  "system": {
+    "menu_title": "[System Control Hub]",
+    "data_sync": "Data Sync",
+    "data_sync_desc": "Manually force upload your current progress.",
+    "manual_save": "[Manual Save]",
+    "saving": "[Syncing...]",
+    "save_cooldown": "[Safely Saved]",
+    "emergency_load": "Emergency Override",
+    "emergency_load_desc": "Force pull cloud save to fix local errors.",
+    "pull_cloud": "[Pull Cloud Save]",
+    "dev_mode": "[Developer Debug Mode]",
+    "dev_mode_desc": "Remote DB overview & local cache clear.",
+    "view_all_data": "[View All Data]",
+    "fetching": "Loading...",
+    "reset_list": "[Reset Roster]",
+    "db_empty": "[Database is currently empty]",
+    "patch_notes": "[Patch Notes]",
+    "docs": "[Documentation]",
+    "bug_report": "[Bug Report]",
+    "logout_clear": "[Logout & Clear Cache]",
+    "language_setting": "[Language Settings]",
+    "language_desc": "Select the display language for interface and logs."
+  },
+  "stats": {
+    "combat": "Combat",
+    "endurance": "Endurance",
+    "intelligence": "Intelligence",
+    "charisma": "Charisma",
+    "luck": "Luck",
+    "stamina": "Stamina",
+    "stress": "Stress",
+    "rebellion": "Rebellion",
+    "obedience": "Obedience"
+  }
+}
