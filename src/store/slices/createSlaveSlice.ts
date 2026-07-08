@@ -4,6 +4,7 @@ import { Slave, Role } from '../../types';
 import { fetchIdentityBatch } from '../../services/aiService';
 import { supabase } from '../../services/supabaseClient';
 import { generateBaseMarketSlave } from '../../utils/generators';
+import { getRandomFallbackName } from '../../utils/fallbackNames'; // ★ V2.11.0 引入備援庫
 
 export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get) => ({
   slaves: [],
@@ -59,7 +60,9 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
 
   consumeIdentity: async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return { name: "無名幽影", story: "" };
+    
+    // ★ 如果沒連線，直接抽本地備援，不走 AI，避免斷網卡死
+    if (!session) return { name: getRandomFallbackName() };
     
     set({ isPoolGenerating: true });
     
@@ -70,20 +73,16 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
          query = query.not('id', 'in', `(${usedIds.join(',')})`);
       }
       
-      const { data: poolData, error: poolError } = await query.limit(50);
+      // ★ 防禦雪崩：我們只去資料庫拉資料。如果拉不到，不呼叫前端 AI，直接降級為本地備援。
+      const { data: poolData, error: poolError } = await query.limit(1);
       if (poolError) throw poolError;
       
-      const availableIdentities = poolData || [];
-      let identity = availableIdentities.length > 0 ? availableIdentities[0] : null;
+      const identity = (poolData && poolData.length > 0) ? poolData[0] : null;
       
       if (!identity) {
-         const newAiData = await fetchIdentityBatch(); 
-         const { data: insertedData, error: insertError } = await supabase.from('global_identities').insert(newAiData).select();
-         if (insertError) throw insertError;
-         if (insertedData && insertedData.length > 0) identity = insertedData[0];
+         console.warn('［系統］雲端名字庫已耗盡，啟動本地防禦備援陣列。');
+         return { name: getRandomFallbackName() };
       }
-      
-      if (!identity) throw new Error('AI 與資料庫雙重潰堤');
       
       const { error: logError } = await supabase.from('user_identity_logs').insert({ user_id: session.user.id, identity_id: identity.id });
       if (logError) console.warn("［寫入紀錄失敗］", logError); 
@@ -91,10 +90,12 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
       const newUsedIds = [...get().player.usedIdentityIds, identity.id];
       set((s: GameStore) => ({ player: { ...s.player, usedIdentityIds: newUsedIds } }));
       
-      return { name: identity.name, story: identity.story || "" };
+      // ★ 徹底移除 story，僅回傳 name
+      return { name: identity.name };
+      
     } catch (e) {
       console.error("［系統攔截］", e); 
-      return { name: `代號 ${Math.floor(Math.random() * 9000 + 1000)}`, story: "" };
+      return { name: getRandomFallbackName() };
     } finally {
       set({ isPoolGenerating: false });
     }
