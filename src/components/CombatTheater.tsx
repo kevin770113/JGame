@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next'; // ★ V2.10.0 多語系引入
 import { useGameStore } from '../store/useGameStore';
 import { CombatLog } from '../types';
 
 export default function CombatTheater() {
+  const { t } = useTranslation(); // ★ V2.10.0 掛載翻譯函數
   const activeCombat = useGameStore((state) => state.activeCombat);
   const setActiveCombat = useGameStore((state) => state.setActiveCombat);
 
@@ -77,7 +79,6 @@ export default function CombatTheater() {
     }
   };
 
-  // ★ V2.9.11 名字長度自適應算式與安全上限鎖定
   const sNameLong = activeCombat.slaveName.length > 8;
   const sNameClass = sNameLong 
     ? "text-sm md:text-base tracking-normal leading-tight whitespace-nowrap" 
@@ -100,12 +101,11 @@ export default function CombatTheater() {
       <div className="bg-gray-950/60 backdrop-blur-md border-b-2 border-blood-red/50 pt-6 pb-6 px-4 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)] relative z-10 min-h-[25vh] md:min-h-[30vh] flex flex-col justify-center">
         <div className="text-center mb-6">
           <span className="text-red-600 font-black tracking-[0.3em] text-xl md:text-2xl drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]">
-            {activeCombat.isAbyss ? '【深淵死鬥】' : '【角鬥廝殺】'}
+            {activeCombat.isAbyss ? t('combat.title_abyss', '【深淵死鬥】') : t('combat.title_arena', '【角鬥廝殺】')}
           </span>
         </div>
         
         <div className="flex justify-between items-start gap-4 max-w-4xl mx-auto w-full">
-          {/* 左側：玩家角色 */}
           <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'slave-hit' ? 'translate-x-[-10px] md:translate-x-[-20px]' : activeEffect === 'slave-skill' ? 'scale-105' : ''}`}>
             <span className={`text-blue-400 font-bold break-all ${sNameClass}`}>
               {activeCombat.slaveName}
@@ -126,7 +126,6 @@ export default function CombatTheater() {
              <span className="text-gray-600 font-black italic text-3xl md:text-4xl">VS</span>
           </div>
 
-          {/* 右側：敵方角色 */}
           <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'npc-hit' ? 'translate-x-[10px] md:translate-x-[20px]' : ''}`}>
             <span className={`text-red-400 font-bold break-all ${nNameClass}`}>
               {activeCombat.npcName}
@@ -160,12 +159,28 @@ export default function CombatTheater() {
             className="absolute inset-0 overflow-y-auto scrollbar-none z-20 p-4 md:p-8"
           >
             <div className="flex flex-col gap-4 max-w-3xl mx-auto w-full pt-12 pb-24 relative">
-              {displayedLogs.map((log, idx) => (
-                <div key={idx} className={`animate-slide-up text-sm md:text-base leading-relaxed ${getLogColor(log.type)}`}>
-                  <span className="text-gray-600 mr-3 text-xs md:text-sm opacity-70">[{log.round > 0 ? `回合 ${String(log.round).padStart(2, '0')}` : '系統'}]</span>
-                  <span dangerouslySetInnerHTML={{ __html: log.message.replace(activeCombat.slaveName, `<strong class="text-blue-300">${activeCombat.slaveName}</strong>`).replace(activeCombat.npcName, `<strong class="text-red-400">${activeCombat.npcName}</strong>`) }} />
-                </div>
-              ))}
+              {displayedLogs.map((log, idx) => {
+                const logAny = log as any;
+                // ★ V2.10.0 即時攔截 messageKey 並翻譯，若無則降級為原本的字串
+                let text = log.message;
+                if (logAny.messageKey) {
+                   text = t(logAny.messageKey, { ...logAny.messageParams, defaultValue: log.message });
+                }
+
+                // 跨語言通用高亮：不論翻譯成哪國語言，皆能精準找出名字並上色
+                const highlightedText = text
+                  .replace(activeCombat.slaveName, `<strong class="text-blue-300">${activeCombat.slaveName}</strong>`)
+                  .replace(activeCombat.npcName, `<strong class="text-red-400">${activeCombat.npcName}</strong>`);
+
+                return (
+                  <div key={idx} className={`animate-slide-up text-sm md:text-base leading-relaxed ${getLogColor(log.type)}`}>
+                    <span className="text-gray-600 mr-3 text-xs md:text-sm opacity-70">
+                      [{log.round > 0 ? t('combat.round_prefix', { round: String(log.round).padStart(2, '0'), defaultValue: `回合 ${String(log.round).padStart(2, '0')}` }) : t('combat.system_prefix', '系統')}]
+                    </span>
+                    <span dangerouslySetInnerHTML={{ __html: highlightedText }} />
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -175,13 +190,13 @@ export default function CombatTheater() {
         {isFinished && (
           <div className="flex flex-col items-center gap-3 w-full max-w-md animate-fade-in mt-2">
             <div className={`text-xl font-black tracking-[0.2em] drop-shadow-md ${activeCombat.isWin ? 'text-yellow-500' : 'text-red-600'}`}>
-              {activeCombat.isWin ? '［討伐成功］' : '［試驗體倒下］'}
+              {activeCombat.isWin ? t('combat.victory', '［討伐成功］') : t('combat.defeat', '［試驗體倒下］')}
             </div>
             
             {activeCombat.isWin && (
               <div className="text-xs text-gray-400 flex gap-4">
-                <span>獲得資金: <strong className="text-yellow-500">${activeCombat.rewardGold}</strong></span>
-                {activeCombat.rewardPrestige > 0 && <span>獲得威望: <strong className="text-blue-400">{activeCombat.rewardPrestige}</strong></span>}
+                <span>{t('combat.reward_gold', '獲得資金:')} <strong className="text-yellow-500">${activeCombat.rewardGold}</strong></span>
+                {activeCombat.rewardPrestige > 0 && <span>{t('combat.reward_prestige', '獲得威望:')} <strong className="text-blue-400">{activeCombat.rewardPrestige}</strong></span>}
               </div>
             )}
             <button 
@@ -192,7 +207,7 @@ export default function CombatTheater() {
                   : 'bg-red-950/60 hover:bg-red-900/80 text-red-500 border-red-900'
               }`}
             >
-              ［返回據點］
+              {t('combat.return_base', '［返回據點］')}
             </button>
           </div>
         )}
