@@ -35,7 +35,6 @@ export default function Header() {
     leaderName, leaderGender, leaderStamina, leaderFaintTurns, lastApUpdateTime
   } = useGameStore((state) => state.player);
   
-  const currentScene = useGameStore((state) => state.currentScene);
   const slaves = useGameStore((state) => state.slaves);
   const processTurn = useGameStore((state) => state.processTurn);
   const checkApRecovery = useGameStore((state) => state.checkApRecovery);
@@ -56,23 +55,22 @@ export default function Header() {
     return () => clearInterval(timer);
   }, [checkApRecovery]);
 
-  const getSceneName = () => {
-    if (currentScene === 'Home') return t('location.base', '據點大廳');
+  const getLocationName = () => {
     switch (location) {
-      case 'Capital': return t('location.capital', '帝國皇城');
-      case 'NeutralHub': return t('location.neutral_hub', '中立城');
       case 'Frontlines': return t('location.frontlines', '前線');
-      default: return t('location.unknown', '邊陲廢土');
+      case 'NeutralHub': return t('location.neutral_hub', '中立城');
+      case 'Capital': return t('location.capital', '皇城');
+      default: return t('location.unknown', '未知');
     }
   };
 
   const getTimeSlotName = () => {
     switch (timePhase) {
-      case '早上': return t('time.morning', '清晨 🌅');
-      case '中午': return t('time.noon', '正午 ☀️');
-      case '下午': return t('time.evening', '黃昏 🌇');
-      case '晚上': return t('time.night', '深夜 🌙');
-      case '深夜': return t('time.late_night', '凌晨 🌌');
+      case '早上': return t('time.morning', '清晨');
+      case '中午': return t('time.noon', '正午');
+      case '下午': return t('time.evening', '黃昏');
+      case '晚上': return t('time.night', '深夜');
+      case '深夜': return t('time.late_night', '凌晨');
       default: return t('time.unknown', '時空錯置');
     }
   };
@@ -103,11 +101,12 @@ export default function Header() {
 
   const activeDispatches = useGameStore(state => state.activeDispatches);
   const isLeaderDispatched = activeDispatches.some(d => d.slaveId === 'LEADER');
-  const leaderStatus = leaderFaintTurns > 0 ? t('leader.faint', `重傷昏厥 (${leaderFaintTurns}時段)`) : isLeaderDispatched ? t('leader.dispatched', '外派中') : t('leader.idle', '閒置');
+  const leaderStatus = leaderFaintTurns > 0 ? `${t('leader.faint', '重傷昏厥')} (${leaderFaintTurns})` : isLeaderDispatched ? t('leader.dispatched', '外派中') : t('leader.idle', '閒置');
 
   return (
     <>
       <div className="bg-gray-950 border-b border-gray-800 p-2 flex items-stretch shadow-md select-none sticky top-0 z-30 min-h-[4rem]">
+        
         <div className="flex items-center h-full mr-2 sm:mr-3 shrink-0">
           <div 
             onClick={openLeaderPanel}
@@ -122,10 +121,9 @@ export default function Header() {
         <div className="flex-1 flex flex-col justify-between text-[11px] sm:text-xs font-bold tracking-widest py-0.5">
           <div className="flex justify-between items-center text-gray-400 border-b border-gray-800/50 pb-0.5">
             <span className="flex items-center gap-1">
-              {/* ★ 修復：將 {timePhase} 替換為 {getTimeSlotName()} */}
               <span>[{t('ui.day_prefix', '第')}{day}{t('ui.day_suffix', '天')} - <span className="text-gray-200">{getTimeSlotName()}</span>]</span>
               <span className="border-l border-gray-700 h-2.5 mx-0.5 sm:mx-1"></span>
-              <span>[{getSceneName()}]</span>
+              <span>[{getLocationName()}]</span>
             </span>
             <span>
               {t('stats.prestige', '威望')}: <span className="text-blue-400 font-mono">{formatK(prestige)}</span>
@@ -145,7 +143,7 @@ export default function Header() {
           <div className="flex justify-between items-center text-gray-500">
             <span className="flex items-center gap-1">
               <span>
-                AP: <span className={actionPoints < 10 ? 'text-red-500 font-mono animate-pulse' : 'text-blue-400 font-mono'}>{actionPoints}/50</span>
+                {t('stats.ap', 'AP')}: <span className={actionPoints < 10 ? 'text-red-500 font-mono animate-pulse' : 'text-blue-400 font-mono'}>{actionPoints}/50</span>
               </span>
               <ApCountdown actionPoints={actionPoints} lastApUpdateTime={lastApUpdateTime} />
               <button 
