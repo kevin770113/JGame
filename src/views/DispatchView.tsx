@@ -43,7 +43,7 @@ export default function DispatchView() {
     candidates.push({
       id: 'LEADER', isLeader: true, name: leaderName, stamina: safeLeaderStamina,
       stress: 0, obedience: 100, 
-      combat: 25, intelligence: 45, isInjured: false, faintTurns: 0, race: t('stats.race_leader', '人類(首領)'), gender: leaderGender
+      combat: 25, intelligence: 45, isInjured: false, faintTurns: 0, race: '人類', gender: leaderGender
     });
   }
   idleSlaves.forEach(s => {
@@ -141,7 +141,12 @@ export default function DispatchView() {
                   }`}
                 >
                   <div className="flex justify-between items-center border-b border-gray-800/50 pb-2 shrink-0">
-                    <span className="text-xs font-bold tracking-widest">{t(`mission.rank_${mission.rank}`, `${mission.rank}級委託`)}</span>
+                    <span className="text-xs font-bold tracking-widest">
+                      {mission.rank === '翠綠' ? t('dispatch.rank_green', '翠綠級委託') :
+                       mission.rank === '蔚藍' ? t('dispatch.rank_blue', '蔚藍級委託') :
+                       mission.rank === '紫色' ? t('dispatch.rank_purple', '紫色級委託') :
+                       mission.rank === '黃金' ? t('dispatch.rank_gold', '黃金級委託') : `${mission.rank}級委託`}
+                    </span>
                     <span className="text-yellow-500 font-mono text-base font-black">${mission.reward}</span>
                   </div>
 
@@ -252,7 +257,7 @@ export default function DispatchView() {
                           {locName}
                         </span>
                         <span className="text-3xs text-gray-500 font-bold">
-                           {cand.race} ({cand.gender === 'Male' ? t('gender.male_short', '男') : t('gender.female_short', '女')})
+                           {t(`race.${cand.race}`, cand.race)} ({cand.gender === 'Male' ? t('gender.male_short', '男') : t('gender.female_short', '女')})
                         </span>
                       </div>
                       {cand.isLeader && <span className="text-4xs px-1.5 py-0.5 bg-yellow-900/40 border border-yellow-700/50 text-yellow-500 font-bold rounded">{t('ui.leader', '首領')}</span>}
