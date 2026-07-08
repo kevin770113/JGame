@@ -13,12 +13,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       });
     }
 
+    // ★ V2.11.0 降級防護：移除所有 JSON 相關要求，強制限定極簡分隔符輸出
     const aiResponse = await context.env.AI.run("@cf/meta/llama-3.1-8b-instruct-fp8", {
-      max_tokens: 2500,
+      max_tokens: 800, 
       messages: [
         { 
           role: "system", 
-          content: "你是一個黑暗奇幻遊戲的文字引擎。\n【全局最高指令】：你所有的輸出必須且只能使用「繁體中文(zh-TW)」。絕對禁止輸出任何簡體中文。\n請嚴格根據玩家的要求生成資料。「僅」回傳玩家要求的 JSON 格式，絕對不要包含任何額外的問候語、Markdown 標籤或解釋性文字。" 
+          content: "你是一個黑暗奇幻遊戲的文字引擎。\n【全局最高指令】：你所有的輸出必須且只能使用「繁體中文(zh-TW)」與「英文」。\n請嚴格根據玩家的要求生成資料。「僅」回傳玩家要求的文字格式（例如：English|中文），絕對不要包含任何額外的問候語、Markdown 標籤、JSON 括號或解釋性文字。" 
         },
         { 
           role: "user", 
