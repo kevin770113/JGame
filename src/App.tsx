@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import './i18n'; // ★ V2.10.0 多語系引擎全域引入
 import Header from './components/Header';
 import BaseView from './views/BaseView';
 import TownMainView from './views/TownMainView'; 
