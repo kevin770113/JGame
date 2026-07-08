@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGameStore } from '../store/useGameStore';
 import { Slave, Gender } from '../types';
 import CustomSelect, { Option } from '../components/CustomSelect';
+import { parseLocalizedName } from '../utils/i18nUtils';
 
 export default function BreedingView() {
+  const { t } = useTranslation();
   const slaves = useGameStore((state) => state.slaves);
   const maxSlaveCapacity = useGameStore((state) => state.player.maxSlaveCapacity);
   const addSlave = useGameStore((state) => state.addSlave);
@@ -24,16 +27,16 @@ export default function BreedingView() {
 
   const handleBreed = async () => {
     if (isFull) {
-      setSysMessage({ text: '［警告］空間不足，據點已達人口上限，無法容納新的試驗體降生。', type: 'error' });
+      setSysMessage({ text: t('breeding.err_full', '［警告］空間不足，據點已達人口上限，無法容納新的試驗體降生。'), type: 'error' });
       return;
     }
 
     if (!alphaId || !betaId) {
-      setSysMessage({ text: '［錯誤］必須提供兩具試驗體。', type: 'error' });
+      setSysMessage({ text: t('breeding.err_missing', '［錯誤］必須提供兩具試驗體。'), type: 'error' });
       return;
     }
     if (alphaId === betaId) {
-      setSysMessage({ text: '［錯誤］無法進行自我複製實驗。', type: 'error' });
+      setSysMessage({ text: t('breeding.err_same', '［錯誤］無法進行自我複製實驗。'), type: 'error' });
       return;
     }
 
@@ -42,21 +45,21 @@ export default function BreedingView() {
     if (!p1 || !p2) return;
 
     if (p1.activityStatus !== '閒置' || p2.activityStatus !== '閒置') {
-      setSysMessage({ text: '［錯誤］試驗體必須處於閒置狀態才能進行融合。', type: 'error' });
+      setSysMessage({ text: t('breeding.err_not_idle', '［錯誤］試驗體必須處於閒置狀態才能進行融合。'), type: 'error' });
       return;
     }
 
     if (p1.race !== p2.race) {
-      setSysMessage({ text: `［排斥反應］基因序列衝突（${p1.race} 與 ${p2.race}），融合失敗。`, type: 'error' });
+      setSysMessage({ text: t('breeding.err_race', { race1: p1.race, race2: p2.race, defaultValue: `［排斥反應］基因序列衝突（${p1.race} 與 ${p2.race}），融合失敗。` }), type: 'error' });
       return;
     }
 
     if (p1.gender === p2.gender) {
-      setSysMessage({ text: `［排斥反應］缺乏足夠的異性生殖條件，融合失敗。`, type: 'error' });
+      setSysMessage({ text: t('breeding.err_gender', '［排斥反應］缺乏足夠的異性生殖條件，融合失敗。'), type: 'error' });
       return;
     }
 
-    setSysMessage({ text: '［運算中］血統融合陣列啟動，正在編織新生命的誕生...', type: 'loading' });
+    setSysMessage({ text: t('breeding.loading', '［運算中］血統融合陣列啟動，正在編織新生命的誕生...'), type: 'loading' });
 
     const calcStat = (s1: number, s2: number) => {
       const base = Math.floor((s1 + s2) / 2);
@@ -67,12 +70,10 @@ export default function BreedingView() {
     const childRace = p1.race;
     const childGender: Gender = Math.random() > 0.5 ? 'Male' : 'Female';
     const childId = 'child-' + Math.random().toString(36).substring(2, 9);
-    const aiData = await consumeIdentity();
     
-    const genderSuffix = childGender === 'Male' ? '之子' : '之女';
-    const fatherName = p1.gender === 'Male' ? p1.name : p2.name;
-    const motherName = p1.gender === 'Female' ? p1.name : p2.name;
+    const aiData = await consumeIdentity();
 
+    // ★ 徹底移除了 backgroundStory 的殘留，完全對齊未來 V2.11.0 精簡型別
     const newChild: Slave = {
       id: childId,
       name: aiData.name,
@@ -87,20 +88,18 @@ export default function BreedingView() {
         endurance: calcStat(p1.primaryStats.endurance, p2.primaryStats.endurance),
         intelligence: calcStat(p1.primaryStats.intelligence, p2.primaryStats.intelligence),
         obedience: calcStat(p1.primaryStats.obedience, p2.primaryStats.obedience),
-        // ★ V2.9.10 補齊魅力與幸運的遺傳計算
         charisma: calcStat(p1.primaryStats.charisma ?? 10, p2.primaryStats.charisma ?? 10),
         luck: calcStat(p1.primaryStats.luck ?? 10, p2.primaryStats.luck ?? 10),
       },
       conditionStats: { stamina: 100, stress: 0, rebellion: 0 },
       traits: [],
-      backgroundStory: `［密室誕生］${fatherName} 與 ${motherName} ${genderSuffix}。${aiData.story}`,
       parents: { fatherId: p1.gender === 'Male' ? p1.id : p2.id, motherId: p1.gender === 'Female' ? p1.id : p2.id },
       combatRecord: { wins: 0, losses: 0 }, 
       isInjured: false 
     };
 
     addSlave(newChild);
-    setSysMessage({ text: `［系統］血脈融合成功！代號［${newChild.name}］已順利降生並建檔。`, type: 'success' });
+    setSysMessage({ text: t('breeding.success', { name: parseLocalizedName(newChild.name), defaultValue: `［系統］血脈融合成功！代號［${parseLocalizedName(newChild.name)}］已順利降生並建檔。` }), type: 'success' });
     setAlphaId('');
     setBetaId('');
   };
@@ -108,22 +107,24 @@ export default function BreedingView() {
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置');
   const alphaSlave = slaves.find(s => s.id === alphaId);
 
+  const getGenderIcon = (g: Gender) => g === 'Male' ? '♂' : '♀';
+
   const alphaOptions: Option[] = idleSlaves.map(s => ({
     value: s.id,
-    label: `${s.name} (種族: ${s.race} | 性別: ${s.gender === 'Male' ? '♂' : '♀'})`
+    label: `${parseLocalizedName(s.name)} (${t('stats.race', '種族')}: ${s.race} | ${t('stats.gender', '性別')}: ${getGenderIcon(s.gender)})`
   }));
 
   const betaOptions: Option[] = idleSlaves.map(s => {
     let isDisabled = false;
     let disabledReason = '';
     if (alphaSlave) {
-      if (s.id === alphaSlave.id) { isDisabled = true; disabledReason = ' (已選)'; }
-      else if (s.race !== alphaSlave.race) { isDisabled = true; disabledReason = ' (基因排斥)'; }
-      else if (s.gender === alphaSlave.gender) { isDisabled = true; disabledReason = ' (性別相同)'; }
+      if (s.id === alphaSlave.id) { isDisabled = true; disabledReason = ` (${t('breeding.rsn_selected', '已選')})`; }
+      else if (s.race !== alphaSlave.race) { isDisabled = true; disabledReason = ` (${t('breeding.rsn_race', '基因排斥')})`; }
+      else if (s.gender === alphaSlave.gender) { isDisabled = true; disabledReason = ` (${t('breeding.rsn_gender', '性別相同')})`; }
     }
     return {
       value: s.id,
-      label: `${s.name} (種族: ${s.race} | 性別: ${s.gender === 'Male' ? '♂' : '♀'})${disabledReason}`,
+      label: `${parseLocalizedName(s.name)} (${t('stats.race', '種族')}: ${s.race} | ${t('stats.gender', '性別')}: ${getGenderIcon(s.gender)})${disabledReason}`,
       disabled: isDisabled
     };
   });
@@ -134,26 +135,26 @@ export default function BreedingView() {
     <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
-          <h2 className="text-xl font-bold text-gray-300">血統密室</h2>
-          <p className="text-xs text-gray-500 mt-1">隱蔽於地下的實驗設施，進行著被帝國嚴格禁止的基因融合。</p>
+          <h2 className="text-xl font-bold text-gray-300">{t('breeding.title', '血統密室')}</h2>
+          <p className="text-xs text-gray-500 mt-1">{t('breeding.desc', '隱蔽於地下的實驗設施，進行著被帝國嚴格禁止的基因融合。')}</p>
         </div>
         <button onClick={() => navigate('Home', 'Main')} className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest">
-          ［返回大廳］
+          {t('ui.return_base', '［返回大廳］')}
         </button>
       </div>
 
       <div className="bg-gray-900/80 p-5 rounded-lg border border-gray-700 flex flex-col gap-4 shadow-md mt-2">
         <p className="text-xs text-gray-400 leading-relaxed italic border-l-2 border-blood-red pl-2">
-          「放入不相容的基因序列將導致陣列啟動失敗。後代將繼承雙親的平均屬性，並帶有不可預測的深淵突變。」
+          {t('breeding.warning', '「放入不相容的基因序列將導致陣列啟動失敗。後代將繼承雙親的平均屬性，並帶有不可預測的深淵突變。」')}
         </p>
 
         <div className="flex flex-col gap-1.5 mt-2">
-          <label className="text-xs text-gray-400 font-bold tracking-widest">［注入試驗體 Alpha］</label>
+          <label className="text-xs text-gray-400 font-bold tracking-widest">{t('breeding.alpha', '［注入試驗體 Alpha］')}</label>
           <CustomSelect options={alphaOptions} value={alphaId} onChange={(val) => { setAlphaId(val); setBetaId(''); }} focusColor="gray" />
         </div>
 
         <div className="flex flex-col gap-1.5 relative z-40">
-          <label className="text-xs text-gray-400 font-bold tracking-widest">［注入試驗體 Beta］</label>
+          <label className="text-xs text-gray-400 font-bold tracking-widest">{t('breeding.beta', '［注入試驗體 Beta］')}</label>
           <CustomSelect options={betaOptions} value={betaId} onChange={setBetaId} focusColor="gray" />
         </div>
 
@@ -170,7 +171,7 @@ export default function BreedingView() {
                   : 'bg-blood-red/20 hover:bg-blood-red/40 text-red-400 border-red-900/50'
           }`}
         >
-          {isFull ? '［據點人口已滿］' : isLoading ? '［血統融合運算中...］' : '［啟動融合陣列］'}
+          {isFull ? t('breeding.btn_full', '［據點人口已滿］') : isLoading ? t('breeding.btn_loading', '［血統融合運算中...］') : t('breeding.btn_start', '［啟動融合陣列］')}
         </button>
 
         {sysMessage && (
