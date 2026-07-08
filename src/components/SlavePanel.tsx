@@ -5,10 +5,6 @@ import { Slave } from '../types';
 import { ITEMS_DATA, getSlavePortraitUrl } from '../utils/gameData';
 import { parseLocalizedName } from '../utils/i18nUtils';
 
-interface SlavePanelProps {
-  onSelectSlave?: (slave: Slave) => void;
-}
-
 const renderRadar = (slave: Slave, t: any) => {
   const weaponAtk = (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) 
     ? (ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0) : 0;
@@ -59,7 +55,8 @@ const renderRadar = (slave: Slave, t: any) => {
   );
 };
 
-export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
+// ★ 修復：完全移除外部傳入的 onSelectSlave，確保點擊只在內部視窗切換
+export default function SlavePanel() {
   const { t } = useTranslation();
   const activeWindow = useGameStore((state) => state.activeWindow);
   const setActiveWindow = useGameStore((state) => state.setActiveWindow);
@@ -68,7 +65,6 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
   const [activeSlaveId, setActiveSlaveId] = useState<string | null>(null);
   const [slaveTab, setSlaveTab] = useState<'ability' | 'status'>('ability');
 
-  // ★ 修復：此處需與 store 的型別對齊
   const isOpen = activeWindow === 'roster';
 
   const handleToggle = () => {
@@ -91,15 +87,15 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
 
   return (
     <>
-      <div className="fixed left-0 top-[65%] z-40 flex items-start pointer-events-none animate-fade-in">
+      <div className="fixed right-0 top-[40%] z-40 flex items-start pointer-events-none animate-fade-in">
         <button
           onClick={handleToggle}
-          className="pointer-events-auto bg-gray-900 border-y border-r border-gray-600 text-gray-400 py-3 px-1.5 rounded-r-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
+          className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-400 py-3 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
         >
           <span>成</span>
           <span>員</span>
           <span>名</span>
-          <span>單</span>
+          <span>冊</span>
           <span className="mt-1 text-2xs px-1 bg-purple-950 text-purple-400 border border-purple-800 rounded-full font-mono">{slaves.length}</span>
         </button>
       </div>
@@ -111,12 +107,13 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
         ></div>
       )}
 
+      {/* ★ 修復：改為從右側滑入 (right-0, translate-x-full) */}
       <div 
-        className={`fixed left-0 top-0 h-full w-full max-w-lg sm:max-w-xl bg-gray-950 border-r border-purple-900/50 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed right-0 top-0 h-full w-full max-w-lg sm:max-w-xl bg-gray-950 border-l border-purple-900/50 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
         <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/80 shrink-0">
           <h3 className="text-sm font-bold text-gray-200 tracking-widest flex items-center gap-2">
-             ⛓️ {t('slave_panel.title', '［商隊成員總覽看板］')}
+             {t('slave_panel.title', '［商隊成員總覽看板］')}
           </h3>
           <button 
             onClick={() => setActiveWindow(null)}
@@ -135,8 +132,7 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
                 <button
                   key={slave.id}
                   onClick={() => {
-                    setActiveSlaveId(slave.id);
-                    if (onSelectSlave) onSelectSlave(slave);
+                    setActiveSlaveId(slave.id); // 只更新內部資料，絕不向外拋出事件
                   }}
                   className={`w-full p-3 flex flex-col items-left text-left gap-1 transition-all relative overflow-hidden group border-l-2 ${
                     isSelected 
@@ -221,7 +217,7 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
                          <div className="flex justify-between items-center bg-gray-950/80 px-2 py-1 rounded border border-gray-900">
                             <span className="text-gray-500 font-bold">{t('stats.combat', '武力')}:</span>
                             {activeSlave.isInjured ? 
-                               <span><span className="text-red-500 font-bold">{Math.floor(activeSlave.primaryStats.combat * 0.5)}</span> <span className="text-gray-600 text-[9px]">(原:{activeSlave.primaryStats.combat})</span></span> 
+                               <span><span className="text-red-500 font-bold">{Math.floor(activeSlave.primaryStats.combat * 0.5)}</span> <span className="text-gray-600 text-[9px]">({t('ui.original', '原')}:{activeSlave.primaryStats.combat})</span></span> 
                                : (
                                  <span>
                                    <span className="text-red-400 font-bold">
@@ -237,13 +233,13 @@ export default function SlavePanel({ onSelectSlave }: SlavePanelProps) {
                          <div className="flex justify-between items-center bg-gray-950/80 px-2 py-1 rounded border border-gray-900">
                             <span className="text-gray-500 font-bold">{t('stats.endurance', '體質')}:</span>
                             {activeSlave.isInjured ? 
-                               <span><span className="text-red-500 font-bold">{Math.floor(activeSlave.primaryStats.endurance * 0.5)}</span> <span className="text-gray-600 text-[9px]">(原:{activeSlave.primaryStats.endurance})</span></span> 
+                               <span><span className="text-red-500 font-bold">{Math.floor(activeSlave.primaryStats.endurance * 0.5)}</span> <span className="text-gray-600 text-[9px]">({t('ui.original', '原')}:{activeSlave.primaryStats.endurance})</span></span> 
                                : <span className="text-green-400 font-bold">{activeSlave.primaryStats.endurance}</span>}
                          </div>
                          <div className="flex justify-between items-center bg-gray-950/80 px-2 py-1 rounded border border-gray-900">
                             <span className="text-gray-500 font-bold">{t('stats.intelligence', '智力')}:</span>
                             {activeSlave.isInjured ? 
-                               <span><span className="text-red-500 font-bold">{Math.floor(activeSlave.primaryStats.intelligence * 0.5)}</span> <span className="text-gray-600 text-[9px]">(原:{activeSlave.primaryStats.intelligence})</span></span> 
+                               <span><span className="text-red-500 font-bold">{Math.floor(activeSlave.primaryStats.intelligence * 0.5)}</span> <span className="text-gray-600 text-[9px]">({t('ui.original', '原')}:{activeSlave.primaryStats.intelligence})</span></span> 
                                : <span className="text-blue-400 font-bold">{activeSlave.primaryStats.intelligence}</span>}
                          </div>
                       </div>
