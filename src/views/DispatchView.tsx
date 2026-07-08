@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGameStore } from '../store/useGameStore';
+import { parseLocalizedName } from '../utils/i18nUtils';
 
 type DispatchCandidate = {
   id: string;
@@ -17,6 +19,7 @@ type DispatchCandidate = {
 };
 
 export default function DispatchView() {
+  const { t } = useTranslation();
   const slaves = useGameStore((state) => state.slaves);
   const dailyMissions = useGameStore((state) => state.dailyMissions);
   const dispatchSlave = useGameStore((state) => state.dispatchSlave);
@@ -40,7 +43,7 @@ export default function DispatchView() {
     candidates.push({
       id: 'LEADER', isLeader: true, name: leaderName, stamina: safeLeaderStamina,
       stress: 0, obedience: 100, 
-      combat: 25, intelligence: 45, isInjured: false, faintTurns: 0, race: '人類(首領)', gender: leaderGender
+      combat: 25, intelligence: 45, isInjured: false, faintTurns: 0, race: t('stats.race_leader', '人類(首領)'), gender: leaderGender
     });
   }
   idleSlaves.forEach(s => {
@@ -63,13 +66,15 @@ export default function DispatchView() {
   const handleDispatch = () => {
     if (!selectedMission || !activeCandidate) return;
 
+    const locName = activeCandidate.isLeader ? activeCandidate.name : parseLocalizedName(activeCandidate.name);
+
     if (activeCandidate.stamina < selectedMission.staminaCost) {
-      setSysMessage({ text: `［拒絕］${activeCandidate.name} 的體力不足以應付此高強度的委託。`, type: 'error' });
+      setSysMessage({ text: t('dispatch.err_stamina', { name: locName, defaultValue: `［拒絕］${locName} 的體力不足以應付此高強度的委託。` }), type: 'error' });
       return;
     }
 
     dispatchSlave(activeCandidate.id, selectedMission.id);
-    setSysMessage({ text: `［系統］已簽署生死契約，【${activeCandidate.name}】已啟程執行委託。`, type: 'success' });
+    setSysMessage({ text: t('dispatch.success', { name: locName, defaultValue: `［系統］已簽署生死契約，【${locName}】已啟程執行委託。` }), type: 'success' });
     setIsSelectingSlave(false);
     setSelectedMissionId('');
     setCarouselIndex(0);
@@ -93,8 +98,8 @@ export default function DispatchView() {
     <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in relative z-10">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2 shrink-0">
         <div>
-          <h2 className="text-xl font-bold text-gray-300">深淵酒館</h2>
-          <p className="text-2xs text-gray-500 mt-0.5">承接地下委託與黑市暗殺合約</p>
+          <h2 className="text-xl font-bold text-gray-300">{t('dispatch.title', '深淵酒館')}</h2>
+          <p className="text-2xs text-gray-500 mt-0.5">{t('dispatch.desc', '承接地下委託與黑市暗殺合約')}</p>
         </div>
       </div>
 
@@ -107,24 +112,23 @@ export default function DispatchView() {
       )}
 
       <div className="flex flex-col gap-2 shrink-0">
-        <h3 className="text-sm font-bold text-gray-400 border-l-2 border-blood-red pl-2 tracking-widest">［今日懸賞佈告欄］</h3>
+        <h3 className="text-sm font-bold text-gray-400 border-l-2 border-blood-red pl-2 tracking-widest">{t('dispatch.board', '［今日懸賞佈告欄］')}</h3>
         
         {dailyMissions.length === 0 ? (
           <div className="bg-gray-900/50 border border-gray-800 rounded p-6 text-center mt-2">
-            <p className="text-xs text-gray-500">［目前佈告欄上沒有任何懸賞委託］</p>
+            <p className="text-xs text-gray-500">{t('dispatch.empty', '［目前佈告欄上沒有任何懸賞委託］')}</p>
           </div>
         ) : (
           <div className="flex gap-4 overflow-x-auto snap-x scrollbar-none py-4 px-2">
             {dailyMissions.map((mission) => {
               const isSelected = selectedMissionId === mission.id;
-              // ★ V2.9.10 強化綠卡外框與底色辨識度
               const rankColors = {
                 '翠綠': 'text-green-400 border-green-500/80 bg-green-950/40 shadow-[0_0_10px_rgba(34,197,94,0.1)]',
                 '蔚藍': 'text-blue-400 border-blue-900/50 bg-blue-950/20',
                 '紫色': 'text-purple-400 border-purple-900/50 bg-purple-950/20',
                 '黃金': 'text-yellow-400 border-yellow-900/50 bg-yellow-950/20'
               };
-              const colorClass = rankColors[mission.rank];
+              const colorClass = rankColors[mission.rank as keyof typeof rankColors] || rankColors['翠綠'];
 
               return (
                 <button
@@ -137,7 +141,7 @@ export default function DispatchView() {
                   }`}
                 >
                   <div className="flex justify-between items-center border-b border-gray-800/50 pb-2 shrink-0">
-                    <span className="text-xs font-bold tracking-widest">{mission.rank}級委託</span>
+                    <span className="text-xs font-bold tracking-widest">{t(`mission.rank_${mission.rank}`, `${mission.rank}級委託`)}</span>
                     <span className="text-yellow-500 font-mono text-base font-black">${mission.reward}</span>
                   </div>
 
@@ -153,26 +157,25 @@ export default function DispatchView() {
                   <div className="flex flex-col gap-1 border-t border-gray-800/50 pt-3 bg-gray-950/60 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl shrink-0">
                     <div className="grid grid-cols-3 gap-1 mb-1">
                       <div className="flex flex-col items-center">
-                         <span className="text-[10px] text-gray-500 font-bold mb-0.5">時段</span>
+                         <span className="text-[10px] text-gray-500 font-bold mb-0.5">{t('ui.time_phase', '時段')}</span>
                          <span className="font-mono text-gray-300 font-bold text-xs">{mission.requiredPhases}</span>
                       </div>
                       <div className="flex flex-col items-center border-x border-gray-800/50">
-                         <span className="text-[10px] text-gray-500 font-bold mb-0.5">體力</span>
+                         <span className="text-[10px] text-gray-500 font-bold mb-0.5">{t('stats.stamina', '體力')}</span>
                          <span className="font-mono text-red-400 font-bold text-xs">-{mission.staminaCost}</span>
                       </div>
                       <div className="flex flex-col items-center">
-                         <span className="text-[10px] text-gray-500 font-bold mb-0.5">壓力</span>
+                         <span className="text-[10px] text-gray-500 font-bold mb-0.5">{t('stats.stress', '壓力')}</span>
                          <span className="font-mono text-yellow-500 font-bold text-xs">+{mission.stressGain}</span>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-1 border-t border-gray-800/50 pt-2">
                       <div className="flex justify-between items-center px-1 border-r border-gray-800/50 pr-2">
-                         <span className="text-[10px] text-gray-500 font-bold">服從度</span>
+                         <span className="text-[10px] text-gray-500 font-bold">{t('stats.obedience', '服從度')}</span>
                          <span className="font-mono text-blue-400 font-bold text-xs">{getObedienceBonus(mission.rank)}</span>
                       </div>
                       <div className="flex justify-between items-center px-1 pl-2">
-                         <span className="text-[10px] text-gray-500 font-bold">成功率</span>
-                         {/* ★ V2.9.10 確實讀取底層機率並轉換為直觀的百分比 */}
+                         <span className="text-[10px] text-gray-500 font-bold">{t('dispatch.success_rate', '成功率')}</span>
                          <span className="font-mono text-purple-400 font-bold text-xs">{Math.round((mission.successRate || 1) * 100)}%</span>
                       </div>
                     </div>
@@ -195,7 +198,7 @@ export default function DispatchView() {
                 : 'bg-gray-200 hover:bg-white text-gray-900 border-gray-300 hover:scale-[1.02]'
             }`}
           >
-            {candidates.length === 0 ? '［目前無可用人力］' : '［準備承接此委託］'}
+            {candidates.length === 0 ? t('dispatch.btn_no_man', '［目前無可用人力］') : t('dispatch.btn_prepare', '［準備承接此委託］')}
           </button>
         </div>
       )}
@@ -204,9 +207,9 @@ export default function DispatchView() {
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-fade-in">
           
           <div className="text-center mb-4 z-[110]">
-             <h3 className="text-xl font-bold text-gray-200 mb-2 tracking-widest">指派執行者</h3>
+             <h3 className="text-xl font-bold text-gray-200 mb-2 tracking-widest">{t('dispatch.assign_title', '指派執行者')}</h3>
              <p className="text-xs text-red-400 font-bold bg-red-950/40 px-3 py-1.5 rounded-full border border-red-900/50 inline-block">
-               此委託將強制消耗 <span className="text-base">{selectedMission.staminaCost}</span> 點體力
+               {t('dispatch.warn_stamina_cost1', '此委託將強制消耗')} <span className="text-base">{selectedMission.staminaCost}</span> {t('dispatch.warn_stamina_cost2', '點體力')}
              </p>
           </div>
 
@@ -227,6 +230,7 @@ export default function DispatchView() {
                 if (isRight) transformClass = "translate-x-[35%] scale-80 z-20 opacity-40 -rotate-y-25 cursor-pointer pointer-events-auto hover:opacity-60";
 
                 const isStaminaInsufficient = cand.stamina < selectedMission.staminaCost;
+                const locName = cand.isLeader ? cand.name : parseLocalizedName(cand.name);
 
                 return (
                   <div 
@@ -237,7 +241,7 @@ export default function DispatchView() {
                     {isStaminaInsufficient && isCenter && (
                       <div className="absolute inset-0 bg-red-950/80 z-50 flex flex-col items-center justify-center p-3 text-center backdrop-blur-xs rounded-xl">
                         <span className="text-red-400 font-black tracking-widest text-xs border-y border-red-900 py-2 w-full bg-black/50">
-                          ［體力嚴重不足］
+                          {t('ui.stamina_insufficient', '［體力嚴重不足］')}
                         </span>
                       </div>
                     )}
@@ -245,30 +249,30 @@ export default function DispatchView() {
                     <div className="flex justify-between items-start w-full border-b border-gray-800 pb-2">
                       <div className="flex flex-col gap-0.5">
                         <span className={`font-black text-sm tracking-widest ${cand.isLeader ? 'text-yellow-500' : 'text-gray-200'}`}>
-                          {cand.name}
+                          {locName}
                         </span>
                         <span className="text-3xs text-gray-500 font-bold">
-                           {cand.race} ({cand.gender === 'Male' ? '男' : '女'})
+                           {cand.race} ({cand.gender === 'Male' ? t('gender.male_short', '男') : t('gender.female_short', '女')})
                         </span>
                       </div>
-                      {cand.isLeader && <span className="text-4xs px-1.5 py-0.5 bg-yellow-900/40 border border-yellow-700/50 text-yellow-500 font-bold rounded">首領</span>}
+                      {cand.isLeader && <span className="text-4xs px-1.5 py-0.5 bg-yellow-900/40 border border-yellow-700/50 text-yellow-500 font-bold rounded">{t('ui.leader', '首領')}</span>}
                     </div>
 
                     <div className="flex-1 flex flex-col justify-center gap-2.5 text-xs mt-2">
                        <div className="grid grid-cols-2 gap-2 mb-1">
                          <div className="flex justify-between items-center bg-gray-950 p-1.5 rounded border border-gray-800">
-                            <span className="text-gray-500 text-3xs font-bold">武力</span>
+                            <span className="text-gray-500 text-3xs font-bold">{t('stats.combat', '武力')}</span>
                             <span className="text-red-400 font-bold font-mono">{cand.combat}</span>
                          </div>
                          <div className="flex justify-between items-center bg-gray-950 p-1.5 rounded border border-gray-800">
-                            <span className="text-gray-500 text-3xs font-bold">智力</span>
+                            <span className="text-gray-500 text-3xs font-bold">{t('stats.intelligence', '智力')}</span>
                             <span className="text-blue-400 font-bold font-mono">{cand.intelligence}</span>
                          </div>
                        </div>
 
                        <div className="w-full flex flex-col gap-1">
                          <div className="flex justify-between text-[10px] text-gray-400 font-bold">
-                           <span>體力 (Stamina)</span>
+                           <span>{t('stats.stamina', '體力')} (Stamina)</span>
                            <span className={isStaminaInsufficient ? 'text-red-500 font-bold font-mono' : 'font-mono text-green-400'}>{cand.stamina}/100</span>
                          </div>
                          <div className="w-full h-1.5 bg-gray-950 rounded-full overflow-hidden border border-gray-800">
@@ -279,7 +283,7 @@ export default function DispatchView() {
                        {!cand.isLeader && (
                          <div className="w-full flex flex-col gap-1">
                            <div className="flex justify-between text-[10px] text-gray-400 font-bold">
-                             <span>壓力 (Stress)</span>
+                             <span>{t('stats.stress', '壓力')} (Stress)</span>
                              <span className="text-yellow-500 font-mono">{cand.stress}/100</span>
                            </div>
                            <div className="w-full h-1.5 bg-gray-950 rounded-full overflow-hidden border border-gray-800">
@@ -291,7 +295,7 @@ export default function DispatchView() {
                        {!cand.isLeader && (
                          <div className="w-full flex flex-col gap-1">
                            <div className="flex justify-between text-[10px] text-gray-400 font-bold">
-                             <span>服從度 (Obedience)</span>
+                             <span>{t('stats.obedience', '服從度')} (Obedience)</span>
                              <span className="text-blue-400 font-mono">{cand.obedience}/100</span>
                            </div>
                            <div className="w-full h-1.5 bg-gray-950 rounded-full overflow-hidden border border-gray-800">
@@ -307,10 +311,10 @@ export default function DispatchView() {
 
             <div className="flex gap-8 mt-4 z-[110] relative">
               <button onClick={prevCarousel} className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors active:scale-95 shadow-md cursor-pointer">
-                〈 上一位
+                〈 {t('interaction.btn_prev', '上一位')}
               </button>
               <button onClick={nextCarousel} className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors active:scale-95 shadow-md cursor-pointer">
-                下一位 〉
+                {t('interaction.btn_next', '下一位')} 〉
               </button>
             </div>
 
@@ -325,7 +329,7 @@ export default function DispatchView() {
                 onClick={() => setIsSelectingSlave(false)}
                 className="flex-1 py-3.5 rounded-lg border bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-600 font-bold text-sm tracking-widest shadow-lg transition-all"
               >
-                ［取消］
+                {t('ui.cancel', '［取消］')}
               </button>
               <button 
                 onClick={handleDispatch}
@@ -336,7 +340,7 @@ export default function DispatchView() {
                     : 'bg-blood-red/80 hover:bg-blood-red text-white border-red-900 hover:scale-[1.02]'
                 }`}
               >
-                ［簽署契約］
+                {t('dispatch.btn_sign', '［簽署契約］')}
               </button>
             </div>
           </div>
