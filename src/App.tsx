@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next'; // ★ V2.11.0 引入多語系
+import { useTranslation } from 'react-i18next';
 import './i18n'; 
 import Header from './components/Header';
 import BaseView from './views/BaseView';
@@ -21,7 +21,7 @@ import { useGameStore } from './store/useGameStore';
 import { supabase } from './services/supabaseClient';
 import { Slave } from './types';
 import { ITEMS_DATA, getSlavePortraitUrl } from './utils/gameData';
-import { parseLocalizedName } from './utils/i18nUtils'; // ★ V2.11.0 雙語解析
+import { parseLocalizedName } from './utils/i18nUtils';
 
 const R2_BASE_URL = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev';
 
@@ -94,7 +94,6 @@ function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   const [slaveTab, setSlaveTab] = useState<'ability' | 'status'>('ability');
-  
   const [showCombatDrawer, setShowCombatDrawer] = useState(false);
 
   useEffect(() => {
@@ -221,7 +220,7 @@ function App() {
       
       <SystemPanel /> 
       <QuestPanel />
-      {/* ★ 解耦合修復：移除 onSelectSlave={setActiveSlave} 阻斷獨立彈窗跳出，維持在右側面板更新 */}
+      {/* 完美解耦合，不帶 onSelectSlave */}
       <SlavePanel />
       <CombatTheater /> 
 
@@ -246,37 +245,32 @@ function App() {
         </div>
       )}
 
+      {/* 舊版獨立彈窗代碼完整保留，並套用動態語系解析 */}
       {activeSlave && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-[60] transition-all animate-fade-in" onClick={() => setActiveSlave(null)}>
           <div className="w-full max-w-3xl bg-gray-900/95 border border-gray-700 rounded-lg p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row gap-5 relative border-t-2 border-t-blood-red backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setActiveSlave(null)} className="absolute top-0 right-0 z-[70] text-gray-400 hover:text-white text-sm font-bold transition-colors bg-red-950/80 hover:bg-red-900/90 rounded-bl-xl px-4 py-2 shadow-md border-b border-l border-red-900">{t('ui.close', '［關閉］')}</button>
             
             <div className="w-full sm:w-2/5 bg-gray-950 border border-gray-800 rounded flex flex-col items-center justify-center min-h-[220px] sm:min-h-[420px] relative overflow-hidden group shrink-0">
-              <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-0">
-                <span className="text-gray-700 text-3xl opacity-30"></span>
-              </div>
-              
               <img 
                 src={getSlavePortraitUrl(activeSlave)} 
                 alt={activeSlave.name} 
                 className="absolute inset-0 w-full h-full object-cover object-[center_15%] z-0 animate-fade-in"
                 onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
               />
-              
               <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/20 to-transparent z-10 pointer-events-none"></div>
               <div className="absolute inset-0 bg-gray-800/10 group-hover:bg-gray-800/30 transition-colors z-20 pointer-events-none"></div>
             </div>
             
             <div className="w-full sm:w-3/5 flex flex-col gap-2 overflow-y-hidden max-h-[60vh] sm:max-h-[75vh]">
-              
               <div className="shrink-0 flex flex-col gap-1.5 pb-2">
                 <h3 className="text-xl font-bold text-gray-200 flex items-center gap-2">
                   {parseLocalizedName(activeSlave.name)}
                   <span className={`text-sm ${activeSlave.gender === 'Male' ? 'text-blue-400' : 'text-pink-400'}`}>[{activeSlave.gender === 'Male' ? t('gender.male_short', '男') : t('gender.female_short', '女')}]</span>
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
-                  <span className="text-xs text-gray-300 bg-gray-950 px-2 py-0.5 rounded border border-gray-700 shadow-sm">{t('stats.race', '種族')}：{activeSlave.race}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded border shadow-sm ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-700 text-gray-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-500 font-bold'}`}>{t('app.status_label', '狀態')}：{activeSlave.activityStatus}</span>
+                  <span className="text-xs text-gray-300 bg-gray-950 px-2 py-0.5 rounded border border-gray-700 shadow-sm">{t('stats.race', '種族')}：{t(`race.${activeSlave.race}`, activeSlave.race)}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded border shadow-sm ${activeSlave.activityStatus === '閒置' ? 'bg-gray-950 border-gray-700 text-gray-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-500 font-bold'}`}>{t('app.status_label', '狀態')}：{t(`activity_status.${activeSlave.activityStatus}`, activeSlave.activityStatus)}</span>
                   
                   {activeSlave.role === 'maid' && <span className="text-xs px-2 py-0.5 bg-blue-900/30 border border-blue-700 text-blue-400 font-bold rounded shadow-sm">{t('app.role_maid', '職位：管家')}</span>}
                   {activeSlave.role === 'security' && <span className="text-xs px-2 py-0.5 bg-purple-900/30 border border-purple-700 text-purple-400 font-bold rounded shadow-sm">{t('app.role_security', '職位：守衛')}</span>}
