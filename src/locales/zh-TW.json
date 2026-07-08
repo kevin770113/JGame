@@ -1,0 +1,46 @@
+{
+  "ui": {
+    "start_battle": "［開始戰鬥］",
+    "return_town": "［返回城鎮］",
+    "return_base": "［返回大廳］",
+    "close": "［關閉］",
+    "cancel": "［取消］",
+    "confirm": "［確認］",
+    "confirm_execute": "［確認執行］",
+    "stamina_insufficient": "［體力不足，無法戰鬥］"
+  },
+  "system": {
+    "menu_title": "［系統控制樞紐］",
+    "data_sync": "資料同步",
+    "data_sync_desc": "將目前的進度手動強制上傳",
+    "manual_save": "［手動存檔］",
+    "saving": "［同步中...］",
+    "save_cooldown": "［已安全儲存］",
+    "emergency_load": "系統急救：強制覆蓋",
+    "emergency_load_desc": "強行拉取雲端存檔以修復異常",
+    "pull_cloud": "［拉取雲端］",
+    "dev_mode": "［開發者除錯模式］",
+    "dev_mode_desc": "遠端資料庫總覽與本地記憶清除",
+    "view_all_data": "［查看全資料］",
+    "fetching": "讀取中...",
+    "reset_list": "［重置名單］",
+    "db_empty": "［資料庫目前為空］",
+    "patch_notes": "［改版日誌］",
+    "docs": "［說明文件］",
+    "bug_report": "［錯誤回報］",
+    "logout_clear": "［登出與清除快取］",
+    "language_setting": "［語系切換 (Language)］",
+    "language_desc": "選擇遊戲介面與日誌的顯示語言"
+  },
+  "stats": {
+    "combat": "武力",
+    "endurance": "體質",
+    "intelligence": "智力",
+    "charisma": "魅力",
+    "luck": "幸運",
+    "stamina": "體力",
+    "stress": "壓力",
+    "rebellion": "反抗",
+    "obedience": "服從度"
+  }
+}
