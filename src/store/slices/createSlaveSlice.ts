@@ -1,10 +1,9 @@
 import { StateCreator } from 'zustand';
 import { GameStore } from '../../types/storeTypes';
 import { Slave, Role } from '../../types';
-import { fetchIdentityBatch } from '../../services/aiService';
 import { supabase } from '../../services/supabaseClient';
 import { generateBaseMarketSlave } from '../../utils/generators';
-import { getRandomFallbackName } from '../../utils/fallbackNames'; // ★ V2.11.0 引入備援庫
+import { getRandomFallbackName } from '../../utils/fallbackNames'; 
 
 export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get) => ({
   slaves: [],
@@ -61,7 +60,6 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
   consumeIdentity: async () => {
     const { data: { session } } = await supabase.auth.getSession();
     
-    // ★ 如果沒連線，直接抽本地備援，不走 AI，避免斷網卡死
     if (!session) return { name: getRandomFallbackName() };
     
     set({ isPoolGenerating: true });
@@ -73,7 +71,6 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
          query = query.not('id', 'in', `(${usedIds.join(',')})`);
       }
       
-      // ★ 防禦雪崩：我們只去資料庫拉資料。如果拉不到，不呼叫前端 AI，直接降級為本地備援。
       const { data: poolData, error: poolError } = await query.limit(1);
       if (poolError) throw poolError;
       
@@ -90,7 +87,6 @@ export const createSlaveSlice: StateCreator<GameStore, [], [], any> = (set, get)
       const newUsedIds = [...get().player.usedIdentityIds, identity.id];
       set((s: GameStore) => ({ player: { ...s.player, usedIdentityIds: newUsedIds } }));
       
-      // ★ 徹底移除 story，僅回傳 name
       return { name: identity.name };
       
     } catch (e) {
