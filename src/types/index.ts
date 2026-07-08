@@ -1,5 +1,4 @@
 export type Scene = 'Home' | 'Town';
-// ★ V2.9.5 新增 'Housekeeping' 頁面 / V2.9.8 新增 'TownMain' 街道
 export type SubView = 'Main' | 'Room' | 'Market' | 'Tavern' | 'Map' | 'Interaction' | 'Arena' | 'Abyss' | 'Housekeeping' | 'TownMain';
 
 export type Race = '人類' | '精靈' | '半獸人' | '矮人' | '不死族' | '龍族';
@@ -47,7 +46,7 @@ export interface Slave {
   primaryStats: PrimaryStats;
   conditionStats: ConditionStats;
   traits: string[];
-  backgroundStory?: string;
+  // ★ V2.11.0 已徹底移除 backgroundStory 與 personality 等幽靈欄位
   parents?: {
     fatherId: string;
     motherId: string;
@@ -82,6 +81,7 @@ export interface Player {
   quests: Record<string, 'hidden' | 'active' | 'completed'>;
   abyssFloor: number;
   shopStock: Record<string, number>;
+  last_updated_at?: number; // ★ V2.11.0 存檔時間戳記鎖
 }
 
 export interface ArenaNPC {
@@ -96,6 +96,8 @@ export interface ArenaNPC {
 
 export interface CombatLog {
   round: number;
+  messageKey?: string;
+  messageParams?: any;
   message: string;
   type: 'info' | 'damage' | 'heal' | 'skill' | 'system';
   sHp?: number;
