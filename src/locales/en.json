@@ -136,7 +136,7 @@
     "stats_label": "Leader Attributes (Immutable)"
   },
   "quest_panel": {
-    "title": "[Chronicles of Empire]",
+    "title": "[Imperial Core Questline]",
     "empty": "\"The Abyss remains silent, continue your exploration...\"",
     "main_quest": "[Imperial Core Questline]",
     "chapter_title": "Chapter {{chapter}}",
@@ -357,5 +357,47 @@
     "btn_anon": "[Sign Nameless Blood Compact] (Quick Play without Registration)",
     "btn_login": "[Verify & Login]",
     "btn_signup": "[Register New Bloodline]"
+  },
+  "nav": {
+    "interaction": "Interact",
+    "breeding": "Breeding",
+    "map": "Relocate",
+    "housekeeping": "Steward",
+    "go_out": "Go Out",
+    "street": "Street",
+    "market": "Market",
+    "tavern": "Tavern",
+    "arena": "Combat",
+    "return": "Return"
+  },
+  "app": {
+    "loading_local": "[Loading Local Cache...]",
+    "loading_auth": "[Connecting to Abyss Signet...]",
+    "select_arena_title": "[Select Arena Sector]",
+    "blood_arena": "Bloodline Arena",
+    "abyss_tower": "Abyss Tower",
+    "status_label": "Status",
+    "role_maid": "Role: Steward",
+    "role_security": "Role: Guard",
+    "faint_state": "Comatose",
+    "turns": "Shifts"
+  },
+  "race": {
+    "人類": "Human",
+    "精靈": "Elf",
+    "半獸人": "Orc",
+    "矮人": "Dwarf",
+    "不死族": "Undead",
+    "龍族": "Dragon"
+  },
+  "activity_status": {
+    "閒置": "Idle",
+    "外派中": "Dispatched",
+    "特訓中": "Training"
+  },
+  "role": {
+    "none": "None",
+    "maid": "Steward",
+    "security": "Guard"
   }
 }
