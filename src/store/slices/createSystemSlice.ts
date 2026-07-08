@@ -55,18 +55,39 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
      }
   },
 
-  syncProfileToCloud: async () => {
+  syncProfileToCloud: async (forceOverwrite = false) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
     set({ isSaving: true });
     
+    // ★ V2.11.0 存檔防護鎖 (Timestamp Check)
+    if (!forceOverwrite) {
+      const { data: cloudData } = await supabase.from('profiles').select('save_data').eq('id', session.user.id).single();
+      if (cloudData && cloudData.save_data && cloudData.save_data.last_updated_at) {
+        const localTime = get().player.last_updated_at || 0;
+        const cloudTime = cloudData.save_data.last_updated_at;
+        // 如果雲端時間比本地新超過 1 分鐘，判定為可能產生覆蓋衝突
+        if (cloudTime > localTime + 60000) {
+           set({ isSaving: false });
+           get().setGlobalModal({
+             title: '［⚠️ 存檔衝突警告］',
+             message: '系統偵測到雲端存在「較新」的遊戲進度（您可能在其他裝置遊玩過）。\n\n若強制上傳將覆蓋較新的雲端存檔。您要強制上傳覆蓋雲端，還是放棄上傳並從系統面板拉取雲端存檔？',
+             isConfirm: true,
+             action: () => get().syncProfileToCloud(true)
+           });
+           return;
+        }
+      }
+    }
+
     const newVersion = (get().localSaveVersion || 0) + 1;
-    set({ localSaveVersion: newVersion });
+    const currentTimestamp = Date.now();
+    set((state: GameStore) => ({ localSaveVersion: newVersion, player: { ...state.player, last_updated_at: currentTimestamp } }));
 
     const state = get(); const p = state.player;
     const { error } = await supabase.from('profiles').upsert({
       id: session.user.id, day: p.day, gold: p.gold, food: p.food, action_points: p.actionPoints, prestige: p.prestige, unlocked_facilities: p.unlockedFacilities,
-      save_data: { localSaveVersion: newVersion, usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent, arenaNPCs: state.arenaNPCs, leaderName: p.leaderName, leaderGender: p.leaderGender, leaderStamina: p.leaderStamina, leaderFaintTurns: p.leaderFaintTurns }
+      save_data: { localSaveVersion: newVersion, last_updated_at: currentTimestamp, usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent, arenaNPCs: state.arenaNPCs, leaderName: p.leaderName, leaderGender: p.leaderGender, leaderStamina: p.leaderStamina, leaderFaintTurns: p.leaderFaintTurns }
     });
     
     if (error) console.error('［同步異常］', error);
@@ -87,7 +108,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
 
     set((state: GameStore) => ({
       localSaveVersion: cloudVersion,
-      player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor, shopStock: sData.shopStock || state.player.shopStock, leaderName: sData.leaderName || state.player.leaderName, leaderGender: sData.leaderGender || state.player.leaderGender, leaderStamina: sData.leaderStamina ?? state.player.leaderStamina ?? 100, leaderFaintTurns: sData.leaderFaintTurns ?? state.player.leaderFaintTurns ?? 0 },
+      player: { ...state.player, day: data.day ?? state.player.day, gold: data.gold ?? state.player.gold, food: data.food ?? state.player.food, actionPoints: data.action_points ?? state.player.actionPoints, prestige: data.prestige ?? state.player.prestige, unlockedFacilities: data.unlocked_facilities || state.player.unlockedFacilities, usedIdentityIds: sData.usedIdentityIds || state.player.usedIdentityIds, inventory: sData.inventory || state.player.inventory, quests: sData.quests || state.player.quests, abyssFloor: sData.abyssFloor || state.player.abyssFloor, shopStock: sData.shopStock || state.player.shopStock, leaderName: sData.leaderName || state.player.leaderName, leaderGender: sData.leaderGender || state.player.leaderGender, leaderStamina: sData.leaderStamina ?? state.player.leaderStamina ?? 100, leaderFaintTurns: sData.leaderFaintTurns ?? state.player.leaderFaintTurns ?? 0, last_updated_at: sData.last_updated_at || state.player.last_updated_at },
       slaves: sData.slaves || state.slaves, marketSlaves: sData.marketSlaves || state.marketSlaves, activeDispatches: sData.activeDispatches || state.activeDispatches, activeEvent: sData.activeEvent || state.activeEvent,
       arenaNPCs: sData.arenaNPCs && sData.arenaNPCs.length > 0 ? sData.arenaNPCs : state.arenaNPCs
     }));
@@ -195,7 +216,6 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
              earnedGold += baseReward;
              earnedFood += foodReward;
              
-             // ★ V2.9.10 金卡紫卡高階獎勵重構 (首領本身不可升級技能，僅獲得威望)
              if (dispatch.mission.rank === '紫色') earnedPrestige += Math.floor(Math.random() * 21) + 10;
              if (dispatch.mission.rank === '黃金') earnedPrestige += Math.floor(Math.random() * 21) + 30;
              
@@ -203,7 +223,6 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
              phaseLogs.push(`［平安歸隊］您已安全完成 ${dispatch.mission.title} 並帶回物資與資金。`);
              if (leaderStamina <= 0) { leaderStamina = 0; leaderFTurns = 3; phaseLogs.push(`［過勞］您耗盡了最後一絲體力，陷入重傷昏厥 (3時段)！`); }
            } else {
-             // ★ V2.9.10 失敗懲罰階梯化：扣除該任務 80% 的體力
              const failStamina = Math.floor(dispatch.mission.staminaCost * 0.8);
              leaderStamina = Math.max(0, leaderStamina - failStamina);
              phaseLogs.push(`［慘敗］您在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫 (-${failStamina})！`);
@@ -224,7 +243,6 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
                 earnedFood += foodReward;
 
                 let updatedSkills = { ...slave.skills };
-                // ★ V2.9.10 奴隸高階獎勵重構：紫卡給威望，金卡給威望+技能突破
                 if (dispatch.mission.rank === '紫色') {
                   earnedPrestige += Math.floor(Math.random() * 21) + 10;
                 }
@@ -259,7 +277,6 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
                   slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + 15);
                 }
               } else {
-                // ★ V2.9.10 失敗懲罰階梯化：扣除該任務 80% 的體力與壓力
                 const failStamina = Math.floor(dispatch.mission.staminaCost * 0.8);
                 const failStress = Math.floor(dispatch.mission.stressGain * 0.8);
                 slave.conditionStats.stamina = Math.max(0, slave.conditionStats.stamina - failStamina);
