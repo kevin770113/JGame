@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGameStore } from '../store/useGameStore';
 import { CombatLog } from '../types';
-import { parseLocalizedName } from '../utils/i18nUtils'; // ★ V2.11.0 引入雙語解析
+import { parseLocalizedName } from '../utils/i18nUtils'; 
 
 export default function CombatTheater() {
   const { t } = useTranslation();
@@ -19,15 +19,15 @@ export default function CombatTheater() {
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
-  // ★ V2.11.0 建立組件存活狀態 Ref 追蹤
   const isMounted = useRef<boolean>(true);
-  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
+  // ★ 修復：取代 NodeJS.Timeout 以相容各類編譯器
+  const timeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
-      if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current); // ★ 解除安裝時強制截斷計時器
+      if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current); 
     };
   }, []);
 
@@ -46,7 +46,7 @@ export default function CombatTheater() {
     if (!activeCombat || isFinished) return;
 
     const playNextFrame = () => {
-      if (!isMounted.current) return; // ★ 防護：組件已被卸載則終止執行更新
+      if (!isMounted.current) return; 
 
       if (currentFrame < activeCombat.logs.length) {
         const log = activeCombat.logs[currentFrame];
@@ -55,7 +55,6 @@ export default function CombatTheater() {
         if (log.sHp !== undefined) setSlaveHp(log.sHp);
         if (log.nHp !== undefined) setNpcHp(log.nHp);
 
-        // 使用原始名稱欄位判定攻擊方
         if (log.type === 'damage') {
           if (log.message.includes(activeCombat.slaveName + ' 發動攻擊')) setActiveEffect('npc-hit');
           else setActiveEffect('slave-hit');
@@ -100,7 +99,6 @@ export default function CombatTheater() {
     }
   };
 
-  // 雙語名字在地化解析
   const localizedSlaveName = parseLocalizedName(activeCombat.slaveName);
   const localizedNpcName = parseLocalizedName(activeCombat.npcName);
 
@@ -186,7 +184,6 @@ export default function CombatTheater() {
                    text = t(logAny.messageKey, { ...logAny.messageParams, defaultValue: log.message }) as string;
                 }
 
-                // 進行高亮替換時，一律使用已解析的在地化名字
                 const highlightedText = text
                   .replace(activeCombat.slaveName, `<strong class="text-blue-300">${localizedSlaveName}</strong>`)
                   .replace(activeCombat.npcName, `<strong class="text-red-400">${localizedNpcName}</strong>`);
