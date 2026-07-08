@@ -1,98 +1,61 @@
+import { useTranslation } from 'react-i18next';
 import { Slave } from '../types';
+import { getSlavePortraitUrl } from '../utils/gameData';
+import { parseLocalizedName } from '../utils/i18nUtils';
 
 interface SlaveCardProps {
   slave: Slave;
+  actionButton?: React.ReactNode;
 }
 
-export default function SlaveCard({ slave }: SlaveCardProps) {
-  const { combat, endurance, intelligence, obedience, charisma = 10, luck = 10 } = slave.primaryStats;
-  const { stamina, stress, rebellion } = slave.conditionStats;
-
-  const renderGender = () => {
-    if (slave.gender === 'Male') return <span className="text-blue-400 font-bold ml-2 text-xs">［男］</span>;
-    if (slave.gender === 'Female') return <span className="text-pink-400 font-bold ml-2 text-xs">［女］</span>;
-    return null;
-  };
+export default function SlaveCard({ slave, actionButton }: SlaveCardProps) {
+  const { t } = useTranslation();
+  const localizedName = parseLocalizedName(slave.name);
 
   return (
-    <div className="bg-gray-900 rounded-lg p-4 border border-gray-700 flex flex-col gap-3 shadow-md relative overflow-hidden group">
-      <div className="absolute top-0 left-0 w-1 h-full bg-gray-600 group-hover:bg-blood-red transition-colors opacity-70"></div>
-
-      <div className="flex justify-between items-start z-10">
-        <div>
-          <h3 className="text-base font-bold text-gray-200 flex items-center tracking-widest">
-            {slave.name}
-            {renderGender()}
-          </h3>
-          <span className="text-xs text-gray-400 bg-gray-950 px-2 py-0.5 rounded mt-1.5 inline-block border border-gray-700">
-            種族：{slave.race}
-          </span>
-        </div>
-        <div className="text-right flex flex-col items-end gap-1">
-          <span className={`text-xs px-2 py-0.5 rounded font-bold ${slave.activityStatus === '閒置' ? 'bg-gray-800 text-gray-400' : 'bg-yellow-900/30 text-yellow-500 border border-yellow-700/50'}`}>
-            {slave.activityStatus}
-          </span>
-          <span className="text-xs text-blue-400 font-bold bg-blue-900/20 px-2 py-0.5 rounded border border-blue-900/50">
-            服從: {obedience}/100
-          </span>
-        </div>
+    <div className="bg-gray-900/90 border border-gray-800 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row gap-4 shadow-xl transition-all hover:border-gray-700 animate-fade-in relative overflow-hidden group">
+      
+      <div className="w-full sm:w-28 h-32 bg-gray-950 border border-gray-800 rounded flex items-center justify-center relative overflow-hidden shrink-0 shadow-inner">
+        <img 
+          src={getSlavePortraitUrl(slave)} 
+          alt="" 
+          className="w-full h-full object-cover object-[center_15%] transition-transform duration-500 group-hover:scale-105"
+          onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent z-10 pointer-events-none"></div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mt-1 z-10">
-        <div className="flex flex-col justify-center gap-1 bg-gray-950 p-2 rounded border border-gray-800">
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-gray-500 font-bold">武力</span>
-            <span className="text-red-400 font-mono font-bold">{combat}</span>
-          </div>
-          <div className="flex justify-between items-center text-xs border-t border-gray-800/60 pt-1">
-            <span className="text-gray-500 font-bold">體質</span>
-            <span className="text-green-400 font-mono font-bold">{endurance}</span>
-          </div>
-          <div className="flex justify-between items-center text-xs border-t border-gray-800/60 pt-1">
-            <span className="text-gray-500 font-bold">智力</span>
-            <span className="text-blue-400 font-mono font-bold">{intelligence}</span>
-          </div>
-          <div className="flex justify-between items-center text-xs border-t border-gray-800/60 pt-1">
-            <span className="text-gray-500 font-bold">魅力</span>
-            <span className="text-pink-400 font-mono font-bold">{charisma}</span>
-          </div>
-          <div className="flex justify-between items-center text-xs border-t border-gray-800/60 pt-1">
-            <span className="text-gray-500 font-bold">幸運</span>
-            <span className="text-yellow-400 font-mono font-bold">{luck}</span>
-          </div>
-        </div>
-
-        <div className="flex flex-col justify-center gap-3 bg-gray-950 p-2 rounded border border-gray-800">
-          <div className="flex flex-col gap-0.5">
-            <div className="flex justify-between text-3xs text-gray-500 font-bold"><span>體力</span><span>{stamina}/100</span></div>
-            <div className="w-full h-1.5 bg-gray-900 rounded overflow-hidden flex border border-gray-800">
-              <div className="bg-green-600 h-full shadow-[0_0_5px_rgba(22,163,74,0.5)]" style={{ width: `${stamina}%` }}></div>
-            </div>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <div className="flex justify-between text-3xs text-gray-500 font-bold"><span>壓力</span><span>{stress}/100</span></div>
-            <div className="w-full h-1.5 bg-gray-900 rounded overflow-hidden flex border border-gray-800">
-              <div className="bg-yellow-600 h-full shadow-[0_0_5px_rgba(202,138,4,0.5)]" style={{ width: `${stress}%` }}></div>
-            </div>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <div className="flex justify-between text-3xs text-gray-500 font-bold"><span>反抗</span><span>{rebellion}/100</span></div>
-            <div className="w-full h-1.5 bg-gray-900 rounded overflow-hidden flex border border-gray-800">
-              <div className="bg-blood-red h-full shadow-[0_0_5px_rgba(220,38,38,0.5)]" style={{ width: `${rebellion}%` }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {slave.traits.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1 z-10">
-          {slave.traits.map(trait => (
-            <span key={trait} className="px-2 py-0.5 bg-purple-900/30 text-purple-400 border border-purple-800/50 rounded text-3xs font-bold tracking-widest">
-              {trait}
+      <div className="flex-1 flex flex-col justify-between min-w-0">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="text-base font-bold text-gray-200 truncate group-hover:text-purple-400 transition-colors">
+              {localizedName}
+            </h4>
+            <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${slave.gender === 'Male' ? 'bg-blue-950/50 text-blue-400 border border-blue-900/30' : 'bg-pink-950/50 text-pink-400 border border-pink-900/30'}`}>
+              {slave.gender === 'Male' ? t('gender.male', '男性') : t('gender.female', '女性')}
             </span>
-          ))}
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 text-3xs font-mono">
+            <span className="bg-gray-950 px-1.5 py-0.5 rounded border border-gray-850 text-gray-400">
+              {t('stats.race', '種族')}: <strong className="text-gray-300 font-sans">{slave.race}</strong>
+            </span>
+            <span className="bg-gray-950 px-1.5 py-0.5 rounded border border-gray-850 text-gray-400">
+              {t('stats.obedience', '服從')}: <strong className="text-blue-400">{slave.primaryStats.obedience}</strong>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 bg-gray-950/50 p-2 rounded border border-gray-850/60 text-3xs font-mono mt-1">
+            <div className="flex flex-col"><span className="text-gray-500 font-bold">{t('stats.combat', '武力')}</span><span className="text-red-400 font-bold text-xs">{slave.primaryStats.combat}</span></div>
+            <div className="flex flex-col"><span className="text-gray-500 font-bold">{t('stats.endurance', '體質')}</span><span className="text-green-400 font-bold text-xs">{slave.primaryStats.endurance}</span></div>
+            <div className="flex flex-col"><span className="text-gray-500 font-bold">{t('stats.intelligence', '智力')}</span><span className="text-blue-400 font-bold text-xs">{slave.primaryStats.intelligence}</span></div>
+          </div>
         </div>
-      )}
+
+        <div className="mt-3 sm:mt-0 flex justify-end shrink-0 pt-2 border-t border-gray-800/30">
+          {actionButton}
+        </div>
+      </div>
     </div>
   );
 }
