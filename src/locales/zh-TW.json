@@ -137,7 +137,11 @@
   },
   "quest_panel": {
     "title": "［劇情任務］",
-    "empty": "「深淵目前保持靜默，繼續您的探索……」"
+    "empty": "「深淵目前保持靜默，繼續您的探索……」",
+    "main_quest": "［帝國核心主線進程］",
+    "chapter_title": "第 {{chapter}} 章",
+    "prestige_progress": "解鎖下章所需威望",
+    "hint": "※ 威望可透過在地下角鬥場取得大捷、或是前往深淵酒館發布告示牌派遣任務獲得。當進度圓滿時，系統將在新時段推進時自動叩開下一章的大門。"
   },
   "breeding": {
     "title": "血統密室",
@@ -238,11 +242,11 @@
   },
   "housekeeping": {
     "title": "家政管理",
-    "desc": "指派成員打掃據點，維持環境整潔以保障恢復效率。",
+    "desc": "指派成員打賞據點，維持環境整潔以保障恢復效率。",
     "dirtiness_prefix": "當前據點環境總髒亂度：",
     "cost_stamina_pt1": "下達此命令將強制消耗該成員 ",
     "cost_stamina_pt2": " 點體力。",
-    "warn_ap": "[注意] 消耗 1 點行動力並推進 1 個時段。",
+    "warn_ap": "[Notice] 消耗 1 點行動力並推進 1 個時段。",
     "assign_label": "［指派清潔負責人］",
     "err_no_worker": "［錯誤］請先選擇要指派的清潔負責人。",
     "err_no_ap": "［系統警告］行動力不足，無法下達命令。",
@@ -264,7 +268,7 @@
     "btn_denied": "［條件不足］",
     "loc_frontlines": {
       "name": "混亂前線",
-      "desc": "帝國與深淵交界的混亂地帶。危險性高，環境髒亂度累積極快，但無需繳納高額地租。",
+      "desc": "帝國與深淵交界的混亂地帶。危險性高，環境髒亂度列積極快，但無需繳納高額地租。",
       "perks": "• 基礎人口容納上限：5 人\n• 據點每日基礎維護費：$500\n• 環境髒亂度增長倍率：2.0x"
     },
     "loc_neutral_hub": {
@@ -353,5 +357,47 @@
     "btn_anon": "［簽署無名血契］(免註冊快速遊玩)",
     "btn_login": "［驗證並登入］",
     "btn_signup": "［註冊新血脈］"
+  },
+  "nav": {
+    "interaction": "互動",
+    "breeding": "育成",
+    "map": "遷移",
+    "housekeeping": "家政",
+    "go_out": "外出",
+    "street": "街道",
+    "market": "市集",
+    "tavern": "酒館",
+    "arena": "競技",
+    "return": "返回"
+  },
+  "app": {
+    "loading_local": "［讀取本地記憶中...］",
+    "loading_auth": "［連線深淵印記中...］",
+    "select_arena_title": "［選擇競技場域］",
+    "blood_arena": "血腥角鬥場",
+    "abyss_tower": "深淵之塔",
+    "status_label": "狀態",
+    "role_maid": "職位：管家",
+    "role_security": "職位：守衛",
+    "faint_state": "昏厥",
+    "turns": "回合"
+  },
+  "race": {
+    "人類": "人類",
+    "精靈": "精靈",
+    "半獸人": "半獸人",
+    "矮人": "矮人",
+    "不死族": "不死族",
+    "龍族": "龍族"
+  },
+  "activity_status": {
+    "閒置": "閒置",
+    "外派中": "外派中",
+    "特訓中": "特訓中"
+  },
+  "role": {
+    "none": "無",
+    "maid": "管家",
+    "security": "守衛"
   }
 }
