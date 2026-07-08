@@ -1,45 +1,47 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGameStore } from '../store/useGameStore';
 import { GAME_CONSTANTS } from '../utils/constants';
 import { Location } from '../types';
 
 interface LocationInfo {
   id: Location;
-  name: string;
+  nameKey: string;
   cost: number;
   reqPrestige: number; 
-  description: string;
-  perks: string;
+  descKey: string;
+  perksKey: string;
 }
 
 const LOCATIONS: LocationInfo[] = [
   { 
     id: 'Frontlines', 
-    name: '混亂前線邊境', 
+    nameKey: 'map.loc_frontlines.name', 
     cost: GAME_CONSTANTS.RELOCATION_COST.Frontlines, 
     reqPrestige: 0,
-    description: '狼煙四起的邊防交戰區，法外之徒的流放地。',
-    perks: '無威望門檻。初始容納上限 5 人。'
+    descKey: 'map.loc_frontlines.desc',
+    perksKey: 'map.loc_frontlines.perks'
   },
   { 
     id: 'NeutralHub', 
-    name: '中立貿易核心城', 
+    nameKey: 'map.loc_neutral_hub.name', 
     cost: GAME_CONSTANTS.RELOCATION_COST.NeutralHub, 
     reqPrestige: 100,
-    description: '三大帝國簽署互不侵犯協議的灰色交易核心。',
-    perks: '需要 100 點商會威望。解鎖上限至 10 人，髒亂累積減緩 30%。'
+    descKey: 'map.loc_neutral_hub.desc',
+    perksKey: 'map.loc_neutral_hub.perks'
   },
   { 
     id: 'Capital', 
-    name: '安逸極樂皇城', 
+    nameKey: 'map.loc_capital.name', 
     cost: GAME_CONSTANTS.RELOCATION_COST.Capital, 
     reqPrestige: 500,
-    description: '戒備森嚴的絕對權力王都，極度排外的奢華牢籠。',
-    perks: '需要 500 點商會威望。解鎖上限至 20 人，髒亂累積減緩 60%。'
+    descKey: 'map.loc_capital.desc',
+    perksKey: 'map.loc_capital.perks'
   },
 ];
 
 export default function MapView() {
+  const { t } = useTranslation();
   const { gold, prestige, location: currentLocation } = useGameStore((state) => state.player);
   const deductGold = useGameStore((state) => state.deductGold);
   const changeLocation = useGameStore((state) => state.changeLocation);
@@ -48,49 +50,49 @@ export default function MapView() {
 
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // ★ 玩家第一次進入地圖，觸發「踏入灰色地帶」任務
   useEffect(() => {
     triggerQuest('q_enter_hub');
   }, [triggerQuest]);
 
   const handleRelocate = (targetLocation: LocationInfo) => {
+    const localizedName = t(targetLocation.nameKey);
     if (currentLocation === targetLocation.id) {
-      setSysMessage({ text: '［提示］您的商會目前已經駐紮在此據點。', type: 'error' });
+      setSysMessage({ text: t('map.err_current', '［提示］您的商會目前已經駐紮在此據點。'), type: 'error' });
       return;
     }
 
     if (prestige < targetLocation.reqPrestige) {
-      setSysMessage({ text: `［拒絕］商會階級不符。進入【${targetLocation.name}】需要至少 ${targetLocation.reqPrestige} 點威望。`, type: 'error' });
+      setSysMessage({ text: t('map.err_prestige', { name: localizedName, req: targetLocation.reqPrestige, defaultValue: `［拒絕］商會階級不符。進入【${localizedName}】需要至少 ${targetLocation.reqPrestige} 點威望。` }), type: 'error' });
       return;
     }
 
     if (gold < targetLocation.cost) {
-      setSysMessage({ text: `［拒絕］疏通資金不足。遷移至【${targetLocation.name}】需要 ${targetLocation.cost} 資金。`, type: 'error' });
+      setSysMessage({ text: t('map.err_gold', { name: localizedName, cost: targetLocation.cost, defaultValue: `［拒絕］疏通資金不足。遷移至【${localizedName}】需要 ${targetLocation.cost} 資金。` }), type: 'error' });
       return;
     }
 
     deductGold(targetLocation.cost);
     changeLocation(targetLocation.id);
-    setSysMessage({ text: `［系統］遷移協議已生效。整個據點已正式搬遷進駐【${targetLocation.name}】。`, type: 'success' });
+    setSysMessage({ text: t('map.success', { name: localizedName, defaultValue: `［系統］遷移協議已生效。整個據點已正式搬遷進駐【${localizedName}】。` }), type: 'success' });
   };
 
   return (
     <div className="w-full flex flex-col gap-4 pb-10 animate-fade-in">
       <div className="flex justify-between items-center border-b border-gray-700 pb-2">
         <div>
-          <h2 className="text-xl font-bold text-gray-300">商會拔營遷移</h2>
+          <h2 className="text-xl font-bold text-gray-300">{t('map.title', '商會拔營遷移')}</h2>
           <div className="flex gap-4 mt-0.5">
-            <p className="text-2xs text-gray-500">可用資產: <span className="text-yellow-500 font-mono font-bold">{gold}</span></p>
-            <p className="text-2xs text-gray-500">當前威望: <span className="text-blue-400 font-mono font-bold">{prestige}</span></p>
+            <p className="text-2xs text-gray-500">{t('stats.gold_avail', '可用資產')}: <span className="text-yellow-500 font-mono font-bold">{gold}</span></p>
+            <p className="text-2xs text-gray-500">{t('stats.prestige_current', '當前威望')}: <span className="text-blue-400 font-mono font-bold">{prestige}</span></p>
           </div>
         </div>
         <button onClick={() => navigate('Home', 'Main')} className="whitespace-nowrap shrink-0 px-3 py-1.5 bg-gray-900 border border-gray-600 hover:bg-gray-800 text-gray-400 font-bold rounded text-xs transition-colors shadow-sm tracking-widest">
-          ［返回大廳］
+          {t('ui.return_base', '［返回大廳］')}
         </button>
       </div>
 
       <p className="text-xs text-gray-400">
-        高階據點不僅需要打點資金，更需要商會擁有足夠的［威望］才能取得入城許可。
+        {t('map.hint', '高階據點不僅需要打點資金，更需要商會擁有足夠的［威望］才能取得入城許可。')}
       </p>
 
       {sysMessage && (
@@ -111,25 +113,25 @@ export default function MapView() {
               <div className="flex justify-between items-start z-10">
                 <div>
                   <h3 className={`text-base font-bold flex items-center gap-2 tracking-widest ${isCurrent ? 'text-blood-red' : 'text-gray-200'}`}>
-                    【{loc.name}】
-                    {isCurrent && <span className="text-3xs bg-blood-red text-white px-1.5 py-0.5 rounded tracking-normal">目前駐紮</span>}
+                    【{t(loc.nameKey)}】
+                    {isCurrent && <span className="text-3xs bg-blood-red text-white px-1.5 py-0.5 rounded tracking-normal">{t('map.current_loc', '目前駐紮')}</span>}
                   </h3>
-                  <p className="text-xs text-gray-400 mt-1.5">{loc.description}</p>
+                  <p className="text-xs text-gray-400 mt-1.5">{t(loc.descKey)}</p>
                 </div>
               </div>
 
               <div className="text-2xs text-gray-300 bg-gray-950 p-2.5 rounded border border-gray-800 font-sans leading-relaxed">
-                <span className="text-gray-500 font-bold">［解鎖基建特性］</span><br/>{loc.perks}
+                <span className="text-gray-500 font-bold">{t('map.perks_title', '［解鎖基建特性］')}</span><br/>{t(loc.perksKey)}
               </div>
 
               {!isCurrent && (
                 <div className="flex justify-between items-center mt-1 z-10 border-t border-gray-800 pt-3">
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-400 font-bold tracking-widest">疏通開銷: <strong className={canAfford ? 'text-yellow-500 font-mono' : 'text-red-500 font-mono'}>{loc.cost}</strong></span>
-                    <span className="text-xs text-gray-400 font-bold tracking-widest">威望需求: <strong className={meetsPrestige ? 'text-blue-400 font-mono' : 'text-red-500 font-mono'}>{loc.reqPrestige}</strong></span>
+                    <span className="text-xs text-gray-400 font-bold tracking-widest">{t('map.cost', '疏通開銷')}: <strong className={canAfford ? 'text-yellow-500 font-mono' : 'text-red-500 font-mono'}>{loc.cost}</strong></span>
+                    <span className="text-xs text-gray-400 font-bold tracking-widest">{t('map.req_prestige', '威望需求')}: <strong className={meetsPrestige ? 'text-blue-400 font-mono' : 'text-red-500 font-mono'}>{loc.reqPrestige}</strong></span>
                   </div>
                   <button onClick={() => handleRelocate(loc)} disabled={!canRelocate} className={`px-4 py-2 rounded font-bold text-xs transition-colors tracking-widest ${ canRelocate ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-500 hover:border-gray-400' : 'bg-gray-900 text-gray-700 border border-gray-800 cursor-not-allowed' }`}>
-                    {canRelocate ? '［下令拔營］' : '［條件不足］'}
+                    {canRelocate ? t('map.btn_relocate', '［下令拔營］') : t('map.btn_denied', '［條件不足］')}
                   </button>
                 </div>
               )}
