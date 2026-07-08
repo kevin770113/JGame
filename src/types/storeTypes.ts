@@ -28,7 +28,7 @@ export interface ArenaNPC {
 }
 
 export interface GameStore {
-  player: Player & { shopStock: Record<string, number> }; 
+  player: Player; 
   slaves: Slave[];
   marketSlaves: Slave[];
   arenaNPCs: ArenaNPC[];
@@ -54,9 +54,9 @@ export interface GameStore {
   setActiveCombat: (combat: CombatPlaybackData | null) => void;
   appointRole: (slaveId: string, role: Role) => void; 
   
-  syncProfileToCloud: () => Promise<void>;
+  syncProfileToCloud: (forceOverwrite?: boolean) => Promise<void>; // ★ 支援強制覆蓋
   loadProfileFromCloud: (forceLoad?: boolean) => Promise<void>; 
-  consumeIdentity: () => Promise<{name: string, story: string}>;
+  consumeIdentity: () => Promise<{name: string}>; // ★ 只回傳 name
   
   addGold: (amount: number) => void;
   deductGold: (amount: number) => void;
