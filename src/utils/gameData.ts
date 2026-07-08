@@ -1,42 +1,67 @@
-import { Slave } from '../types';
+import { Item, NPC } from '../types';
 
-export type ItemType = 'potion' | 'weapon';
+export const PORTRAIT_COUNT = 112; 
 
-// ★ V2.9.0 重構：古代英靈全面五維化（符合歷史人設）
-export const HEROES_DATA = [
-  { floor: 5, name: '狂戰士・斯巴達克斯', stats: { combat: 90, endurance: 90, intelligence: 30, charisma: 70, luck: 60 }, quote: '血...我要更多的血！', rewardGold: 3000, rewardPrestige: 50 },
-  { floor: 10, name: '深淵暴君・項羽', stats: { combat: 160, endurance: 110, intelligence: 65, charisma: 95, luck: 10 }, quote: '力拔山兮氣蓋世！', rewardGold: 10000, rewardPrestige: 200 }
-];
-
-export const QUESTS_DATA = {
-  'q_first_blood': { title: '【主線】深淵的初啼', description: '前往地下商隊，引進您的第一名試驗體。' },
-  'q_first_fusion': { title: '【主線】禁忌的鍊金術', description: '在血統密室中，完成第一次生命融合。' },
-  'q_enter_hub': { title: '【主線】踏入灰色地帶', description: '累積 100 點威望，並將商會遷移至中立貿易城。' },
+export const getSlavePortraitUrl = (slave: { portraitId?: number; gender: 'Male' | 'Female' }) => {
+  const id = slave.portraitId !== undefined ? slave.portraitId : 1;
+  const genderPath = slave.gender === 'Male' ? 'male' : 'female';
+  return `https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/portraits/${genderPath}/${id}.webp`;
 };
 
-export const ITEMS_DATA: Record<string, { name: string, type: ItemType, effect: any, price: number, desc: string }> = {
-  'potion_heal_small': { name: '劣質恢復藥', type: 'potion', effect: { stamina: 30 }, price: 500, desc: '勉強能喝的紅藥水，恢復 30 體力。' },
-  'weapon_iron_sword': { name: '精鋼長劍', type: 'weapon', effect: { attack: 10 }, price: 2000, desc: '標準的步兵武器，戰鬥時武力判定 +10。' },
-};
-
-export const getSlavePortraitUrl = (slave: Slave): string => {
-  const RACE_MAP: Record<string, string> = {
-    '人類': 'human',
-    '精靈': 'elf',
-    '半獸人': 'orc',
-    '矮人': 'dwarf',
-    '不死族': 'undead',
-    '龍族': 'dragon'
-  };
-
-  const raceKey = RACE_MAP[slave.race] || 'human';
-  const genderKey = slave.gender.toLowerCase();
-
-  let hash = 5381;
-  for (let i = 0; i < slave.id.length; i++) {
-    hash = ((hash << 5) + hash) + slave.id.charCodeAt(i);
+// ★ V2.11.0 武器資料庫字典化
+export const ITEMS_DATA: Record<string, Item> = {
+  iron_sword: {
+    id: 'iron_sword',
+    name: 'items.iron_sword.name',
+    type: 'weapon',
+    price: 150,
+    desc: 'items.iron_sword.desc',
+    effect: { attack: 8 }
+  },
+  steel_spear: {
+    id: 'steel_spear',
+    name: 'items.steel_spear.name',
+    type: 'weapon',
+    price: 320,
+    desc: 'items.steel_spear.desc',
+    effect: { attack: 15 }
+  },
+  obsidian_dagger: {
+    id: 'obsidian_dagger',
+    name: 'items.obsidian_dagger.name',
+    type: 'weapon',
+    price: 680,
+    desc: 'items.obsidian_dagger.desc',
+    effect: { attack: 28 }
+  },
+  abyss_reaper: {
+    id: 'abyss_reaper',
+    name: 'items.abyss_reaper.name',
+    type: 'weapon',
+    price: 1500,
+    desc: 'items.abyss_reaper.desc',
+    effect: { attack: 55 }
   }
-  
-  const index = (Math.abs(hash) % 3) + 1;
-  return `https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/portrait-${raceKey}-${genderKey}-${index}.webp`;
 };
+
+// ★ V2.11.0 靜態區域鎮守者名詞 Key 化
+export const BASE_ARENA_NPCS: NPC[] = [
+  {
+    id: 'npc-arena-capital',
+    name: 'npc.arena_capital.name',
+    location: 'Capital',
+    stats: { combat: 35, endurance: 35, intelligence: 20, charisma: 20, luck: 15 },
+    rewardGold: 300,
+    rewardPrestige: 15,
+    description: 'npc.arena_capital.desc'
+  },
+  {
+    id: 'npc-arena-border',
+    name: 'npc.arena_border.name',
+    location: 'BorderTown',
+    stats: { combat: 16, endurance: 16, intelligence: 10, charisma: 10, luck: 10 },
+    rewardGold: 120,
+    rewardPrestige: 5,
+    description: 'npc.arena_border.desc'
+  }
+];
