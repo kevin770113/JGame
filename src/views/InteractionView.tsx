@@ -281,7 +281,7 @@ export default function InteractionView() {
                             {locName}
                           </span>
                           <span className="text-3xs text-gray-500 font-bold">
-                             {t('stats.race')}: {slave.race} ({slave.gender === 'Male' ? t('gender.male_short', '男') : t('gender.female_short', '女')})
+                             {t('stats.race')}: {t(`race.${slave.race}`, slave.race)} ({slave.gender === 'Male' ? t('gender.male_short', '男') : t('gender.female_short', '女')})
                           </span>
                         </div>
                         
