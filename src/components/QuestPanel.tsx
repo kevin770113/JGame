@@ -58,8 +58,8 @@ export default function QuestPanel() {
               return (
                 <div key={qId} className="bg-gray-950 p-2.5 rounded border border-gray-800 relative overflow-hidden shadow-inner">
                   <div className="absolute left-0 top-0 w-0.5 h-full bg-blood-red"></div>
-                  <h4 className="text-2xs font-bold text-gray-200 mb-1 pl-1 tracking-wide">{t(`quests.${qId}.title`, qData.title)}</h4>
-                  <p className="text-3xs text-gray-400 leading-normal pl-1">{t(`quests.${qId}.desc`, qData.description)}</p>
+                  <h4 className="text-2xs font-bold text-gray-200 mb-1 pl-1 tracking-wide">{qData.title}</h4>
+                  <p className="text-3xs text-gray-400 leading-normal pl-1">{qData.description}</p>
                 </div>
               );
             })}
