@@ -78,7 +78,6 @@ export const generateDailyMissions = (): Mission[] => {
   const targets = ['私掠物資', '深淵礦脈', '異端營地', '帝國商隊', '地下黑市', '古老遺跡'];
   const getName = () => `【${actions[Math.floor(Math.random() * actions.length)]}${targets[Math.floor(Math.random() * targets.length)]}】`;
 
-  // ★ V2.9.10 重新平衡任務難度、消耗與報酬階梯
   for (let i = 0; i < Math.floor(Math.random() * 2) + 3; i++) {
     missions.push({ 
       id: `m-grn-${baseId}-${i}`, title: `［常規］${getName()}`, rank: '翠綠', requiredPhases: 1, staminaCost: 20, stressGain: 10, reward: 250 + Math.floor(Math.random() * 100), 
@@ -106,7 +105,8 @@ export const generateDailyMissions = (): Mission[] => {
   return missions;
 };
 
-export const generateBaseMarketSlave = (idSuffix: string, identity: {name: string, story: string}): Slave => {
+// ★ V2.11.0 修復：對齊 index.ts 中的 Slave 型別，移除 story 與 backgroundStory
+export const generateBaseMarketSlave = (idSuffix: string, identity: {name: string}): Slave => {
   const races: Race[] = ['人類', '精靈', '半獸人', '矮人', '不死族', '龍族'];
   const race = races[Math.floor(Math.random() * races.length)];
   const gender: Gender = Math.random() > 0.5 ? 'Male' : 'Female';
@@ -123,7 +123,6 @@ export const generateBaseMarketSlave = (idSuffix: string, identity: {name: strin
     },
     conditionStats: { stamina: 100, stress: 0, rebellion: Math.floor(Math.random() * 20) },
     traits: [], 
-    backgroundStory: "", 
     combatRecord: { wins: 0, losses: 0 },
     isInjured: false
   };
