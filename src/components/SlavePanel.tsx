@@ -181,10 +181,10 @@ export default function SlavePanel() {
                           <span className="absolute top-[28%] -left-2 text-[9px] text-green-400/90 font-mono font-bold leading-none">{t('stats.endurance', '體')}</span>
                         </div>
                         
-                        {/* 右側：緊密型鍵值對資料列 (Compact Data Rows) */}
-                        <div className="flex-1 flex flex-col gap-0.5 justify-center min-w-0">
-                          <div className="flex justify-between items-center border-b border-gray-800/60 pb-1">
-                            <span className="text-[10px] text-gray-500 font-bold truncate pr-1">{t('stats.combat', '武力')}</span>
+                        {/* 右側：完美 5 宮格素質表 (去除服從度，維持專業排版) */}
+                        <div className="grid grid-cols-2 border border-gray-800 rounded bg-black/40 text-2xs font-mono overflow-hidden shadow-inner flex-1 w-full">
+                          <div className="border-r border-b border-gray-800 p-2 flex justify-between items-center">
+                            <span className="text-gray-500 font-bold">{t('stats.combat', '武力')}</span>
                             {activeSlave.isInjured ? (
                               <div className="flex items-center gap-1">
                                 <span className="text-gray-600 text-[9px]">({activeSlave.primaryStats.combat})</span>
@@ -197,29 +197,26 @@ export default function SlavePanel() {
                               </div>
                             )}
                           </div>
-                          <div className="flex justify-between items-center border-b border-gray-800/60 py-1">
-                            <span className="text-[10px] text-gray-500 font-bold truncate pr-1">{t('stats.endurance', '體質')}</span>
+                          <div className="border-b border-gray-800 p-2 flex justify-between items-center">
+                            <span className="text-gray-500 font-bold">{t('stats.endurance', '體質')}</span>
                             {activeSlave.isInjured ? (
                                <div className="flex items-center gap-1"><span className="text-gray-600 text-[9px]">({activeSlave.primaryStats.endurance})</span><span className="text-red-500 font-bold text-xs font-mono">{Math.floor(activeSlave.primaryStats.endurance * 0.5)}</span></div>
                             ) : (<span className="text-green-400/90 font-bold text-xs font-mono">{activeSlave.primaryStats.endurance}</span>)}
                           </div>
-                          <div className="flex justify-between items-center border-b border-gray-800/60 py-1">
-                            <span className="text-[10px] text-gray-500 font-bold truncate pr-1">{t('stats.intelligence', '智力')}</span>
+                          <div className="border-r border-b border-gray-800 p-2 flex justify-between items-center">
+                            <span className="text-gray-500 font-bold">{t('stats.intelligence', '智力')}</span>
                             {activeSlave.isInjured ? (
                                <div className="flex items-center gap-1"><span className="text-gray-600 text-[9px]">({activeSlave.primaryStats.intelligence})</span><span className="text-red-500 font-bold text-xs font-mono">{Math.floor(activeSlave.primaryStats.intelligence * 0.5)}</span></div>
                             ) : (<span className="text-blue-400/90 font-bold text-xs font-mono">{activeSlave.primaryStats.intelligence}</span>)}
                           </div>
-                          <div className="flex justify-between items-center border-b border-gray-800/60 py-1">
-                            <span className="text-[10px] text-gray-500 font-bold truncate pr-1">{t('stats.charisma', '魅力')}</span>
+                          <div className="border-b border-gray-800 p-2 flex justify-between items-center">
+                            <span className="text-gray-500 font-bold">{t('stats.charisma', '魅力')}</span>
                             <span className="text-pink-400/90 font-bold text-xs font-mono">{activeSlave.primaryStats.charisma ?? 10}</span>
                           </div>
-                          <div className="flex justify-between items-center border-b border-gray-800/60 py-1">
-                            <span className="text-[10px] text-gray-500 font-bold truncate pr-1">{t('stats.luck', '幸運')}</span>
+                          {/* 幸運橫跨兩格 (col-span-2) 達成完美對稱 */}
+                          <div className="col-span-2 p-2 flex justify-between items-center bg-gray-900/20">
+                            <span className="text-gray-500 font-bold">{t('stats.luck', '幸運')}</span>
                             <span className="text-yellow-400/90 font-bold text-xs font-mono">{activeSlave.primaryStats.luck ?? 10}</span>
-                          </div>
-                          <div className="flex justify-between items-center py-1">
-                            <span className="text-[10px] text-gray-500 font-bold truncate pr-1">{t('stats.obedience', '服從度')}</span>
-                            <span className="text-indigo-400/90 font-bold text-xs font-mono">{activeSlave.primaryStats.obedience}</span>
                           </div>
                         </div>
 
@@ -287,10 +284,18 @@ export default function SlavePanel() {
                                 <div className="bg-red-600/80 h-full transition-all shadow-[0_0_8px_rgba(220,38,38,0.4)]" style={{ width: `${activeSlave.conditionStats.rebellion}%` }}></div>
                              </div>
                           </div>
-                          <div className="h-px bg-gray-800/80 my-1"></div>
-                          <div className="flex justify-between items-center text-gray-400 font-bold">
-                             <span>{t('stats.obedience', '服從度')}</span>
-                             <span className={activeSlave.primaryStats.obedience < 20 ? 'text-red-400 font-bold animate-pulse font-mono text-sm' : 'text-indigo-400/90 font-mono text-sm'}>{activeSlave.primaryStats.obedience}/100</span>
+                          
+                          <div className="h-px bg-gray-800/80 my-0.5"></div>
+                          
+                          {/* ★ 補齊服從度專屬進度條與視覺一體化 */}
+                          <div className="flex flex-col gap-1">
+                             <div className="flex justify-between text-gray-400 font-bold">
+                                <span>{t('stats.obedience', '服從度')}</span>
+                                <span className={activeSlave.primaryStats.obedience < 20 ? 'text-red-400 font-bold animate-pulse font-mono text-[11px]' : 'text-indigo-400/90 font-mono text-[11px]'}>{activeSlave.primaryStats.obedience}/100</span>
+                             </div>
+                             <div className="w-full h-2 bg-gray-900 rounded border border-gray-800 overflow-hidden">
+                                <div className="bg-indigo-600/80 h-full transition-all shadow-[0_0_8px_rgba(79,70,229,0.4)]" style={{ width: `${activeSlave.primaryStats.obedience}%` }}></div>
+                             </div>
                           </div>
                        </div>
 
