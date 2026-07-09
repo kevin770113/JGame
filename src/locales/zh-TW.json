@@ -27,7 +27,9 @@
     "leader": "首領",
     "member": "成員",
     "stamina_low": "［體力不足］",
-    "time_phase": "時段"
+    "time_phase": "時段",
+    "please_select": "［請選擇］",
+    "no_options": "無可用選項"
   },
   "system": {
     "menu_title": "［系統控制樞紐］",
@@ -178,6 +180,10 @@
     "undead": "【枯骨不朽】每次攻擊造成傷害時，將吸收 15% 轉化為自身生命力。"
   },
   "interaction": {
+    "title": "互動與管理中心",
+    "desc_none": "請先選擇欲下達的商會命令類型。",
+    "desc_task": "滑動挑選執行命令的試驗體。",
+    "err_no_idle": "目前據點內沒有任何處於「閒置」狀態的成員可供指派。",
     "waiting": "［等待傳喚中...］",
     "d1": "深淵的凝視未曾移開，主人。",
     "d2": "我會將那些敵人的骨頭磨成粉末。",
@@ -247,7 +253,8 @@
     "act_clean": "下令整頓大廳環境",
     "act_train_combat": "戰鬥專精特訓",
     "act_train_housework": "內政管家特訓",
-    "act_train_survival": "生存本能特訓"
+    "act_train_survival": "生存本能特訓",
+    "btn_reselect": "［重選指令］"
   },
   "housekeeping": {
     "title": "家政管理",
@@ -260,7 +267,8 @@
     "err_no_worker": "［錯誤］請先選擇要指派的清潔負責人。",
     "err_no_ap": "［系統警告］行動力不足，無法下達命令。",
     "success": "［系統］已完成據點清潔工作並推進時段。",
-    "err_no_idle": "目前沒有可供差遣的人力（首領與奴隸體力皆不足或正忙碌中）。"
+    "err_no_idle": "目前沒有可供差遣的人力（首領與奴隸體力皆不足或正忙碌中）。",
+    "btn_exec": "［確認指派並推進時間］"
   },
   "map": {
     "title": "商會拔營遷移",
