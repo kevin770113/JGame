@@ -26,7 +26,8 @@
     "reselect": "[Reselect]",
     "leader": "Leader",
     "member": "Member",
-    "stamina_low": "[Low Stamina]"
+    "stamina_low": "[Low Stamina]",
+    "time_phase": "Phase"
   },
   "system": {
     "menu_title": "[System Control Hub]",
@@ -52,15 +53,15 @@
     "language_desc": "Select the display language for interface and logs."
   },
   "stats": {
-    "combat": "Combat",
-    "endurance": "Endurance",
-    "intelligence": "Intelligence",
-    "charisma": "Charisma",
-    "luck": "Luck",
-    "stamina": "Stamina",
+    "combat": "Atk",
+    "endurance": "End",
+    "intelligence": "Int",
+    "charisma": "Cha",
+    "luck": "Luk",
+    "stamina": "Stam",
     "stress": "Stress",
-    "rebellion": "Rebellion",
-    "obedience": "Obedience",
+    "rebellion": "Rebel",
+    "obedience": "Obed",
     "gold": "Gold",
     "food": "Food",
     "prestige": "Prestige",
@@ -136,17 +137,21 @@
     "stats_label": "Leader Attributes (Immutable)"
   },
   "quest_panel": {
-    "title": "[Imperial Core Questline]",
-    "empty": "\"The Abyss remains silent, continue your exploration...\"",
+    "title": "[Chronicles of Empire]",
+    "empty": "[The Abyss remains silent, continue your exploration]",
     "main_quest": "[Imperial Core Questline]",
     "chapter_title": "Chapter {{chapter}}",
     "prestige_progress": "Prestige Required for Next Chapter",
-    "hint": "※ Prestige can be acquired by achieving victories in the underground arena or dispatching tasks at the Abyss Tavern. Once the progress is fulfilled, the system will automatically unlock the next chapter when the time phase advances."
+    "hint": "Prestige can be acquired by achieving victories in the underground arena or dispatching tasks at the Abyss Tavern. Once the progress is fulfilled, the system will automatically unlock the next chapter when the time phase advances.",
+    "tab_q": "Q",
+    "tab_u": "U",
+    "tab_e": "E",
+    "tab_s": "S"
   },
   "breeding": {
     "title": "Bloodline Chamber",
     "desc": "A secluded underground facility for forbidden genetic fusions prohibited by the Empire.",
-    "warning": "\"Injecting incompatible genetic sequences will cause the array to fail. Offspring inherit the average attributes of both parents, along with unpredictable abyssal mutations.\"",
+    "warning": "Injecting incompatible genetic sequences will cause the array to fail. Offspring inherit the average attributes of both parents, along with unpredictable abyssal mutations.",
     "alpha": "[Inject Subject Alpha]",
     "beta": "[Inject Subject Beta]",
     "btn_full": "[Stronghold Capacity Full]",
@@ -238,7 +243,11 @@
     "pts_ap": " AP",
     "warn_cost_pt2": ", and advance ",
     "pts_time": " shift(s)",
-    "warn_desc": "As time progresses, stronghold dirtiness and dispatch mission remaining shifts will update. Execute?"
+    "warn_desc": "As time progresses, stronghold dirtiness and dispatch mission remaining shifts will update. Execute?",
+    "act_clean": "Order Stewardship Cleanup",
+    "act_train_combat": "Combat Mastery Training",
+    "act_train_housework": "Stewardship Training",
+    "act_train_survival": "Survival Instinct Training"
   },
   "housekeeping": {
     "title": "Stewardship Management",
@@ -269,17 +278,17 @@
     "loc_frontlines": {
       "name": "Chaotic Frontlines",
       "desc": "The chaotic edge where empires and the abyss collide. High danger, high filth accumulation, but low rent.",
-      "perks": "• Base Member Capacity: 5\n• Daily Base Maintenance Rent: $500\n• Environmental Filth Multiplier: 2.0x"
+      "perks": "Base Member Capacity: 5\nDaily Base Maintenance Rent: $500\nEnvironmental Filth Multiplier: 2.0x"
     },
     "loc_neutral_hub": {
       "name": "Neutral Trade City",
       "desc": "A grey trade paradise ruled by underground chambers. Expands member slots, unlocks advanced black markets.",
-      "perks": "• Base Member Capacity: 10\n• Daily Base Maintenance Rent: $3,000\n• Environmental Filth Multiplier: 1.5x\n• Unlocks Trade events from underground brokers"
+      "perks": "Base Member Capacity: 10\nDaily Base Maintenance Rent: $3,000\nEnvironmental Filth Multiplier: 1.5x\nUnlocks Trade events from underground brokers"
     },
     "loc_capital": {
       "name": "Imperial Capital",
       "desc": "The apex of prosperity. High safety, lowest filth accumulation, but weekly land taxes are extremely harsh.",
-      "perks": "• Base Member Capacity: 20\n• Daily Base Maintenance Rent: $10,000\n• Environmental Filth Multiplier: 1.0x\n• Unlocks High-tier luxury bounties from Nobles"
+      "perks": "Base Member Capacity: 20\nDaily Base Maintenance Rent: $10,000\nEnvironmental Filth Multiplier: 1.0x\nUnlocks High-tier luxury bounties from Nobles"
     }
   },
   "town": {
@@ -341,7 +350,11 @@
     "assign_title": "Assign Operator",
     "warn_stamina_cost1": "This dispatch will force consume ",
     "warn_stamina_cost2": " Stamina pts",
-    "btn_sign": "[Sign Contract]"
+    "btn_sign": "[Sign Contract]",
+    "rank_green": "Green Bound",
+    "rank_blue": "Blue Bound",
+    "rank_purple": "Purple Bound",
+    "rank_gold": "Gold Bound"
   },
   "login": {
     "subtitle": "The gate to the Abyss has opened, declare your incarnation method.",
@@ -399,5 +412,38 @@
     "none": "None",
     "maid": "Steward",
     "security": "Guard"
+  },
+  "base": {
+    "description": "The central orchestration hub of the chamber, managing all internal infrastructure and base operations.",
+    "dirtiness_warning": "[System Warning] The chamber environment is filthy! Member sleep restoration efficiency is heavily penalized. Please immediately assign workers to clean.",
+    "location_title": "Chamber Management Hub"
+  },
+  "arena": {
+    "title": "[Bloody Arena]",
+    "desc": "Brutal entertainment for the high imperial class. Win matches to secure capital and prestige.",
+    "select_fighter": "[Assign Frontline Gladiator]",
+    "no_fighter": "No idle members with combat readiness currently available.",
+    "err_no_fighter": "[Error] Please select a subject to deploy first.",
+    "err_no_ap": "[System Warning] Action Points insufficient.",
+    "no_npc": "No eligible duel opponents available in this sector currently.",
+    "reward": "Bounty / Prestige",
+    "win_rate": "System Forecast Win Rate",
+    "select_to_predict": "Select a gladiator to simulate prediction metrics",
+    "btn_fight": "[Sign Execution Compact]"
+  },
+  "abyss": {
+    "title": "[Tower of Abyss]",
+    "desc": "Endless trials. Each echelon crawls with more lethal abyssal anomalies.",
+    "current_floor": "Current Incursion Floor: ",
+    "select_fighter": "[Assign Expedition Infiltrator]",
+    "no_fighter": "No idle members with infiltration readiness currently available.",
+    "err_no_fighter": "[Error] Please select a subject to deploy first.",
+    "err_no_ap": "[System Warning] Action Points insufficient.",
+    "enemy_intel": "[Abyss Gatekeeper Intel]",
+    "reward": "Incursion Rewards",
+    "win_rate": "Forecast Survival Rate",
+    "select_to_predict": "Select an infiltrator to simulate survival metrics",
+    "btn_boss": "[Challenge Boss]",
+    "btn_challenge": "[Incur into Abyss]"
   }
 }
