@@ -9,6 +9,7 @@ export default function SystemPanel() {
   const setActiveWindow = useGameStore((state) => state.setActiveWindow);
   const syncProfileToCloud = useGameStore((state) => state.syncProfileToCloud);
   const loadProfileFromCloud = useGameStore((state) => state.loadProfileFromCloud);
+  const setGlobalModal = useGameStore((state) => state.setGlobalModal);
   const isSaving = useGameStore((state) => state.isSaving);
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success'>('idle');
@@ -30,12 +31,17 @@ export default function SystemPanel() {
 
   const handleEmergencyLoad = async () => {
     if (loadStatus !== 'idle') return;
-    if (window.confirm(t('system.emergency_load_desc', '強行拉取雲端存檔以修復本地異常。是否確認？'))) {
-      setLoadStatus('loading');
-      await loadProfileFromCloud(true);
-      setLoadStatus('idle');
-      setActiveWindow(null);
-    }
+    setGlobalModal({
+      title: t('system.emergency_load', '系統急救：強制覆蓋'),
+      message: t('system.emergency_load_desc', '強行拉取雲端存檔以修復本地異常。是否確認執行？'),
+      isConfirm: true,
+      action: async () => {
+        setLoadStatus('loading');
+        await loadProfileFromCloud(true);
+        setLoadStatus('idle');
+        setActiveWindow(null);
+      }
+    });
   };
 
   const fetchDevData = async () => {
@@ -47,11 +53,18 @@ export default function SystemPanel() {
   };
 
   const handleLogout = async () => {
-    if (window.confirm(t('system.logout_clear', '［登出與清除快取］確定要執行嗎？本地未同步的進度將會遺失。'))) {
-      await supabase.auth.signOut();
-      localStorage.clear();
-      window.location.reload();
-    }
+    setGlobalModal({
+      title: t('system.logout_clear', '［登出與清除快取］'),
+      message: isEn 
+        ? 'Are you sure you want to log out and clear cache? All unsynced local progress will be permanently lost.' 
+        : '確定要登出並清除本地快取嗎？所有「未手動同步」的本地進度將會永遠遺失。',
+      isConfirm: true,
+      action: async () => {
+        await supabase.auth.signOut();
+        localStorage.clear();
+        window.location.reload();
+      }
+    });
   };
 
   const changeLanguage = (lng: string) => i18n.changeLanguage(lng);
@@ -134,7 +147,7 @@ export default function SystemPanel() {
             <button 
               onClick={handleEmergencyLoad}
               disabled={loadStatus !== 'idle'}
-              className="w-full py-2.5 bg-yellow-950/20 hover:bg-yellow-900/40 text-yellow-500 border border-yellow-900 rounded text-xs font-bold tracking-widest transition-colors shadow"
+              className="w-full py-2.5 bg-yellow-950/20 hover:bg-yellow-900/40 text-yellow-500 border border-yellow-900 rounded text-xs font-bold tracking-widest transition-colors shadow cursor-pointer disabled:cursor-not-allowed"
             >
               {loadStatus === 'loading' ? t('system.fetching', '讀取中...') : t('system.pull_cloud', '［拉取雲端］')}
             </button>
@@ -146,13 +159,13 @@ export default function SystemPanel() {
             <div className="flex flex-col gap-2">
               <button 
                 onClick={fetchDevData}
-                className="w-full py-2 bg-purple-950/20 hover:bg-purple-900/40 text-purple-400 border border-purple-900/50 rounded text-xs font-bold tracking-widest transition-colors"
+                className="w-full py-2 bg-purple-950/20 hover:bg-purple-900/40 text-purple-400 border border-purple-900/50 rounded text-xs font-bold tracking-widest transition-colors cursor-pointer"
               >
                 {t('system.view_all_data', '［查看全資料］')}
               </button>
               <button 
                 onClick={handleLogout}
-                className="w-full py-2 bg-red-950/20 hover:bg-red-900/40 text-red-500 border border-red-900/50 rounded text-xs font-bold tracking-widest transition-colors"
+                className="w-full py-2 bg-red-950/20 hover:bg-red-900/40 text-red-500 border border-red-900/50 rounded text-xs font-bold tracking-widest transition-colors cursor-pointer"
               >
                 {t('system.logout_clear', '［登出與清除快取］')}
               </button>
