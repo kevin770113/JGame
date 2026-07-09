@@ -5,6 +5,7 @@ import { Slave } from '../types';
 import { ITEMS_DATA, getSlavePortraitUrl } from '../utils/gameData';
 import { parseLocalizedName } from '../utils/i18nUtils';
 
+// ★ V2.11.0 雷達圖座標外推防溢出修正
 const renderRadar = (slave: Slave, t: any) => {
   const weaponAtk = (slave.equipment?.weaponId && ITEMS_DATA[slave.equipment.weaponId]) 
     ? (ITEMS_DATA[slave.equipment.weaponId].effect.attack || 0) : 0;
@@ -30,8 +31,9 @@ const renderRadar = (slave: Slave, t: any) => {
   const bg25 = [25,25,25,25,25].map((v,i) => getP(v,i)).join(' ');
 
   return (
-    <div className="relative w-36 h-36 sm:w-44 sm:h-44 shrink-0 flex items-center justify-center -ml-2">
-       <svg viewBox="0 0 120 120" className="w-full h-full drop-shadow-md">
+    <div className="relative w-40 h-40 sm:w-48 sm:h-48 shrink-0 flex items-center justify-center -ml-2">
+       {/* 擴展 viewBox 確保文字不會被切斷 */}
+       <svg viewBox="-15 -15 150 150" className="w-full h-full drop-shadow-md overflow-visible">
           <polygon points={bg100} fill="rgba(31, 41, 55, 0.4)" stroke="#4b5563" strokeWidth="1" />
           <polygon points={bg75} fill="none" stroke="#374151" strokeWidth="0.5" strokeDasharray="2 2" />
           <polygon points={bg50} fill="none" stroke="#374151" strokeWidth="0.5" strokeDasharray="2 2" />
@@ -45,18 +47,19 @@ const renderRadar = (slave: Slave, t: any) => {
 
           <polygon points={statPoints} fill="rgba(139, 92, 246, 0.5)" stroke="#a855f7" strokeWidth="1.5" className="transition-all duration-700 ease-out" />
 
-          <text x="60" y="14" fontSize="10" fill="#f87171" textAnchor="middle" fontWeight="bold">{t('stats.combat', '武力')}</text>
-          <text x="110" y="52" fontSize="10" fill="#60a5fa" textAnchor="middle" fontWeight="bold">{t('stats.intelligence', '智力')}</text>
-          <text x="96" y="112" fontSize="10" fill="#f472b6" textAnchor="middle" fontWeight="bold">{t('stats.charisma', '魅力')}</text>
-          <text x="24" y="112" fontSize="10" fill="#facc15" textAnchor="middle" fontWeight="bold">{t('stats.luck', '幸運')}</text>
-          <text x="10" y="52" fontSize="10" fill="#4ade80" textAnchor="middle" fontWeight="bold">{t('stats.endurance', '體質')}</text>
+          {/* 動態錨點定位 (textAnchor)，文字再長也會自動向外延伸 */}
+          <text x="60" y="5" fontSize="10" fill="#f87171" textAnchor="middle" fontWeight="bold">{t('stats.combat', '武力')}</text>
+          <text x="105" y="48" fontSize="10" fill="#60a5fa" textAnchor="start" fontWeight="bold">{t('stats.intelligence', '智力')}</text>
+          <text x="90" y="108" fontSize="10" fill="#f472b6" textAnchor="start" fontWeight="bold">{t('stats.charisma', '魅力')}</text>
+          <text x="30" y="108" fontSize="10" fill="#facc15" textAnchor="end" fontWeight="bold">{t('stats.luck', '幸運')}</text>
+          <text x="15" y="48" fontSize="10" fill="#4ade80" textAnchor="end" fontWeight="bold">{t('stats.endurance', '體質')}</text>
        </svg>
     </div>
   );
 };
 
 export default function SlavePanel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const activeWindow = useGameStore((state) => state.activeWindow);
   const setActiveWindow = useGameStore((state) => state.setActiveWindow);
   const slaves = useGameStore((state) => state.slaves);
@@ -65,17 +68,11 @@ export default function SlavePanel() {
   const [slaveTab, setSlaveTab] = useState<'ability' | 'status'>('ability');
 
   const isOpen = activeWindow === 'roster';
-
-  const handleToggle = () => {
-    setActiveWindow(isOpen ? null : 'roster');
-  };
+  const handleToggle = () => setActiveWindow(isOpen ? null : 'roster');
 
   useEffect(() => {
-    if (slaves.length > 0 && !activeSlaveId) {
-      setActiveSlaveId(slaves[0].id);
-    } else if (slaves.length === 0) {
-      setActiveSlaveId(null);
-    }
+    if (slaves.length > 0 && !activeSlaveId) setActiveSlaveId(slaves[0].id);
+    else if (slaves.length === 0) setActiveSlaveId(null);
   }, [slaves, activeSlaveId]);
 
   useEffect(() => {
@@ -83,16 +80,18 @@ export default function SlavePanel() {
   }, [activeSlaveId]);
 
   const activeSlave = slaves.find(s => s.id === activeSlaveId);
+  const isEn = i18n.language?.startsWith('en');
 
   return (
     <>
       <div className="fixed right-0 top-[40%] z-40 flex items-start pointer-events-none animate-fade-in">
         <button
           onClick={handleToggle}
-          className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-400 py-3 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
+          className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-400 py-4 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
         >
-          <span>{t('ui.member', '成')}</span>
-          <span>{t('ui.member', '員')}</span>
+          <div style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }} className="flex items-center gap-2 uppercase">
+             {isEn ? 'ROSTER' : '成員名冊'}
+          </div>
           <span className="mt-1 text-2xs px-1 bg-purple-950 text-purple-400 border border-purple-800 rounded-full font-mono">{slaves.length}</span>
         </button>
       </div>
@@ -127,16 +126,14 @@ export default function SlavePanel() {
               return (
                 <button
                   key={slave.id}
-                  onClick={() => {
-                    setActiveSlaveId(slave.id);
-                  }}
+                  onClick={() => setActiveSlaveId(slave.id)}
                   className={`w-full p-3 flex flex-col items-left text-left gap-1 transition-all relative overflow-hidden group border-l-2 ${
                     isSelected 
                       ? 'bg-purple-950/20 border-l-purple-500 bg-gradient-to-r from-purple-950/10 to-transparent' 
                       : 'border-l-transparent hover:bg-gray-900/40'
                   }`}
                 >
-                  <span className={`text-xs font-bold truncate transition-colors ${isSelected ? 'text-purple-400' : 'text-gray-400 group-hover:text-gray-200'}`}>
+                  <span className={`text-xs font-bold truncate w-full transition-colors ${isSelected ? 'text-purple-400' : 'text-gray-400 group-hover:text-gray-200'}`}>
                     {localizedName}
                   </span>
                   <div className="flex items-center gap-1.5 text-3xs text-gray-600 font-mono">
@@ -242,17 +239,18 @@ export default function SlavePanel() {
 
                       <div className="flex flex-col gap-2 mt-1">
                          <div className="text-[10px] text-gray-500 font-bold tracking-widest border-b border-gray-800 pb-0.5">{t('slave_panel.skills', '［掌握技能］')}</div>
-                         <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
-                            <div className="bg-gray-950/60 border border-gray-800 p-1 rounded">
-                               <div className="text-[9px] text-gray-500">{t('stats.skill_combat', '戰鬥專精')}</div>
+                         {/* ★ 響應式佈局：避免文字過長撐爆 */}
+                         <div className="flex flex-wrap gap-2 text-center font-mono">
+                            <div className="flex-1 min-w-[30%] bg-gray-950/60 border border-gray-800 p-1.5 rounded">
+                               <div className="text-[9px] text-gray-500 truncate">{t('stats.skill_combat', '戰鬥專精')}</div>
                                <div className="text-blue-400 font-bold text-xs">Lv.{activeSlave.isInjured ? Math.floor((activeSlave.skills?.combat || 1) * 0.5) : (activeSlave.skills?.combat || 1)}</div>
                             </div>
-                            <div className="bg-gray-950/60 border border-gray-800 p-1 rounded">
-                               <div className="text-[9px] text-gray-500">{t('stats.skill_housework', '內政管家')}</div>
+                            <div className="flex-1 min-w-[30%] bg-gray-950/60 border border-gray-800 p-1.5 rounded">
+                               <div className="text-[9px] text-gray-500 truncate">{t('stats.skill_housework', '內政管家')}</div>
                                <div className="text-green-400 font-bold text-xs">Lv.{activeSlave.isInjured ? Math.floor((activeSlave.skills?.housework || 1) * 0.5) : (activeSlave.skills?.housework || 1)}</div>
                             </div>
-                            <div className="bg-gray-950/60 border border-gray-800 p-1 rounded">
-                               <div className="text-[9px] text-gray-500">{t('stats.skill_survival', '生存本能')}</div>
+                            <div className="flex-1 min-w-[30%] bg-gray-950/60 border border-gray-800 p-1.5 rounded">
+                               <div className="text-[9px] text-gray-500 truncate">{t('stats.skill_survival', '生存本能')}</div>
                                <div className="text-yellow-400 font-bold text-xs">Lv.{activeSlave.isInjured ? Math.floor((activeSlave.skills?.survival || 1) * 0.5) : (activeSlave.skills?.survival || 1)}</div>
                             </div>
                          </div>
@@ -331,7 +329,7 @@ export default function SlavePanel() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-3xs text-gray-600 tracking-widest font-mono">
+              <div className="flex-1 flex items-center justify-center text-3xs text-gray-600 tracking-widest font-mono p-4 text-center">
                 {t('slave_panel.select_prompt', '［請選擇成員查看詳細屬性］')}
               </div>
             )}
