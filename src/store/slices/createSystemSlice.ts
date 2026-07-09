@@ -5,6 +5,7 @@ import { GAME_CONSTANTS } from '../../utils/constants';
 import { supabase } from '../../services/supabaseClient';
 import { QUESTS_DATA } from '../../utils/gameData';
 import { generateDailyMissions, generateArenaNPCs } from '../../utils/generators';
+import i18next from 'i18next';
 
 const TIME_PHASES: TimePhase[] = ['早上', '中午', '下午', '晚上', '深夜'];
 const DEFAULT_SHOP_STOCK: Record<string, number> = { 'potion_heal_small': 5, 'weapon_iron_sword': 1 }; 
@@ -34,9 +35,18 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
     if (!state.player.quests[questId]) {
        const newQuests = { ...state.player.quests, [questId]: 'active' as const };
        const qData = QUESTS_DATA[questId as keyof typeof QUESTS_DATA];
+       const isEn = i18next.language?.startsWith('en');
        setTimeout(() => {
          get().syncProfileToCloud();
-         if (qData) { get().setGlobalModal({ title: '［⚡ 發現新劇情任務解鎖］', message: `${qData.title}\n\n任務目標：${qData.description}`, isConfirm: false }); }
+         if (qData) {
+            let title = qData.title; let desc = qData.description;
+            if (isEn) {
+               if (questId === 'q_first_blood') { title = '[Main] First Blood'; desc = 'Visit the Underground Market and acquire your first subject.'; }
+               if (questId === 'q_first_fusion') { title = '[Main] Forbidden Alchemy'; desc = 'Complete your first bloodline fusion in the Chamber.'; }
+               if (questId === 'q_enter_hub') { title = '[Main] Into the Grey Zone'; desc = 'Accumulate 100 Prestige and relocate to the Neutral Trade City.'; }
+            }
+            get().setGlobalModal({ title: isEn ? '［⚡ New Story Quest Unlocked］' : '［⚡ 發現新劇情任務解鎖］', message: `${title}\n\n${isEn ? 'Objective: ' : '任務目標：'}${desc}`, isConfirm: false }); 
+         }
        }, 100); 
        return { player: { ...state.player, quests: newQuests } };
     }
@@ -45,9 +55,23 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
 
   checkQuestCompletion: () => {
      const state = get(); let updated = false; const newQuests = { ...state.player.quests }; let title = ''; let msg = ''; let addG = 0;
-     if (newQuests['q_first_blood'] === 'active' && state.slaves.length > 0) { newQuests['q_first_blood'] = 'completed'; addG = 2000; updated = true; title = '［任務達成］【深淵的初啼】'; msg = `成功簽署第一份血脈契約！商會基礎雛形已然確立。\n\n獲得報酬：\n資金 +2,000`; }
-     else if (newQuests['q_first_fusion'] === 'active' && state.slaves.some(s => s.parents)) { newQuests['q_first_fusion'] = 'completed'; addG = 1500; updated = true; title = '［任務達成］【禁忌的鍊金術】'; msg = `成功在血統密室中編織融合出全新的生命血脈！\n\n獲得報酬：\n資金 +1,500`; }
-     else if (newQuests['q_enter_hub'] === 'active' && (state.player.location === 'NeutralHub' || state.player.location === 'Capital')) { newQuests['q_enter_hub'] = 'completed'; addG = 5000; updated = true; title = '［任務達成］【踏入灰色地帶】'; msg = `成功突破混亂前線，向核心城區拔營挺進！\n\n獲得報酬：\n資金 +5,000`; }
+     const isEn = i18next.language?.startsWith('en');
+
+     if (newQuests['q_first_blood'] === 'active' && state.slaves.length > 0) { 
+       newQuests['q_first_blood'] = 'completed'; addG = 2000; updated = true; 
+       title = isEn ? '［Quest Complete］ First Blood' : '［任務達成］【深淵的初啼】'; 
+       msg = isEn ? `Successfully signed your first blood compact! Caravan foundation established.\n\nRewards:\nGold +2,000` : `成功簽署第一份血脈契約！商會基礎雛形已然確立。\n\n獲得報酬：\n資金 +2,000`; 
+     }
+     else if (newQuests['q_first_fusion'] === 'active' && state.slaves.some(s => s.parents)) { 
+       newQuests['q_first_fusion'] = 'completed'; addG = 1500; updated = true; 
+       title = isEn ? '［Quest Complete］ Forbidden Alchemy' : '［任務達成］【禁忌的鍊金術】'; 
+       msg = isEn ? `Successfully fused a new bloodline entity within the chamber!\n\nRewards:\nGold +1,500` : `成功在血統密室中編織融合出全新的生命血脈！\n\n獲得報酬：\n資金 +1,500`; 
+     }
+     else if (newQuests['q_enter_hub'] === 'active' && (state.player.location === 'NeutralHub' || state.player.location === 'Capital')) { 
+       newQuests['q_enter_hub'] = 'completed'; addG = 5000; updated = true; 
+       title = isEn ? '［Quest Complete］ Into the Grey Zone' : '［任務達成］【踏入灰色地帶】'; 
+       msg = isEn ? `Successfully broke through the frontlines and relocated to the core sector!\n\nRewards:\nGold +5,000` : `成功突破混亂前線，向核心城區拔營挺進！\n\n獲得報酬：\n資金 +5,000`; 
+     }
 
      if (updated) {
         set({ player: { ...state.player, quests: newQuests, gold: state.player.gold + addG } });
@@ -59,19 +83,18 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
     set({ isSaving: true });
+    const isEn = i18next.language?.startsWith('en');
     
-    // ★ V2.11.0 存檔防護鎖 (Timestamp Check)
     if (!forceOverwrite) {
       const { data: cloudData } = await supabase.from('profiles').select('save_data').eq('id', session.user.id).single();
       if (cloudData && cloudData.save_data && cloudData.save_data.last_updated_at) {
         const localTime = get().player.last_updated_at || 0;
         const cloudTime = cloudData.save_data.last_updated_at;
-        // 如果雲端時間比本地新超過 1 分鐘，判定為可能產生覆蓋衝突
         if (cloudTime > localTime + 60000) {
            set({ isSaving: false });
            get().setGlobalModal({
-             title: '［⚠️ 存檔衝突警告］',
-             message: '系統偵測到雲端存在「較新」的遊戲進度（您可能在其他裝置遊玩過）。\n\n若強制上傳將覆蓋較新的雲端存檔。您要強制上傳覆蓋雲端，還是放棄上傳並從系統面板拉取雲端存檔？',
+             title: isEn ? '［⚠️ Save Conflict Warning］' : '［⚠️ 存檔衝突警告］',
+             message: isEn ? 'System detected a "newer" game progress in the cloud (you might have played on another device).\n\nForcing upload will overwrite the newer cloud save. Do you want to force upload, or cancel and pull the cloud save from the System Hub?' : '系統偵測到雲端存在「較新」的遊戲進度（您可能在其他裝置遊玩過）。\n\n若強制上傳將覆蓋較新的雲端存檔。您要強制上傳覆蓋雲端，還是放棄上傳並從系統面板拉取雲端存檔？',
              isConfirm: true,
              action: () => get().syncProfileToCloud(true)
            });
@@ -90,7 +113,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
       save_data: { localSaveVersion: newVersion, last_updated_at: currentTimestamp, usedIdentityIds: p.usedIdentityIds, inventory: p.inventory, quests: p.quests, abyssFloor: p.abyssFloor, shopStock: p.shopStock, slaves: state.slaves, marketSlaves: state.marketSlaves, activeDispatches: state.activeDispatches, activeEvent: state.activeEvent, arenaNPCs: state.arenaNPCs, leaderName: p.leaderName, leaderGender: p.leaderGender, leaderStamina: p.leaderStamina, leaderFaintTurns: p.leaderFaintTurns }
     });
     
-    if (error) console.error('［同步異常］', error);
+    if (error) console.error('［Sync Error］', error);
     set({ isSaving: false });
   },
 
@@ -168,6 +191,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
     const state = get(); const { player, slaves, activeDispatches, triggerBackgroundMarketRefresh } = state;
     if (player.actionPoints < 1) return;
 
+    const isEn = i18next.language?.startsWith('en');
     const newAp = player.actionPoints - 1; const newApUpdateTime = player.actionPoints === 50 ? Date.now() : player.lastApUpdateTime;
     const currentPhaseIndex = TIME_PHASES.indexOf(player.timePhase);
     let nextPhase: TimePhase; let nextDay = player.day; let triggerDailySettlement = false; let triggerWeeklyRent = false;
@@ -211,7 +235,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
              const successChance = 45 / 200; 
              if (Math.random() < successChance) {
                 baseReward = Math.floor(baseReward * 1.5);
-                phaseLogs.push(`［大捷］您親自出馬，完美規避風險，帶回額外 1.5 倍收益！`);
+                phaseLogs.push(isEn ? `［Major Victory］ You personally led the operation and avoided all risks, bringing back 1.5x rewards!` : `［大捷］您親自出馬，完美規避風險，帶回額外 1.5 倍收益！`);
              }
              earnedGold += baseReward;
              earnedFood += foodReward;
@@ -220,13 +244,13 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
              if (dispatch.mission.rank === '黃金') earnedPrestige += Math.floor(Math.random() * 21) + 30;
              
              leaderStamina = Math.max(0, leaderStamina - dispatch.mission.staminaCost);
-             phaseLogs.push(`［平安歸隊］您已安全完成 ${dispatch.mission.title} 並帶回物資與資金。`);
-             if (leaderStamina <= 0) { leaderStamina = 0; leaderFTurns = 3; phaseLogs.push(`［過勞］您耗盡了最後一絲體力，陷入重傷昏厥 (3時段)！`); }
+             phaseLogs.push(isEn ? `［Safe Return］ You safely completed ${dispatch.mission.title} and brought back resources.` : `［平安歸隊］您已安全完成 ${dispatch.mission.title} 並帶回物資與資金。`);
+             if (leaderStamina <= 0) { leaderStamina = 0; leaderFTurns = 3; phaseLogs.push(isEn ? `［Exhaustion］ You drained your last ounce of stamina and fell into a coma (3 shifts)!` : `［過勞］您耗盡了最後一絲體力，陷入重傷昏厥 (3時段)！`); }
            } else {
              const failStamina = Math.floor(dispatch.mission.staminaCost * 0.8);
              leaderStamina = Math.max(0, leaderStamina - failStamina);
-             phaseLogs.push(`［慘敗］您在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫 (-${failStamina})！`);
-             if (leaderStamina <= 0) { leaderStamina = 0; leaderFTurns = 3; phaseLogs.push(`［重傷］您傷勢過重，陷入重傷昏厥 (3時段)！`); }
+             phaseLogs.push(isEn ? `［Crushing Defeat］ You suffered a lethal setback during ${dispatch.mission.title}! Returned empty-handed with heavy stamina loss (-${failStamina})!` : `［慘敗］您在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫 (-${failStamina})！`);
+             if (leaderStamina <= 0) { leaderStamina = 0; leaderFTurns = 3; phaseLogs.push(isEn ? `［Severe Injury］ Your injuries are too severe. You fell into a coma (3 shifts)!` : `［重傷］您傷勢過重，陷入重傷昏厥 (3時段)！`); }
            }
         } else {
            const slave = updatedSlaves.find(s => s.id === dispatch.slaveId);
@@ -237,7 +261,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
                 const successChance = intelligenceStat / 200;
                 if (Math.random() < successChance) {
                    baseReward = Math.floor(baseReward * 1.5);
-                   phaseLogs.push(`［大捷］${slave.name} 憑藉智力完美規避風險，帶回額外 1.5 倍收益！`);
+                   phaseLogs.push(isEn ? `［Major Victory］ ${slave.name} perfectly mitigated risks with high Intelligence, bringing back 1.5x rewards!` : `［大捷］${slave.name} 憑藉智力完美規避風險，帶回額外 1.5 倍收益！`);
                 }
                 earnedGold += baseReward;
                 earnedFood += foodReward;
@@ -252,7 +276,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
                   const k = keys[Math.floor(Math.random() * keys.length)]; 
                   if (updatedSkills[k] < 10) {
                      updatedSkills[k] += 1;
-                     phaseLogs.push(`［突破］${slave.name} 經歷生死交關，【${k === 'combat' ? '戰鬥專精' : k === 'housework' ? '內政管家' : '生存本能'}】提升至 Lv.${updatedSkills[k]}！`);
+                     phaseLogs.push(isEn ? `［Breakthrough］ ${slave.name} survived life-or-death stakes! [${k === 'combat' ? 'Combat Mastery' : k === 'housework' ? 'Stewardship' : 'Survival Instinct'}] increased to Lv.${updatedSkills[k]}!` : `［突破］${slave.name} 經歷生死交關，【${k === 'combat' ? '戰鬥專精' : k === 'housework' ? '內政管家' : '生存本能'}】提升至 Lv.${updatedSkills[k]}！`);
                   }
                 }
                 
@@ -263,9 +287,9 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
                 const obReward = dispatch.mission.obedienceReward || 0;
                 if (obReward > 0) {
                   slave.primaryStats.obedience = Math.min(100, slave.primaryStats.obedience + obReward);
-                  phaseLogs.push(`［捷報］${slave.name} 順利完成 ${dispatch.mission.title}，服從度提升 ${obReward} 點！`);
+                  phaseLogs.push(isEn ? `［Triumph］ ${slave.name} successfully completed ${dispatch.mission.title}, gaining ${obReward} Obedience!` : `［捷報］${slave.name} 順利完成 ${dispatch.mission.title}，服從度提升 ${obReward} 點！`);
                 } else {
-                  phaseLogs.push(`［平安歸隊］${slave.name} 已安全完成 ${dispatch.mission.title}。`);
+                  phaseLogs.push(isEn ? `［Safe Return］ ${slave.name} safely completed ${dispatch.mission.title}.` : `［平安歸隊］${slave.name} 已安全完成 ${dispatch.mission.title}。`);
                 }
 
                 slave.activityStatus = '閒置';
@@ -282,7 +306,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
                 slave.conditionStats.stamina = Math.max(0, slave.conditionStats.stamina - failStamina);
                 slave.conditionStats.stress = Math.min(100, slave.conditionStats.stress + failStress);
                 slave.activityStatus = '閒置';
-                phaseLogs.push(`［慘敗］${slave.name} 在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫 (-${failStamina})，壓力激增 (+${failStress})！`);
+                phaseLogs.push(isEn ? `［Crushing Defeat］ ${slave.name} suffered a lethal setback during ${dispatch.mission.title}! Returned empty-handed with stamina penalty (-${failStamina}) and stress surge (+${failStress})!` : `［慘敗］${slave.name} 在執行 ${dispatch.mission.title} 時突遭致命挫敗！空手而歸且體力重挫 (-${failStamina})，壓力激增 (+${failStress})！`);
 
                 if (slave.conditionStats.stamina <= 0) {
                   slave.faintTurns = 5;
@@ -315,12 +339,12 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
       if (triggerWeeklyRent) {
          if (get().player.gold >= rentCost) {
             get().deductGold(rentCost);
-            dailyLogs.push(`［繳納地租］已從金庫扣除本週地租 $${rentCost}，獲得片刻安寧。`);
+            dailyLogs.push(isEn ? `［Rent Paid］ $${rentCost} deducted for weekly rent. Momentary peace secured.` : `［繳納地租］已從金庫扣除本週地租 $${rentCost}，獲得片刻安寧。`);
          } else {
             get().deductGold(get().player.gold);
             get().deductPrestige(100);
             isBankrupt = true;
-            dailyLogs.push(`［⚠️ 破產危機］資金斷裂！無法支付地租 $${rentCost}，商會威望掃地，據點內陷入極大恐慌與叛逆！`);
+            dailyLogs.push(isEn ? `［⚠️ BANKRUPTCY］ Funds severed! Failed to pay rent $${rentCost}. Prestige ruined, massive panic and rebellion ensues!` : `［⚠️ 破產危機］資金斷裂！無法支付地租 $${rentCost}，商會威望掃地，據點內陷入極大恐慌與叛逆！`);
          }
       }
 
@@ -337,7 +361,7 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
           maid.faintTurns = 5;
           maid.primaryStats.obedience = Math.max(0, maid.primaryStats.obedience - 10);
           maid.conditionStats.stress = Math.min(100, maid.conditionStats.stress + 30);
-          dailyLogs.push(`［傭人過勞］打掃管家【${maid.name}】因無腦高強度打掃致使體力徹底榨乾，陷入昏厥罷工。`);
+          dailyLogs.push(isEn ? `［Steward Overwork］ Steward [${maid.name}] drained all stamina from mindless heavy cleaning and fainted on strike.` : `［傭人過勞］打掃管家【${maid.name}】因無腦高強度打掃致使體力徹底榨乾，陷入昏厥罷工。`);
         }
 
         const discount = Math.min(0.9, maidHousework * 0.05);
@@ -349,13 +373,13 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
            if (get().player.gold >= cost) {
               get().deductGold(cost);
               get().addFood(foodMissing);
-              dailyLogs.push(`［管家後勤］管家 ${maid.name} 憑藉交涉技巧，花費 $${cost} 替商會採購了 ${foodMissing} 單位糧食。`);
+              dailyLogs.push(isEn ? `［Logistics］ Steward ${maid.name} used negotiation skills to buy ${foodMissing} Food for $${cost}.` : `［管家後勤］管家 ${maid.name} 憑藉交涉技巧，花費 $${cost} 替商會採購了 ${foodMissing} 單位糧食。`);
            } else {
               const affordableFood = Math.floor(get().player.gold / foodUnitPrice);
               if (affordableFood > 0) {
                  get().deductGold(affordableFood * foodUnitPrice);
                  get().addFood(affordableFood);
-                 dailyLogs.push(`［管家後勤］資金枯竭，管家 ${maid.name} 僅能勉強花費 $${affordableFood * foodUnitPrice} 買到 ${affordableFood} 單位口糧。`);
+                 dailyLogs.push(isEn ? `［Logistics］ Funds depleted. Steward ${maid.name} barely secured ${affordableFood} Food for $${affordableFood * foodUnitPrice}.` : `［管家後勤］資金枯竭，管家 ${maid.name} 僅能勉強花費 $${affordableFood * foodUnitPrice} 買到 ${affordableFood} 單位口糧。`);
               }
            }
         }
@@ -367,14 +391,14 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
       } else {
          get().deductFood(get().player.food);
          isStarving = true;
-         dailyLogs.push(`［⚠️ 飢荒蔓延］口糧徹底耗盡！首領與所有成員強制進入飢餓狀態！`);
+         dailyLogs.push(isEn ? `［⚠️ STARVATION］ Food supplies exhausted! Leader and all members forced into Starvation state!` : `［⚠️ 飢荒蔓延］口糧徹底耗盡！首領與所有成員強制進入飢餓狀態！`);
       }
 
       if (isStarving) {
          leaderStamina = Math.max(0, leaderStamina - 20);
          if (leaderStamina === 0 && leaderFTurns === 0) {
             leaderFTurns = 3;
-            dailyLogs.push(`［首領倒下］您因嚴重飢餓與過勞，陷入重傷昏厥！`);
+            dailyLogs.push(isEn ? `［Leader Collapsed］ You fell into a severe coma due to extreme starvation and exhaustion!` : `［首領倒下］您因嚴重飢餓與過勞，陷入重傷昏厥！`);
          }
       }
 
@@ -447,16 +471,16 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
       if (escapedNames.length > 0) {
          const actualStolen = Math.min(get().player.gold, totalStolenGold); const actualPrestigeLoss = Math.min(get().player.prestige, totalPrestigeLoss);
          set((s: GameStore) => ({ player: { ...s.player, gold: Math.max(0, s.player.gold - actualStolen), prestige: Math.max(0, s.player.prestige - actualPrestigeLoss) } }));
-         dailyLogs.push(`［越獄成功］以下成員逃離據點：【${escapedNames.join('】、【')}】\n商會損失資金：$${actualStolen}，威望降低 ${actualPrestigeLoss} 點。`);
+         dailyLogs.push(isEn ? `［Escape Successful］ The following members fled the base: [${escapedNames.join('], [')}]\nStolen Funds: $${actualStolen}, Prestige Lost: ${actualPrestigeLoss}.` : `［越獄成功］以下成員逃離據點：【${escapedNames.join('】、【')}】\n商會損失資金：$${actualStolen}，威望降低 ${actualPrestigeLoss} 點。`);
       }
 
       if (suppressedNames.length > 0) {
-        dailyLogs.push(`［成功鎮壓］守衛成功擊潰以下成員的叛逃企圖：【${suppressedNames.join('】、【')}】\n上述成員已被強制重傷拘禁，反抗心清零。`);
+        dailyLogs.push(isEn ? `［Suppressed］ Guards successfully crushed escape attempts by: [${suppressedNames.join('], [')}]\nThey have been severely injured and confined. Rebellion zeroed.` : `［成功鎮壓］守衛成功擊潰以下成員的叛逃企圖：【${suppressedNames.join('】、【')}】\n上述成員已被強制重傷拘禁，反抗心清零。`);
       }
 
       let nextEvent = null;
-      if (get().player.location === 'NeutralHub' && Math.random() < 0.4) { nextEvent = { id: 'evt1', type: 'merchant', desc: '【地頭蛇老張】急需一名服從度達 60 的女性半獸人。', reqRace: '半獸人', reqGender: 'Female', reqStat: { key: 'obedience', val: 60 }, reward: { gold: 12000, prestige: 20, item: 'potion_heal_small' } } as const; } 
-      else if (get().player.location === 'Capital' && Math.random() < 0.3) { nextEvent = { id: 'evt2', type: 'noble', desc: '【腥紅伯爵】徵求武力達 80 的精靈。', reqRace: '精靈', reqStat: { key: 'combat', val: 80 }, reward: { gold: 35000, prestige: 100, item: 'weapon_iron_sword' } } as const; }
+      if (get().player.location === 'NeutralHub' && Math.random() < 0.4) { nextEvent = { id: 'evt1', type: 'merchant', desc: isEn ? '[Broker Lao Zhang] Urgently requires a Female Orc with 60 Obedience.' : '【地頭蛇老張】急需一名服從度達 60 的女性半獸人。', reqRace: '半獸人', reqGender: 'Female', reqStat: { key: 'obedience', val: 60 }, reward: { gold: 12000, prestige: 20, item: 'potion_heal_small' } } as const; } 
+      else if (get().player.location === 'Capital' && Math.random() < 0.3) { nextEvent = { id: 'evt2', type: 'noble', desc: isEn ? '[Crimson Earl] Seeking an Elf with 80 Combat.' : '【腥紅伯爵】徵求武力達 80 的精靈。', reqRace: '精靈', reqStat: { key: 'combat', val: 80 }, reward: { gold: 35000, prestige: 100, item: 'weapon_iron_sword' } } as const; }
 
       triggerBackgroundMarketRefresh(); 
       set({ dailyMissions: generateDailyMissions(), activeEvent: nextEvent });
@@ -475,11 +499,11 @@ export const createSystemSlice: StateCreator<GameStore, [], [], any> = (set, get
     if (triggerDailySettlement) {
        if (phaseLogs.length > 0) dailyLogs = [...phaseLogs, ...dailyLogs];
        if (dailyLogs.length > 0) {
-          setTimeout(() => { get().setGlobalModal({ title: '［每日經濟結算］', message: dailyLogs.join('\n\n'), isConfirm: false }); }, 250);
+          setTimeout(() => { get().setGlobalModal({ title: isEn ? '［Daily Economic Settlement］' : '［每日經濟結算］', message: dailyLogs.join('\n\n'), isConfirm: false }); }, 250);
        }
     } else {
        if (phaseLogs.length > 0) {
-          setTimeout(() => { get().setGlobalModal({ title: '［外派結果回報］', message: phaseLogs.join('\n\n'), isConfirm: false }); }, 250);
+          setTimeout(() => { get().setGlobalModal({ title: isEn ? '［Dispatch Result Report］' : '［外派結果回報］', message: phaseLogs.join('\n\n'), isConfirm: false }); }, 250);
        }
     }
     
