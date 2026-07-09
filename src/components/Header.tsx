@@ -25,7 +25,7 @@ const ApCountdown = ({ actionPoints, lastApUpdateTime }: { actionPoints: number,
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
   const s = (seconds % 60).toString().padStart(2, '0');
   
-  return <span className="text-gray-500 text-3xs ml-1 font-mono tracking-tighter">({m}:{s})</span>;
+  return <span className="text-gray-500 text-3xs ml-1 font-mono tracking-tighter whitespace-nowrap">({m}:{s})</span>;
 };
 
 export default function Header() {
@@ -34,15 +34,13 @@ export default function Header() {
     day, timePhase, gold, food, location, roomDirtiness, maxSlaveCapacity, prestige, actionPoints,
     leaderName, leaderGender, leaderStamina, leaderFaintTurns, lastApUpdateTime
   } = useGameStore((state) => state.player);
-  
   const slaves = useGameStore((state) => state.slaves);
   const processTurn = useGameStore((state) => state.processTurn);
   const checkApRecovery = useGameStore((state) => state.checkApRecovery);
-  
   const setPlayerNameAndGender = useGameStore((state) => state.setPlayerNameAndGender);
   const useItem = useGameStore((state) => state.useItem);
   const inventory = useGameStore((state) => state.player.inventory);
-  
+
   const [showLeaderPanel, setShowLeaderPanel] = useState(false);
   const [editName, setEditName] = useState('');
 
@@ -76,10 +74,10 @@ export default function Header() {
   };
 
   const getDirtinessDisplay = () => {
-    if (roomDirtiness < 20) return <span className="text-green-400">{t('dirtiness.clean', '乾淨')}({roomDirtiness}%)</span>;
-    if (roomDirtiness < 50) return <span className="text-yellow-400">{t('dirtiness.normal', '尚可')}({roomDirtiness}%)</span>;
-    if (roomDirtiness < 80) return <span className="text-orange-400">{t('dirtiness.dirty', '髒亂')}({roomDirtiness}%)</span>;
-    return <span className="text-red-500 font-bold animate-pulse">{t('dirtiness.awful', '惡劣')}({roomDirtiness}%)</span>;
+    if (roomDirtiness < 20) return <span className="text-green-400 whitespace-nowrap">{t('dirtiness.clean', '乾淨')}({roomDirtiness}%)</span>;
+    if (roomDirtiness < 50) return <span className="text-yellow-400 whitespace-nowrap">{t('dirtiness.normal', '尚可')}({roomDirtiness}%)</span>;
+    if (roomDirtiness < 80) return <span className="text-orange-400 whitespace-nowrap">{t('dirtiness.dirty', '髒亂')}({roomDirtiness}%)</span>;
+    return <span className="text-red-500 font-bold animate-pulse whitespace-nowrap">{t('dirtiness.awful', '惡劣')}({roomDirtiness}%)</span>;
   };
 
   const openLeaderPanel = () => {
@@ -118,45 +116,47 @@ export default function Header() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col justify-between text-[11px] sm:text-xs font-bold tracking-widest py-0.5">
-          <div className="flex justify-between items-center text-gray-400 border-b border-gray-800/50 pb-0.5">
-            <span className="flex items-center gap-1">
-              <span>[{t('ui.day_prefix', '第')}{day}{t('ui.day_suffix', '天')} - <span className="text-gray-200">{getTimeSlotName()}</span>]</span>
-              <span className="border-l border-gray-700 h-2.5 mx-0.5 sm:mx-1"></span>
-              <span>[{getLocationName()}]</span>
+        <div className="flex-1 flex flex-col justify-between text-[11px] sm:text-xs font-bold tracking-widest py-0.5 min-w-0">
+          
+          {/* ★ 修復：導入 flex-wrap 與 gap，允許文字過長時優雅換行 */}
+          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-0.5 text-gray-400 border-b border-gray-800/50 pb-0.5">
+            <span className="flex flex-wrap items-center gap-1">
+              <span className="whitespace-nowrap">[{t('ui.day_prefix', '第')}{day}{t('ui.day_suffix', '天')} - <span className="text-gray-200">{getTimeSlotName()}</span>]</span>
+              <span className="border-l border-gray-700 h-2.5 mx-0.5 sm:mx-1 hidden sm:inline-block"></span>
+              <span className="whitespace-nowrap">[{getLocationName()}]</span>
             </span>
-            <span>
+            <span className="whitespace-nowrap">
               {t('stats.prestige', '威望')}: <span className="text-blue-400 font-mono">{formatK(prestige)}</span>
             </span>
           </div>
 
-          <div className="flex justify-between items-center text-gray-500 border-b border-gray-800/50 pb-0.5">
-            <span className="flex gap-2 sm:gap-3">
-              <span>{t('stats.gold', '資金')}: <span className="text-yellow-500 font-mono">${formatK(gold)}</span></span>
-              <span>{t('stats.food', '糧食')}: <span className="text-green-500 font-mono">{formatK(food)}</span></span>
+          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-0.5 text-gray-500 border-b border-gray-800/50 pb-0.5">
+            <span className="flex flex-wrap gap-2 sm:gap-3">
+              <span className="whitespace-nowrap">{t('stats.gold', '資金')}: <span className="text-yellow-500 font-mono">${formatK(gold)}</span></span>
+              <span className="whitespace-nowrap">{t('stats.food', '糧食')}: <span className="text-green-500 font-mono">{formatK(food)}</span></span>
             </span>
-            <span>
+            <span className="whitespace-nowrap">
               {t('ui.population', '人口')}: <span className={slaves.length > maxSlaveCapacity ? 'text-red-500 animate-pulse' : 'text-gray-300'}>{slaves.length}/{maxSlaveCapacity}</span>
             </span>
           </div>
 
-          <div className="flex justify-between items-center text-gray-500">
-            <span className="flex items-center gap-1">
-              <span>
+          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-0.5 text-gray-500">
+            <span className="flex flex-wrap items-center gap-1">
+              <span className="whitespace-nowrap">
                 {t('stats.ap', 'AP')}: <span className={actionPoints < 10 ? 'text-red-500 font-mono animate-pulse' : 'text-blue-400 font-mono'}>{actionPoints}/50</span>
               </span>
               <ApCountdown actionPoints={actionPoints} lastApUpdateTime={lastApUpdateTime} />
               <button 
                 onClick={processTurn}
                 disabled={actionPoints < 1}
-                className={`ml-1 px-1.5 py-0.5 rounded text-3xs sm:text-2xs transition-colors shadow-sm ${
+                className={`ml-1 px-1.5 py-0.5 rounded text-3xs sm:text-2xs transition-colors shadow-sm whitespace-nowrap ${
                   actionPoints >= 1 ? 'bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600' : 'bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed'
                 }`}
               >
                 {t('ui.advance', '［推進］')}
               </button>
             </span>
-            <span>{t('ui.environment', '環境')}: {getDirtinessDisplay()}</span>
+            <span className="whitespace-nowrap truncate">{t('ui.environment', '環境')}: {getDirtinessDisplay()}</span>
           </div>
         </div>
       </div>
