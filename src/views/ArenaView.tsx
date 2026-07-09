@@ -5,7 +5,7 @@ import CustomSelect, { Option } from '../components/CustomSelect';
 import { parseLocalizedName } from '../utils/i18nUtils';
 
 export default function ArenaView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const slaves = useGameStore((state) => state.slaves);
   const arenaNPCs = useGameStore((state) => state.arenaNPCs);
   const { actionPoints, location } = useGameStore((state) => state.player);
@@ -15,6 +15,7 @@ export default function ArenaView() {
   const [selectedSlaveId, setSelectedSlaveId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
 
+  const isEn = i18n.language?.startsWith('en');
   const localNPCs = arenaNPCs.filter(npc => npc.location === location);
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置' && (s.faintTurns || 0) === 0);
 
@@ -27,7 +28,6 @@ export default function ArenaView() {
       setSysMessage({ text: t('arena.err_no_ap', '［系統警告］行動力不足。'), type: 'error' });
       return;
     }
-
     executeArenaBattle(selectedSlaveId, npcId);
   };
 
@@ -64,7 +64,7 @@ export default function ArenaView() {
           )}
           {activeSlave && (
             <div className="text-3xs text-gray-400 mt-1 flex justify-between px-1">
-              <span>{t('stats.stamina', '體力')}: <strong className={activeSlave.conditionStats.stamina < 30 ? 'text-red-400' : 'text-green-400'}>{activeSlave.conditionStats.stamina}/100</strong> (最低需求: 20)</span>
+              <span>{t('stats.stamina', '體力')}: <strong className={activeSlave.conditionStats.stamina < 30 ? 'text-red-400' : 'text-green-400'}>{activeSlave.conditionStats.stamina}/100</strong> (Min: 20)</span>
               <span>{t('stats.skill_combat', '戰鬥專精')}: <strong className="text-blue-400">Lv.{activeSlave.skills.combat}</strong></span>
             </div>
           )}
@@ -88,12 +88,20 @@ export default function ArenaView() {
               winRate = Math.min(95, Math.max(5, Math.floor((pScore / (pScore + nScore)) * 100)));
             }
 
+            // Fallback translations for NPC descriptions if English
+            let npcDesc = npc.description;
+            if (isEn) {
+              if (npc.id.includes('npc-1')) npcDesc = 'A desperate outlaw covered in mud and blood. Lacks any real technique.';
+              else if (npc.id.includes('npc-2')) npcDesc = 'A professional fighter heavily invested by the guild. Well-equipped and trained.';
+              else if (npc.id.includes('npc-3')) npcDesc = 'A killing machine of the imperial family, designed to crush challengers.';
+            }
+
             return (
               <div key={npc.id} className="bg-gray-950 p-4 rounded-lg border border-gray-800 flex flex-col gap-3 relative overflow-hidden group hover:border-red-900/50 transition-colors">
                 <div className="flex justify-between items-start z-10">
                   <div className="flex flex-col gap-1">
-                    <h4 className="text-sm font-bold text-gray-200 group-hover:text-red-400 transition-colors tracking-widest">{t(`npc.${npc.id}`, npc.name)}</h4>
-                    <p className="text-3xs text-gray-500 leading-relaxed max-w-[200px]">{t(`npc_desc.${npc.id}`, npc.description)}</p>
+                    <h4 className="text-sm font-bold text-gray-200 group-hover:text-red-400 transition-colors tracking-widest">{npc.name}</h4>
+                    <p className="text-3xs text-gray-500 leading-relaxed max-w-[200px]">{npcDesc}</p>
                   </div>
                   <div className="flex flex-col items-end gap-0.5">
                     <span className="text-3xs text-gray-500 font-bold tracking-widest">{t('arena.reward', '賞金 / 威望')}</span>
