@@ -12,7 +12,6 @@ export default function HousekeepingView() {
   const performHousekeeping = useGameStore((state) => state.performHousekeeping);
   
   const navigate = useGameStore((state) => state.navigate);
-
   const [selectedWorkerId, setSelectedWorkerId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -85,7 +84,7 @@ export default function HousekeepingView() {
             {t('housekeeping.cost_stamina_pt1', '下達此命令將強制消耗該成員')} <span className="text-red-400 text-base mx-1">{staminaCost}</span> {t('housekeeping.cost_stamina_pt2', '點體力。')}
           </div>
           <div className="text-yellow-600 text-sm font-bold tracking-widest mt-3">
-            {t('housekeeping.warn_ap', '[注意] 消耗 1 點行動力並推進 1 個時段。')}
+            {t('housekeeping.warn_ap', '［注意］消耗 1 點行動力並推進 1 個時段。')}
           </div>
         </div>
 
@@ -94,7 +93,7 @@ export default function HousekeepingView() {
           {workerOptions.length > 0 ? (
             <CustomSelect options={workerOptions} value={selectedWorkerId} onChange={setSelectedWorkerId} focusColor="blue" />
           ) : (
-            <div className="text-xs text-red-500 bg-red-950/20 p-2 border border-red-900/30 rounded">
+            <div className="text-xs text-red-500 bg-red-950/20 p-3 border border-red-900/30 rounded">
               {t('housekeeping.err_no_idle', '目前沒有可供差遣的人力（首領與奴隸體力皆不足或正忙碌中）。')}
             </div>
           )}
