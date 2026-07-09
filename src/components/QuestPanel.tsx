@@ -3,7 +3,7 @@ import { useGameStore } from '../store/useGameStore';
 import { QUESTS_DATA } from '../utils/gameData';
 
 export default function QuestPanel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const activeWindow = useGameStore((state) => state.activeWindow);
   const setActiveWindow = useGameStore((state) => state.setActiveWindow);
   const quests = useGameStore((state) => state.player.quests);
@@ -16,18 +16,19 @@ export default function QuestPanel() {
     setActiveWindow(isOpen ? null : 'quest');
   };
 
+  const isEn = i18n.language?.startsWith('en');
+
   return (
     <>
       <div className="fixed right-0 top-[15%] z-40 flex items-start pointer-events-none animate-fade-in">
         <button
           onClick={handleToggle}
-          className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-400 py-3 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
+          className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-400 py-4 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex items-center justify-center transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
         >
-          {hasActive && !isOpen && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>}
-          <span>{t('quest_panel.tab_q', '任')}</span>
-          <span>{t('quest_panel.tab_u', '務')}</span>
-          <span>{t('quest_panel.tab_e', '追')}</span>
-          <span>{t('quest_panel.tab_s', '蹤')}</span>
+          <div style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }} className="flex items-center gap-2 uppercase">
+            {isEn ? 'QUESTS' : '任務追蹤'}
+            {hasActive && !isOpen && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse mt-1"></span>}
+          </div>
         </button>
       </div>
 
@@ -55,11 +56,20 @@ export default function QuestPanel() {
             {activeQuests.map(qId => {
               const qData = QUESTS_DATA[qId as keyof typeof QUESTS_DATA];
               if (!qData) return null;
+              
+              let title = qData.title;
+              let desc = qData.description;
+              if (isEn) {
+                 if (qId === 'q_first_blood') { title = '[Main] First Blood'; desc = 'Visit the Underground Market and acquire your first subject.'; }
+                 if (qId === 'q_first_fusion') { title = '[Main] Forbidden Alchemy'; desc = 'Complete your first bloodline fusion in the Chamber.'; }
+                 if (qId === 'q_enter_hub') { title = '[Main] Into the Grey Zone'; desc = 'Accumulate 100 Prestige and relocate to the Neutral Trade City.'; }
+              }
+
               return (
                 <div key={qId} className="bg-gray-950 p-2.5 rounded border border-gray-800 relative overflow-hidden shadow-inner">
                   <div className="absolute left-0 top-0 w-0.5 h-full bg-blood-red"></div>
-                  <h4 className="text-2xs font-bold text-gray-200 mb-1 pl-1 tracking-wide">{qData.title}</h4>
-                  <p className="text-3xs text-gray-400 leading-normal pl-1">{qData.description}</p>
+                  <h4 className="text-2xs font-bold text-gray-200 mb-1 pl-1 tracking-wide">{title}</h4>
+                  <p className="text-3xs text-gray-400 leading-normal pl-1">{desc}</p>
                 </div>
               );
             })}
