@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface Option {
   value: string;
@@ -11,11 +12,11 @@ interface CustomSelectProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  // ★ 增加 'yellow' 允許值
   focusColor?: 'purple' | 'blue' | 'gray' | 'yellow'; 
 }
 
-export default function CustomSelect({ options, value, onChange, placeholder = '［請選擇］', focusColor = 'purple' }: CustomSelectProps) {
+export default function CustomSelect({ options, value, onChange, placeholder, focusColor = 'purple' }: CustomSelectProps) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -30,6 +31,8 @@ export default function CustomSelect({ options, value, onChange, placeholder = '
   }, []);
 
   const selectedOption = options.find(opt => opt.value === value);
+  const finalPlaceholder = placeholder || t('ui.please_select', '［請選擇］');
+  const noOptionsText = t('ui.no_options', '無可用選項');
   
   let borderColorClass = 'border-purple-500';
   let highlightColorClass = 'text-purple-400';
@@ -41,7 +44,6 @@ export default function CustomSelect({ options, value, onChange, placeholder = '
     borderColorClass = 'border-gray-500';
     highlightColorClass = 'text-gray-300';
   } else if (focusColor === 'yellow') {
-    // ★ 增加 yellow 的對應 Tailwind 顏色
     borderColorClass = 'border-yellow-500';
     highlightColorClass = 'text-yellow-400';
   }
@@ -54,7 +56,7 @@ export default function CustomSelect({ options, value, onChange, placeholder = '
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className={selectedOption ? 'text-gray-200' : 'text-gray-500 truncate pr-4'}>
-          {selectedOption ? selectedOption.label : placeholder}
+          {selectedOption ? selectedOption.label : finalPlaceholder}
         </span>
         <span className="text-gray-500 text-xs transform transition-transform duration-200 shrink-0" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
           ▼
@@ -82,7 +84,7 @@ export default function CustomSelect({ options, value, onChange, placeholder = '
             </li>
           ))}
           {options.length === 0 && (
-            <li className="p-3 text-gray-500 text-center">無可用選項</li>
+            <li className="p-3 text-gray-500 text-center">{noOptionsText}</li>
           )}
         </ul>
       )}
