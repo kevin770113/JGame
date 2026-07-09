@@ -27,7 +27,9 @@
     "leader": "Leader",
     "member": "Member",
     "stamina_low": "[Low Stamina]",
-    "time_phase": "Phase"
+    "time_phase": "Phase",
+    "please_select": "[Please Select]",
+    "no_options": "No Available Options"
   },
   "system": {
     "menu_title": "[System Control Hub]",
@@ -178,6 +180,10 @@
     "undead": "[Immortal Bones] Each successful attack absorbs 15% of damage dealt and converts it into self-stamina."
   },
   "interaction": {
+    "title": "Interaction & Management Hub",
+    "desc_none": "Please select a caravan command type to issue.",
+    "desc_task": "Swipe to select a test subject to execute the order.",
+    "err_no_idle": "No idle members currently available for assignment in the stronghold.",
     "waiting": "[Waiting for summons...]",
     "d1": "The gaze of the Abyss has never shifted, Master.",
     "d2": "I will grind the bones of those enemies into powder.",
@@ -247,7 +253,8 @@
     "act_clean": "Order Stewardship Cleanup",
     "act_train_combat": "Combat Mastery Training",
     "act_train_housework": "Stewardship Training",
-    "act_train_survival": "Survival Instinct Training"
+    "act_train_survival": "Survival Instinct Training",
+    "btn_reselect": "[Reselect Order]"
   },
   "housekeeping": {
     "title": "Stewardship Management",
@@ -260,7 +267,8 @@
     "err_no_worker": "[Error] Please select a cleaning supervisor first.",
     "err_no_ap": "[Warning] Action Points insufficient.",
     "success": "[System] Completed stronghold cleaning and advanced shift.",
-    "err_no_idle": "No available workforce currently (Leader and members are exhausted or busy)."
+    "err_no_idle": "No available workforce currently (Leader and members are exhausted or busy).",
+    "btn_exec": "[Confirm Assignment & Advance Time]"
   },
   "map": {
     "title": "Caravan Relocation",
