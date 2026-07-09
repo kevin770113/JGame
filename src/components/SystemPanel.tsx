@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGameStore } from '../store/useGameStore';
 import { supabase } from '../services/supabaseClient';
@@ -17,10 +17,8 @@ export default function SystemPanel() {
   const [devData, setDevData] = useState<any>(null);
 
   const isOpen = activeWindow === 'system';
-
-  const handleToggle = () => {
-    setActiveWindow(isOpen ? null : 'system');
-  };
+  const handleToggle = () => setActiveWindow(isOpen ? null : 'system');
+  const isEn = i18n.language?.startsWith('en');
 
   const handleManualSave = async () => {
     if (isSaving || saveStatus !== 'idle') return;
@@ -56,19 +54,18 @@ export default function SystemPanel() {
     }
   };
 
-  const changeLanguage = (lng: string) => {
-    i18n.changeLanguage(lng);
-  };
+  const changeLanguage = (lng: string) => i18n.changeLanguage(lng);
 
   return (
     <>
       <div className="fixed right-0 top-[65%] z-40 flex items-start pointer-events-none animate-fade-in">
         <button
           onClick={handleToggle}
-          className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-400 py-3 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
+          className="pointer-events-auto bg-gray-900 border-y border-l border-gray-600 text-gray-400 py-4 px-1.5 rounded-l-md shadow-lg font-bold text-xs tracking-widest flex items-center justify-center transition-colors hover:bg-gray-800 hover:text-white active:scale-95"
         >
-          <span>系</span>
-          <span>統</span>
+          <div style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }} className="flex items-center gap-2 uppercase">
+            {isEn ? 'SYSTEM' : '系統選單'}
+          </div>
         </button>
       </div>
 
