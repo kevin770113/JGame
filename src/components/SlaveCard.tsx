@@ -42,7 +42,6 @@ export default function SlaveCard({ slave, actionButton }: SlaveCardProps) {
             </span>
           </div>
 
-          {/* 體力、壓力、反抗 三色長條圖重建 */}
           <div className="flex gap-3 text-[9px] font-mono font-bold mt-1">
              <div className="flex-1 flex flex-col gap-0.5">
                <div className="flex justify-between text-gray-500"><span>{t('stats.stamina', '體力')}</span><span className="text-green-400">{slave.conditionStats.stamina}</span></div>
@@ -58,15 +57,15 @@ export default function SlaveCard({ slave, actionButton }: SlaveCardProps) {
              </div>
           </div>
 
-          {/* 完整六維素質網格重建 */}
-          <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 bg-gray-950/60 p-2.5 rounded border border-gray-850/80 text-3xs font-mono mt-1">
-            <div className="flex justify-between items-center"><span className="text-gray-500 font-bold">{t('stats.combat', '武力')}</span><span className="text-red-400 font-bold text-xs">{slave.primaryStats.combat}</span></div>
-            <div className="flex justify-between items-center"><span className="text-gray-500 font-bold">{t('stats.endurance', '體質')}</span><span className="text-green-400 font-bold text-xs">{slave.primaryStats.endurance}</span></div>
-            <div className="flex justify-between items-center"><span className="text-gray-500 font-bold">{t('stats.intelligence', '智力')}</span><span className="text-blue-400 font-bold text-xs">{slave.primaryStats.intelligence}</span></div>
+          {/* ★ V2.11.0 響應式網格：使用 grid-cols-2 與 sm:grid-cols-3，確保手機窄螢幕也不會撐破 */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-2 bg-gray-950/60 p-2.5 rounded border border-gray-850/80 text-3xs font-mono mt-1">
+            <div className="flex justify-between items-center"><span className="text-gray-500 font-bold truncate pr-1">{t('stats.combat', '武力')}</span><span className="text-red-400 font-bold text-xs">{slave.primaryStats.combat}</span></div>
+            <div className="flex justify-between items-center"><span className="text-gray-500 font-bold truncate pr-1">{t('stats.endurance', '體質')}</span><span className="text-green-400 font-bold text-xs">{slave.primaryStats.endurance}</span></div>
+            <div className="flex justify-between items-center"><span className="text-gray-500 font-bold truncate pr-1">{t('stats.intelligence', '智力')}</span><span className="text-blue-400 font-bold text-xs">{slave.primaryStats.intelligence}</span></div>
             
-            <div className="flex justify-between items-center"><span className="text-gray-500 font-bold">{t('stats.charisma', '魅力')}</span><span className="text-pink-400 font-bold text-xs">{slave.primaryStats.charisma ?? 10}</span></div>
-            <div className="flex justify-between items-center"><span className="text-gray-500 font-bold">{t('stats.luck', '幸運')}</span><span className="text-yellow-400 font-bold text-xs">{slave.primaryStats.luck ?? 10}</span></div>
-            <div className="flex justify-between items-center border-l border-gray-800 pl-2"><span className="text-gray-500 font-bold">{t('stats.obedience', '服從')}</span><span className="text-blue-400 font-bold text-xs">{slave.primaryStats.obedience}</span></div>
+            <div className="flex justify-between items-center"><span className="text-gray-500 font-bold truncate pr-1">{t('stats.charisma', '魅力')}</span><span className="text-pink-400 font-bold text-xs">{slave.primaryStats.charisma ?? 10}</span></div>
+            <div className="flex justify-between items-center"><span className="text-gray-500 font-bold truncate pr-1">{t('stats.luck', '幸運')}</span><span className="text-yellow-400 font-bold text-xs">{slave.primaryStats.luck ?? 10}</span></div>
+            <div className="flex justify-between items-center sm:border-l sm:border-gray-800 sm:pl-2"><span className="text-gray-500 font-bold truncate pr-1">{t('stats.obedience', '服從')}</span><span className="text-blue-400 font-bold text-xs">{slave.primaryStats.obedience}</span></div>
           </div>
         </div>
 
