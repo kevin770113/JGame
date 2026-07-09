@@ -61,8 +61,13 @@ export default function SystemPanel() {
       isConfirm: true,
       action: async () => {
         await supabase.auth.signOut();
-        localStorage.clear();
-        window.location.reload();
+        // ★ 核心修復：阻斷 Zustand Persist 的競態條件 (Race Condition) 寫回漏洞
+        // 延遲 200ms 等待狀態更新視窗關閉後，再徹底清空 storage 並強制刷新
+        setTimeout(() => {
+          localStorage.clear();
+          sessionStorage.clear();
+          window.location.href = '/'; 
+        }, 200);
       }
     });
   };
