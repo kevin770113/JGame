@@ -64,7 +64,7 @@ export default function AbyssView() {
         </div>
 
         <div className="flex flex-col gap-1 border-b border-gray-800 pb-3 relative z-10">
-          <span className="text-xs text-gray-400 font-bold tracking-widest">{t('abyss.current_floor', '當前攻略層數：')} <strong className="text-purple-400 text-base font-mono">第 {abyssFloor} 階</strong></span>
+          <span className="text-xs text-gray-400 font-bold tracking-widest">{t('abyss.current_floor', '當前攻略層數：')} <strong className="text-purple-400 text-base font-mono">F {abyssFloor}</strong></span>
         </div>
 
         <div className="flex flex-col gap-2 relative z-10">
@@ -78,7 +78,7 @@ export default function AbyssView() {
           )}
           {activeSlave && (
             <div className="text-3xs text-gray-400 mt-1 flex justify-between px-1">
-              <span>{t('stats.stamina', '體力')}: <strong className={activeSlave.conditionStats.stamina < 30 ? 'text-red-400' : 'text-green-400'}>{activeSlave.conditionStats.stamina}/100</strong> (最低需求: 30)</span>
+              <span>{t('stats.stamina', '體力')}: <strong className={activeSlave.conditionStats.stamina < 30 ? 'text-red-400' : 'text-green-400'}>{activeSlave.conditionStats.stamina}/100</strong> (Min: 30)</span>
               <span>{t('stats.skill_survival', '生存本能')}: <strong className="text-yellow-400">Lv.{activeSlave.skills.survival}</strong></span>
             </div>
           )}
@@ -95,9 +95,9 @@ export default function AbyssView() {
           <div className="flex justify-between items-start">
             <div className="flex flex-col gap-1">
               <span className={`text-base font-bold tracking-widest ${currentEnemy.isBoss ? 'text-red-500 animate-pulse' : 'text-purple-300'}`}>
-                {currentEnemy.isBoss ? `【領主】${t(`npc.${currentEnemy.name}`, currentEnemy.name)}` : t(`npc.${currentEnemy.name}`, currentEnemy.name)}
+                {currentEnemy.isBoss ? `【BOSS】${currentEnemy.name}` : currentEnemy.name}
               </span>
-              <span className="text-3xs text-gray-500 italic">「{t(`npc_quote.${currentEnemy.name}`, currentEnemy.quote)}」</span>
+              <span className="text-3xs text-gray-500 italic">「{currentEnemy.quote}」</span>
             </div>
             <div className="flex flex-col items-end gap-0.5">
                <span className="text-3xs text-gray-500 font-bold tracking-widest">{t('abyss.reward', '突破獎勵')}</span>
