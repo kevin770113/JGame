@@ -13,23 +13,25 @@ export default function ArenaView() {
   const [selectedSlaveId, setSelectedSlaveId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
   
-  // ★ 戰鬥動效專屬狀態鎖
+  // 戰鬥動效專屬狀態鎖
   const [isFighting, setIsFighting] = useState(false);
 
   const isEn = i18n.language?.startsWith('en');
   const localNPCs = arenaNPCs.filter(npc => npc.location === location);
   
-  // 僅篩選閒置且未昏厥的奴隸（體力低於20仍會顯示，以便玩家知道他不能上場）
+  // 僅篩選閒置且未昏厥的奴隸（體力低於20仍會顯示，以便玩家直觀掌握狀態）
   const idleSlaves = slaves.filter(s => s.activityStatus === '閒置' && (s.faintTurns || 0) === 0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // 當可指派鬥士名單更新時，預設選取中央第一位
   useEffect(() => {
     if (idleSlaves.length > 0 && !selectedSlaveId) {
       setSelectedSlaveId(idleSlaves[0].id);
     }
   }, [idleSlaves, selectedSlaveId]);
 
+  // 處理滾輪滾動監聽，動態判定正中央的試驗體
   const handleScroll = () => {
     if (!scrollRef.current || idleSlaves.length === 0) return;
     const container = scrollRef.current;
@@ -74,20 +76,42 @@ export default function ArenaView() {
     // 觸發刀劍交鋒的紅光閃擊與容器震動特效
     setIsFighting(true);
 
-    // 延遲 900ms 鎖定操作，營造懸念後正式交付 Store 結算
+    // 延遲 900ms 鎖定操作，交付 Store 進行深層結算
     setTimeout(() => {
       executeArenaBattle(selectedSlaveId, npcId);
       setIsFighting(false);
     }, 900);
   };
 
-  // 依據目前地點獲取對應的 R2 角鬥場背景圖片路徑
+  // ★ 核心修復：更正為合法的 R2 儲存空間網址前綴
   const getArenaBgUrl = () => {
-    const r2Base = 'https://pub-f4c2298cdecf44d8bedcde11c1d8ea8d.r2.dev/';
+    const r2Base = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/';
     if (location === 'Frontlines') return `${r2Base}arena-bg-frontlines.webp`;
     if (location === 'Capital') return `${r2Base}arena-bg-capital.webp`;
     if (location === 'NeutralHub') return `${r2Base}arena-bg-neutral.webp`;
     return `${r2Base}arena-bg-frontlines.webp`;
+  };
+
+  // ★ 核心修復：動態即時語系名字解析器（相容新舊存檔，切換語系絕不卡死名字）
+  const getLocalizedNpcName = (id: string, currentName: string) => {
+    let cleanName = currentName
+      .replace('【狂暴的】', '').replace('【鐵壁的】', '').replace('【狡詐的】', '')
+      .replace('[Frenzied] ', '').replace('[Ironclad] ', '').replace('[Cunning] ', '').trim();
+
+    if (id.includes('npc-1')) cleanName = isEn ? 'Underground Thug' : '地下狂徒';
+    else if (id.includes('npc-2')) cleanName = isEn ? 'Iron Gladiator' : '鐵血角鬥士';
+    else if (id.includes('npc-3')) cleanName = isEn ? 'Royal Executioner' : '皇家處刑者';
+
+    if (id.includes('berserk') || currentName.includes('狂暴') || currentName.includes('Frenzied')) {
+      return isEn ? `[Frenzied] ${cleanName}` : `【狂暴的】${cleanName}`;
+    }
+    if (id.includes('ironclad') || id.includes('iron') || currentName.includes('鐵壁') || currentName.includes('Ironclad')) {
+      return isEn ? `[Ironclad] ${cleanName}` : `【鐵壁的】${cleanName}`;
+    }
+    if (id.includes('cunning') || currentName.includes('狡詐') || currentName.includes('Cunning')) {
+      return isEn ? `[Cunning] ${cleanName}` : `【狡詐的】${cleanName}`;
+    }
+    return cleanName;
   };
 
   const activeSlave = slaves.find(s => s.id === selectedSlaveId);
@@ -102,10 +126,9 @@ export default function ArenaView() {
 
       {/* 頂部暗黑英雄式滿版橫幅 */}
       <div className="relative w-full h-36 sm:h-40 shrink-0 bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-2xl">
-        {/* 移除嚴苛的 onError，讓圖片即使慢速載入也能顯示，並加入 bg-gray-900 墊底 */}
         <img 
           src={getArenaBgUrl()} 
-          alt="Arena Background" 
+          alt="Arena" 
           className="absolute inset-0 w-full h-full object-cover opacity-80"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/40 to-transparent" />
@@ -114,7 +137,7 @@ export default function ArenaView() {
             {t('arena.title', '［血腥角鬥場］')}
           </h2>
         </div>
-        {/* 已拔除破壞畫面的「返回城鎮」按鈕 */}
+        {/* ★ 已完美拔除畫蛇添足的「返回城鎮」按鈕 */}
       </div>
 
       <div className="bg-black/40 p-4 sm:p-5 rounded-lg border border-red-900/20 shadow-xl flex flex-col gap-5">
@@ -136,12 +159,12 @@ export default function ArenaView() {
               <div 
                 ref={scrollRef}
                 onScroll={handleScroll}
-                // ★ 導入 overflow-x-hidden 與 touch-pan-y 徹底鎖死 X 軸左右滑動干擾
+                // ★ 核心修復：強制 overflow-x-hidden 與 touch-pan-y 鎖死水平滑動干擾
                 className="w-full h-full overflow-y-auto overflow-x-hidden touch-pan-y snap-y snap-mandatory scrollbar-none py-12 flex flex-col items-center"
               >
                 {idleSlaves.map(s => {
                   const isSelected = s.id === selectedSlaveId;
-                  const isStaminaLow = s.conditionStats.stamina < 30;
+                  const isStaminaLow = s.conditionStats.stamina < 20;
                   return (
                     <div 
                       key={s.id}
@@ -155,10 +178,10 @@ export default function ArenaView() {
                       <span className="truncate max-w-[50%] font-sans tracking-wide">
                         {parseLocalizedName(s.name)}
                       </span>
-                      {/* ★ 改為顯示體力，直觀判斷是否能進場 */}
+                      {/* ★ 核心修復：改為顯示體力，並在低於出戰門檻時以紅色警告 */}
                       <div className="flex gap-2 text-right text-3xs items-center">
                         <span className="text-gray-500 tracking-widest">{t('stats.stamina', '體力')}:</span>
-                        <strong className={`${isStaminaLow ? 'text-red-500' : 'text-green-400'} font-mono text-sm`}>
+                        <strong className={`${isStaminaLow ? 'text-red-500 animate-pulse' : 'text-green-400'} font-mono text-sm`}>
                           {s.conditionStats.stamina}
                         </strong>
                       </div>
@@ -169,7 +192,7 @@ export default function ArenaView() {
             </div>
           ) : (
             <div className="text-xs text-gray-500 bg-gray-950/80 p-3 rounded border border-gray-800/80 shadow-inner">
-              {t('arena.no_fighter', '目前沒有閒置的鬥士。')}
+              {t('arena.no_fighter', '目前沒有閒置的試驗體。')}
             </div>
           )}
 
@@ -213,7 +236,10 @@ export default function ArenaView() {
               <div key={npc.id} className="bg-gray-950/80 p-4 rounded-lg border border-gray-800 shadow-lg flex flex-col gap-3 relative overflow-hidden group hover:border-red-900/40 transition-colors">
                 <div className="flex justify-between items-start z-10">
                   <div className="flex flex-col gap-1">
-                    <h4 className="text-sm font-bold text-gray-300 group-hover:text-red-400/90 transition-colors tracking-widest">{npc.name}</h4>
+                    {/* ★ 核心修復：使用 getLocalizedNpcName 即時重繪名字與特質前綴 */}
+                    <h4 className="text-sm font-bold text-gray-300 group-hover:text-red-400/90 transition-colors tracking-widest">
+                      {getLocalizedNpcName(npc.id, npc.name)}
+                    </h4>
                     <p className="text-3xs text-gray-500 leading-relaxed max-w-[180px] sm:max-w-[220px]">{npcDesc}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
