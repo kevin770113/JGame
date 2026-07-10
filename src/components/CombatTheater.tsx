@@ -117,7 +117,6 @@ export default function CombatTheater() {
       .replace('【狂暴的】', '').replace('【鐵壁的】', '').replace('【狡詐的】', '')
       .replace('[Frenzied] ', '').replace('[Ironclad] ', '').replace('[Cunning] ', '').trim();
 
-    // ★ 修復：使用 as any 迴避 TypeScript 嚴格檢查，讀取我們在 store 夾帶的 npcId
     const combatAny = activeCombat as any;
     const dynamicNpcId = combatAny.npcId || '';
 
@@ -164,10 +163,11 @@ export default function CombatTheater() {
     <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-fade-in overflow-hidden select-none font-mono">
       <div className="absolute inset-0 bg-black/95 z-0 pointer-events-none"></div>
       
+      {/* ★ 核心微調：擴大透明中心區域 (40%)，並大幅調降邊緣 Alpha 值，營造高級不刺眼的環境氛圍燈 */}
       <div className="fixed inset-0 z-[110] pointer-events-none mix-blend-screen">
-        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_20%,_rgba(220,20,20,0.55)_100%)] ${!isFinished ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
-        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_15%,_rgba(234,179,8,0.75)_100%)] ${isFinished && activeCombat.isWin ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
-        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_15%,_rgba(185,28,28,0.85)_100%)] ${isFinished && !activeCombat.isWin ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
+        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(220,20,20,0.25)_100%)] ${!isFinished ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
+        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(234,179,8,0.35)_100%)] ${isFinished && activeCombat.isWin ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
+        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(185,28,28,0.45)_100%)] ${isFinished && !activeCombat.isWin ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
       </div>
 
       <div className="relative border-b border-gray-800/80 pt-14 pb-5 px-4 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.9)] z-10 min-h-[25vh] md:min-h-[30vh] flex flex-col justify-end bg-gray-950">
@@ -178,11 +178,10 @@ export default function CombatTheater() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/50 to-transparent"></div>
         
-        <div className="absolute top-4 left-4 z-10">
-          <span className="text-red-600/70 font-mono font-black tracking-widest text-[10px] uppercase drop-shadow-md">
-            {activeCombat.isAbyss ? t('combat.title_abyss', '［深淵死鬥］') : t('combat.title_arena', '［血腥角鬥］')}
-          </span>
-        </div>
+        {/* ★ 徹底隱藏為 sr-only，保證不會再有死灰復燃的實體文字破壞橫幅純淨度 */}
+        <span className="sr-only">
+          {activeCombat.isAbyss ? t('combat.title_abyss', '［深淵死鬥］') : t('combat.title_arena', '［血腥角鬥］')}
+        </span>
         
         <div className="relative z-10 flex justify-between items-end gap-4 max-w-4xl mx-auto w-full">
           <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'slave-hit' ? 'translate-x-[-10px] md:translate-x-[-20px]' : activeEffect === 'slave-skill' ? 'scale-105' : ''}`}>
