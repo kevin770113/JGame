@@ -14,9 +14,8 @@ export default function ArenaView() {
   const [selectedSlaveId, setSelectedSlaveId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
   
-  // ★ 戰鬥動效專屬狀態鎖
+  // ★ 戰鬥動效專屬狀態鎖 (已移除多餘未使用的 targetNpcId)
   const [isFighting, setIsFighting] = useState(false);
-  const [targetNpcId, setTargetNpcId] = useState<string | null>(null);
 
   const isEn = i18n.language?.startsWith('en');
   const localNPCs = arenaNPCs.filter(npc => npc.location === location);
@@ -69,14 +68,12 @@ export default function ArenaView() {
     }
 
     // 觸發全屏閃擊與容器震動特效
-    setTargetNpcId(npcId);
     setIsFighting(true);
 
     // 延遲 900ms 鎖定操作，隨後正式交付結算
     setTimeout(() => {
       executeArenaBattle(selectedSlaveId, npcId);
       setIsFighting(false);
-      setTargetNpcId(null);
     }, 900);
   };
 
@@ -189,7 +186,7 @@ export default function ArenaView() {
           </div>
         )}
 
-        {/* 挑戰對手列表（完全無損繼承完整邏輯與五宮格排版） */}
+        {/* 挑戰對手列表 */}
         <div className="flex flex-col gap-4 mt-1">
           {localNPCs.length === 0 && (
             <div className="text-xs text-gray-600 text-center py-6 italic">{t('arena.no_npc', '該區域目前沒有可挑戰的對手。')}</div>
