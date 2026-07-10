@@ -5,7 +5,7 @@ import { CombatLog } from '../types';
 import { parseLocalizedName } from '../utils/i18nUtils';
 
 export default function CombatTheater() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const activeCombat = useGameStore((state) => state.activeCombat);
   const setActiveCombat = useGameStore((state) => state.setActiveCombat);
   const location = useGameStore((state) => state.player.location);
@@ -22,6 +22,8 @@ export default function CombatTheater() {
   
   const isMounted = useRef<boolean>(true);
   const timeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isEn = i18n.language?.startsWith('en');
 
   useEffect(() => {
     isMounted.current = true;
@@ -99,20 +101,53 @@ export default function CombatTheater() {
     }
   };
 
-  const localizedSlaveName = parseLocalizedName(activeCombat.slaveName);
-  const localizedNpcName = parseLocalizedName(activeCombat.npcName);
+  // ★ 己方名字自適應排版渲染器（拔除強制不換行，支援單字體貼近容器）
+  const renderSlaveNameHeader = (rawName: string) => {
+    const cleanName = parseLocalizedName(rawName);
+    return (
+      <div className="flex flex-col text-left font-sans min-h-[46px] justify-end">
+        <span className="text-sm md:text-lg font-bold text-blue-400 break-words tracking-wide leading-tight">
+          {cleanName}
+        </span>
+      </div>
+    );
+  };
 
-  const sNameLong = localizedSlaveName.length > 8;
-  const sNameClass = sNameLong 
-    ? "text-sm md:text-base tracking-normal leading-tight whitespace-nowrap" 
-    : "text-base md:text-xl tracking-widest leading-snug whitespace-nowrap";
+  // ★ 核心重構：對手稱號獨立一行，換行再顯示本名之自適應渲染器
+  const renderNpcNameHeader = (rawName: string) => {
+    let cleanName = rawName
+      .replace('【狂暴的】', '').replace('【鐵壁的】', '').replace('【狡詐的】', '')
+      .replace('[Frenzied] ', '').replace('[Ironclad] ', '').replace('[Cunning] ', '').trim();
 
-  const nNameLong = localizedNpcName.length > 8;
-  const nNameClass = nNameLong 
-    ? "text-sm md:text-base tracking-normal leading-tight text-right whitespace-nowrap" 
-    : "text-base md:text-xl tracking-widest leading-snug text-right whitespace-nowrap";
+    // 處理潛在的舊存檔翻譯兼容
+    if (activeCombat.npcId?.includes('npc-1')) cleanName = isEn ? 'Underground Thug' : '地下狂徒';
+    else if (activeCombat.npcId?.includes('npc-2')) cleanName = isEn ? 'Iron Gladiator' : '鐵血角鬥士';
+    else if (activeCombat.npcId?.includes('npc-3')) cleanName = isEn ? 'Royal Executioner' : '皇家處刑者';
 
-  // ★ 核心修復：正確的 R2 空間網址掛載
+    let title = '';
+    if (rawName.includes('狂暴') || rawName.includes('Frenzied')) {
+      title = isEn ? '[Frenzied]' : '【狂暴的】';
+    } else if (rawName.includes('鐵壁') || rawName.includes('Ironclad')) {
+      title = isEn ? '[Ironclad]' : '【鐵壁的】';
+    } else if (rawName.includes('狡詐') || rawName.includes('Cunning')) {
+      title = isEn ? '[Cunning]' : '【狡詐的】';
+    }
+
+    return (
+      <div className="flex flex-col text-right font-sans min-h-[46px] justify-end items-end">
+        {title && (
+          <span className="text-[10px] md:text-xs font-mono text-gray-500 font-semibold tracking-wider leading-none mb-0.5">
+            {title}
+          </span>
+        )}
+        <span className="text-sm md:text-lg font-bold text-red-400 break-words tracking-wide leading-tight">
+          {cleanName}
+        </span>
+      </div>
+    );
+  };
+
+  // ★ 更正為合法的 R2 儲存空間網址前綴
   const getArenaBgUrl = () => {
     const r2Base = 'https://pub-960b13e3ff2e4b13940f018c6763a755.r2.dev/';
     if (activeCombat.isAbyss) return `${r2Base}bg-abyss-capital.webp`;
@@ -122,72 +157,74 @@ export default function CombatTheater() {
     return `${r2Base}arena-bg-frontlines.webp`;
   };
 
+  const localizedSlaveName = parseLocalizedName(activeCombat.slaveName);
+  const localizedNpcName = parseLocalizedName(activeCombat.npcName);
+
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-fade-in overflow-hidden select-none font-mono">
       {/* 基礎暗黑底層 */}
-      <div className="absolute inset-0 bg-black/90 z-0 pointer-events-none"></div>
+      <div className="absolute inset-0 bg-black/95 z-0 pointer-events-none"></div>
       
-      {/* ★ 核心升級：三段式動態環境呼吸燈過渡 */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        {/* 戰鬥中：血紅呼吸燈 */}
-        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(220,20,20,0.4)_100%)] ${!isFinished ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
+      {/* ★ 核心重構：置於最頂層 z-[110] 的全螢幕大環境脈衝呼吸燈（覆蓋全機螢幕、不阻擋點擊、全面調高金光與紅光飽和度） */}
+      <div className="fixed inset-0 z-[110] pointer-events-none mix-blend-screen">
+        {/* 1. 戰鬥中：血紅環境呼吸燈 */}
+        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_20%,_rgba(220,20,20,0.55)_100%)] ${!isFinished ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
         
-        {/* 結算勝利：黃金呼吸燈 */}
-        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(234,179,8,0.35)_100%)] ${isFinished && activeCombat.isWin ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
+        {/* 2. 結算成功：高飽和度黃金榮譽呼吸燈 */}
+        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_15%,_rgba(234,179,8,0.75)_100%)] ${isFinished && activeCombat.isWin ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
         
-        {/* 結算失敗：深紅呼吸燈 */}
-        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(185,28,28,0.6)_100%)] ${isFinished && !activeCombat.isWin ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
+        {/* 3. 結算失敗：沉重暗紅死亡呼吸燈 */}
+        <div className={`absolute inset-0 transform-gpu transition-opacity duration-1000 ease-in-out bg-[radial-gradient(ellipse_at_center,_transparent_15%,_rgba(185,28,28,0.85)_100%)] ${isFinished && !activeCombat.isWin ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
       </div>
 
-      {/* 頂部英雄式滿版橫幅 (完全拔除舊版純文字標題) */}
-      <div className="relative border-b border-gray-800 pt-16 pb-6 px-4 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)] z-10 min-h-[25vh] md:min-h-[30vh] flex flex-col justify-end bg-gray-950">
+      {/* 頂部改造成滿版暗黑英雄式橫幅 (已徹底拔除舊版制式純文字標題與多餘外距) */}
+      <div className="relative border-b border-gray-800/80 pt-14 pb-5 px-4 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.9)] z-10 min-h-[25vh] md:min-h-[30vh] flex flex-col justify-end bg-gray-950">
         <img 
           src={getArenaBgUrl()} 
-          alt={activeCombat.isAbyss ? 'Abyss Combat' : 'Arena Combat'} 
-          className="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity duration-700" 
+          alt="Combat Theatre Banner" 
+          className="absolute inset-0 w-full h-full object-cover object-top opacity-60" 
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/60 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/50 to-transparent"></div>
         
-        {/* 隱藏標題，維持語意結構但保證畫面絕對乾淨 */}
-        <span className="sr-only">
-          {activeCombat.isAbyss ? t('combat.title_abyss', '［深淵死鬥］') : t('combat.title_arena', '［血腥角鬥］')}
-        </span>
+        <div className="absolute top-4 left-4 z-10">
+          <span className="text-red-600/70 font-mono font-black tracking-widest text-[10px] uppercase drop-shadow-md">
+            {activeCombat.isAbyss ? t('combat.title_abyss', '［深淵死鬥］') : t('combat.title_arena', '［血腥角鬥］')}
+          </span>
+        </div>
         
-        {/* 血條對抗資訊列 */}
-        <div className="relative z-10 flex justify-between items-start gap-4 max-w-4xl mx-auto w-full">
-          {/* 左側：己方鬥士 */}
+        {/* 對抗資訊與血條控制列 */}
+        <div className="relative z-10 flex justify-between items-end gap-4 max-w-4xl mx-auto w-full">
+          {/* 左側：己方試驗體 */}
           <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'slave-hit' ? 'translate-x-[-10px] md:translate-x-[-20px]' : activeEffect === 'slave-skill' ? 'scale-105' : ''}`}>
-            <span className={`text-blue-400 font-bold break-all ${sNameClass}`}>
-              {localizedSlaveName}
-            </span>
+            {renderSlaveNameHeader(activeCombat.slaveName)}
             <div className="w-full h-4 md:h-5 bg-gray-950 border border-gray-800 rounded-sm overflow-hidden relative">
               <div 
                 className={`h-full transition-all duration-500 ease-out shadow-[0_0_8px_rgba(37,99,235,0.4)] ${slaveHpPercent < 30 ? 'bg-red-600 animate-pulse shadow-[0_0_8px_rgba(220,38,38,0.6)]' : 'bg-blue-600'}`}
                 style={{ width: `${slaveHpPercent}%` }}
               />
+              <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent mix-blend-overlay"></div>
             </div>
-            <span className="text-gray-400 text-[10px] md:text-xs font-bold font-mono text-left tracking-widest">
+            <span className="text-gray-400 text-[10px] md:text-xs font-bold font-mono text-left tracking-wider">
               {slaveHp} / {activeCombat.slaveMaxHp}
             </span>
           </div>
 
-          {/* 中央：VS */}
-          <div className="shrink-0 flex flex-col items-center justify-center w-10 md:w-16 mt-4">
-             <span className="text-gray-500 font-black italic text-2xl md:text-3xl drop-shadow-md">VS</span>
+          {/* 中央：VS 標記 */}
+          <div className="shrink-0 flex flex-col items-center justify-center w-10 md:w-16 pb-4">
+             <span className="text-gray-600 font-black italic text-2xl md:text-3xl drop-shadow-md">VS</span>
           </div>
 
-          {/* 右側：敵方 NPC */}
+          {/* 右側：敵方對手 */}
           <div className={`flex-1 flex flex-col gap-1.5 transition-transform duration-75 overflow-hidden ${activeEffect === 'npc-hit' ? 'translate-x-[10px] md:translate-x-[20px]' : ''}`}>
-            <span className={`text-red-400 font-bold break-all ${nNameClass}`}>
-              {localizedNpcName}
-            </span>
+            {renderNpcNameHeader(activeCombat.npcName)}
             <div className="w-full h-4 md:h-5 bg-gray-950 border border-gray-800 rounded-sm overflow-hidden relative rotate-180">
               <div 
                 className="h-full bg-red-700 transition-all duration-500 ease-out shadow-[0_0_8px_rgba(185,28,28,0.5)]"
                 style={{ width: `${npcHpPercent}%` }}
               />
+              <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent mix-blend-overlay"></div>
             </div>
-            <span className="text-gray-400 text-[10px] md:text-xs font-bold font-mono text-right tracking-widest">
+            <span className="text-gray-400 text-[10px] md:text-xs font-bold font-mono text-right tracking-wider">
               {npcHp} / {activeCombat.npcMaxHp}
             </span>
           </div>
@@ -232,7 +269,7 @@ export default function CombatTheater() {
         </div>
       </div>
 
-      {/* 結算面板 */}
+      {/* 結算控制面板 */}
       <div className={`bg-gray-950/95 backdrop-blur-xl border-t border-gray-800 relative z-20 flex justify-center items-center transition-all duration-1000 ${isFinished ? 'h-40 md:h-44 opacity-100 translate-y-0 px-4 pt-4 pb-12' : 'h-0 opacity-0 translate-y-full overflow-hidden p-0'}`}>
         {isFinished && (
           <div className="flex flex-col items-center gap-3 w-full max-w-md animate-fade-in mt-2">
