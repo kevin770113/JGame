@@ -9,28 +9,27 @@ export default function ArenaView() {
   const arenaNPCs = useGameStore((state) => state.arenaNPCs);
   const { actionPoints, location } = useGameStore((state) => state.player);
   const executeArenaBattle = useGameStore((state) => state.executeArenaBattle);
-  const navigate = useGameStore((state) => state.navigate);
 
   const [selectedSlaveId, setSelectedSlaveId] = useState<string>('');
   const [sysMessage, setSysMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
   
-  // ★ 戰鬥動效專屬狀態鎖 (已移除多餘未使用的 targetNpcId)
+  // ★ 戰鬥動效專屬狀態鎖
   const [isFighting, setIsFighting] = useState(false);
 
   const isEn = i18n.language?.startsWith('en');
   const localNPCs = arenaNPCs.filter(npc => npc.location === location);
-  const idleSlaves = slaves.filter(s => s.activityStatus === '閒置' && (s.faintTurns || 0) === 0 && s.conditionStats.stamina >= 20);
+  
+  // 僅篩選閒置且未昏厥的奴隸（體力低於20仍會顯示，以便玩家知道他不能上場）
+  const idleSlaves = slaves.filter(s => s.activityStatus === '閒置' && (s.faintTurns || 0) === 0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 當可指派鬥士名單更新時，預設選取中央第一位
   useEffect(() => {
     if (idleSlaves.length > 0 && !selectedSlaveId) {
       setSelectedSlaveId(idleSlaves[0].id);
     }
   }, [idleSlaves, selectedSlaveId]);
 
-  // 處理滾輪滾動監聽，動態判定正中央的鬥士
   const handleScroll = () => {
     if (!scrollRef.current || idleSlaves.length === 0) return;
     const container = scrollRef.current;
@@ -62,15 +61,20 @@ export default function ArenaView() {
       setSysMessage({ text: t('arena.err_no_fighter', '［錯誤］請先選擇要上陣的試驗體。'), type: 'error' });
       return;
     }
+    const activeSlave = slaves.find(s => s.id === selectedSlaveId);
+    if (!activeSlave || activeSlave.conditionStats.stamina < 20) {
+      setSysMessage({ text: t('arena.err_no_fighter_stamina', '［錯誤］該名鬥士體力不足，無法上陣。'), type: 'error' });
+      return;
+    }
     if (actionPoints < 1) {
       setSysMessage({ text: t('arena.err_no_ap', '［系統警告］行動力不足。'), type: 'error' });
       return;
     }
 
-    // 觸發全屏閃擊與容器震動特效
+    // 觸發刀劍交鋒的紅光閃擊與容器震動特效
     setIsFighting(true);
 
-    // 延遲 900ms 鎖定操作，隨後正式交付結算
+    // 延遲 900ms 鎖定操作，營造懸念後正式交付 Store 結算
     setTimeout(() => {
       executeArenaBattle(selectedSlaveId, npcId);
       setIsFighting(false);
@@ -91,18 +95,18 @@ export default function ArenaView() {
   return (
     <div className={`w-full flex flex-col gap-4 pb-10 animate-fade-in relative z-10 ${isFighting ? 'animate-shake' : ''}`}>
       
-      {/* 全屏戰鬥血紅閃擊遮罩 */}
+      {/* 全屏戰鬥刀劍交鋒血紅閃擊遮罩 */}
       {isFighting && (
-        <div className="fixed inset-0 bg-red-600/40 z-50 pointer-events-none animate-flash" />
+        <div className="fixed inset-0 bg-red-600/50 z-50 pointer-events-none animate-flash" />
       )}
 
       {/* 頂部暗黑英雄式滿版橫幅 */}
-      <div className="relative w-full h-36 sm:h-40 shrink-0 bg-black border border-gray-800 rounded-lg overflow-hidden shadow-2xl">
+      <div className="relative w-full h-36 sm:h-40 shrink-0 bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-2xl">
+        {/* 移除嚴苛的 onError，讓圖片即使慢速載入也能顯示，並加入 bg-gray-900 墊底 */}
         <img 
           src={getArenaBgUrl()} 
-          alt="" 
+          alt="Arena Background" 
           className="absolute inset-0 w-full h-full object-cover opacity-80"
-          onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/40 to-transparent" />
         <div className="absolute bottom-3 left-4 z-10">
@@ -110,15 +114,7 @@ export default function ArenaView() {
             {t('arena.title', '［血腥角鬥場］')}
           </h2>
         </div>
-        <div className="absolute top-3 right-3 z-10">
-          <button 
-            onClick={() => navigate('Town', 'Main')} 
-            disabled={isFighting}
-            className="whitespace-nowrap px-3 py-1.5 bg-gray-950/80 border border-gray-700 hover:bg-gray-900 text-gray-400 font-bold rounded text-xs transition-colors shadow-lg tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {t('ui.return_town', '［返回城鎮］')}
-          </button>
-        </div>
+        {/* 已拔除破壞畫面的「返回城鎮」按鈕 */}
       </div>
 
       <div className="bg-black/40 p-4 sm:p-5 rounded-lg border border-red-900/20 shadow-xl flex flex-col gap-5">
@@ -140,10 +136,12 @@ export default function ArenaView() {
               <div 
                 ref={scrollRef}
                 onScroll={handleScroll}
-                className="w-full h-full overflow-y-auto snap-y snap-mandatory scrollbar-none py-12 flex flex-col items-center"
+                // ★ 導入 overflow-x-hidden 與 touch-pan-y 徹底鎖死 X 軸左右滑動干擾
+                className="w-full h-full overflow-y-auto overflow-x-hidden touch-pan-y snap-y snap-mandatory scrollbar-none py-12 flex flex-col items-center"
               >
                 {idleSlaves.map(s => {
                   const isSelected = s.id === selectedSlaveId;
+                  const isStaminaLow = s.conditionStats.stamina < 30;
                   return (
                     <div 
                       key={s.id}
@@ -157,9 +155,12 @@ export default function ArenaView() {
                       <span className="truncate max-w-[50%] font-sans tracking-wide">
                         {parseLocalizedName(s.name)}
                       </span>
-                      <div className="flex gap-4 text-right text-3xs">
-                        <span>{t('stats.combat', '武')}: <strong className={isSelected ? 'text-red-400' : 'text-gray-600'}>{s.primaryStats.combat}</strong></span>
-                        <span>{t('stats.endurance', '體')}: <strong className={isSelected ? 'text-green-400' : 'text-gray-600'}>{s.primaryStats.endurance}</strong></span>
+                      {/* ★ 改為顯示體力，直觀判斷是否能進場 */}
+                      <div className="flex gap-2 text-right text-3xs items-center">
+                        <span className="text-gray-500 tracking-widest">{t('stats.stamina', '體力')}:</span>
+                        <strong className={`${isStaminaLow ? 'text-red-500' : 'text-green-400'} font-mono text-sm`}>
+                          {s.conditionStats.stamina}
+                        </strong>
                       </div>
                     </div>
                   );
@@ -168,13 +169,15 @@ export default function ArenaView() {
             </div>
           ) : (
             <div className="text-xs text-gray-500 bg-gray-950/80 p-3 rounded border border-gray-800/80 shadow-inner">
-              {t('arena.no_fighter', '目前沒有閒置且有戰鬥力的奴隸。')}
+              {t('arena.no_fighter', '目前沒有閒置的鬥士。')}
             </div>
           )}
 
           {activeSlave && (
             <div className="text-3xs text-gray-500 mt-1 flex justify-between px-1 font-mono">
-              <span>{t('stats.stamina', '體力')}: <strong className={activeSlave.conditionStats.stamina < 30 ? 'text-red-500/80' : 'text-green-500/80'}>{activeSlave.conditionStats.stamina}/100</strong> (Min: 20)</span>
+              <span className={activeSlave.conditionStats.stamina < 20 ? 'text-red-500 font-bold animate-pulse' : ''}>
+                {t('arena.min_stamina_req', '※ 出戰需具備最低體力: 20')}
+              </span>
               <span>{t('stats.skill_combat', '戰鬥專精')}: <strong className="text-blue-400/80">Lv.{activeSlave.skills.combat}</strong></span>
             </div>
           )}
@@ -243,9 +246,9 @@ export default function ArenaView() {
                   </div>
                   <button 
                     onClick={() => handleFight(npc.id)}
-                    disabled={!selectedSlaveId || actionPoints < 1 || isFighting}
+                    disabled={!selectedSlaveId || actionPoints < 1 || isFighting || (activeSlave && activeSlave.conditionStats.stamina < 20)}
                     className={`px-4 py-2 rounded font-bold text-xs tracking-widest transition-all shadow-md ${
-                      !selectedSlaveId || actionPoints < 1 || isFighting
+                      !selectedSlaveId || actionPoints < 1 || isFighting || (activeSlave && activeSlave.conditionStats.stamina < 20)
                         ? 'bg-gray-900/50 text-gray-600 border border-gray-800 cursor-not-allowed'
                         : 'bg-red-950/60 hover:bg-red-900/80 text-red-400/90 hover:text-red-300 border border-red-900/60'
                     }`}
