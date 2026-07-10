@@ -3,7 +3,7 @@ import { GameStore } from '../../types/storeTypes';
 import { CombatLog, CombatPlaybackData } from '../../types';
 import { ITEMS_DATA } from '../../utils/gameData';
 import { getAbyssEnemy, BASE_ARENA_NPCS } from '../../utils/generators';
-import i18n from '../../i18n'; // ★ V2.10.0 引入 i18n 引擎以支援動態前綴與數值翻譯
+import i18n from '../../i18n';
 
 export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get) => ({
   executeArenaBattle: (slaveId: string, npcId: string) => {
@@ -33,7 +33,6 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
     let nSpd = npc.stats.intelligence; let nLuck = npc.stats.luck; let nCharisma = npc.stats.charisma;
 
     const logs: CombatLog[] = []; 
-    // ★ V2.10.0 日誌重構：使用 addLog 輔助函數隱式塞入 messageKey 與 params
     const addLog = (r: number, key: string, params: any, msg: string, type: 'system'|'damage'|'heal'|'skill', dmg?: number) => {
         logs.push({ round: r, messageKey: key, messageParams: params, message: msg, type, sHp, nHp, damage: dmg } as any);
     };
@@ -154,12 +153,14 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
         const newNpcs = s.arenaNPCs.filter(n => n.id !== npcId);
         const baseMatch = BASE_ARENA_NPCS.find(b => b.location === npc.location) || BASE_ARENA_NPCS[0];
         const rand = Math.random();
-        let prefix = ''; let cStats = { ...baseMatch.stats };
-        // ★ V2.10.0 即時翻譯敵方前綴
-        if (rand < 0.33) { prefix = i18n.t('npc.prefix_berserk', '【狂暴的】 '); cStats.combat = Math.floor(cStats.combat * 1.15); cStats.endurance = Math.floor(cStats.endurance * 0.85); }
-        else if (rand < 0.66) { prefix = i18n.t('npc.prefix_iron', '【鐵壁的】 '); cStats.endurance = Math.floor(cStats.endurance * 1.20); cStats.combat = Math.floor(cStats.combat * 0.90); cStats.intelligence = Math.floor(cStats.intelligence * 0.90); }
-        else { prefix = i18n.t('npc.prefix_cunning', '【狡詐的】 '); cStats.luck += 15; cStats.intelligence = Math.floor(cStats.intelligence * 1.10); cStats.endurance = Math.floor(cStats.endurance * 0.85); }
-        newNpcs.push({ ...baseMatch, id: `${baseMatch.id}-${Date.now()}`, name: `${prefix}${baseMatch.name}`, stats: cStats });
+        let prefixTag = ''; let cStats = { ...baseMatch.stats };
+        
+        // ★ 核心修復：特質前綴改為寫入 ID Tag，名稱保持乾淨，避免硬編碼污染語系
+        if (rand < 0.33) { prefixTag = 'berserk'; cStats.combat = Math.floor(cStats.combat * 1.15); cStats.endurance = Math.floor(cStats.endurance * 0.85); }
+        else if (rand < 0.66) { prefixTag = 'ironclad'; cStats.endurance = Math.floor(cStats.endurance * 1.20); cStats.combat = Math.floor(cStats.combat * 0.90); cStats.intelligence = Math.floor(cStats.intelligence * 0.90); }
+        else { prefixTag = 'cunning'; cStats.luck += 15; cStats.intelligence = Math.floor(cStats.intelligence * 1.10); cStats.endurance = Math.floor(cStats.endurance * 0.85); }
+        
+        newNpcs.push({ ...baseMatch, id: `${baseMatch.id}-${prefixTag}-${Date.now()}`, name: baseMatch.name, stats: cStats });
         return { arenaNPCs: newNpcs };
       });
 
@@ -180,13 +181,14 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
 
     get().updateSlave(slave.id, { combatRecord: { wins: newWins, losses: newLosses }, isInjured: isInjuredNow, conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion }, primaryStats: slave.primaryStats });
     
-    const playbackData: CombatPlaybackData = {
+    // ★ 核心修復：夾帶 npcId 交給 View 層解析；確保 npcName 對齊日誌，使正則高亮染色永不失效
+    const playbackData = {
        slaveId: slave.id, slaveName: slave.name, slaveMaxHp: sHpMax,
-       npcName: npc.name, npcMaxHp: nHpMax, logs, isWin,
+       npcId: npc.id, npcName: npc.name, npcMaxHp: nHpMax, logs, isWin,
        rewardGold: finalRewardGold,
        rewardPrestige: isWin ? npc.rewardPrestige : 0, isAbyss: false
-    };
-    set({ activeCombat: playbackData });
+    } as CombatPlaybackData & { npcId?: string };
+    set({ activeCombat: playbackData as CombatPlaybackData });
 
     get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
   },
@@ -351,13 +353,14 @@ export const createCombatSlice: StateCreator<GameStore, [], [], any> = (set, get
 
     get().updateSlave(slave.id, { combatRecord: { wins: newWins, losses: newLosses }, isInjured: isInjuredNow, conditionStats: { stamina: newStamina, stress: newStress, rebellion: newRebellion }, primaryStats: slave.primaryStats });
     
-    const playbackData: CombatPlaybackData = {
+    // ★ 核心修復：深淵也同步寫入 npcId 以支援動態即時語系
+    const playbackData = {
        slaveId: slave.id, slaveName: slave.name, slaveMaxHp: sHpMax,
-       npcName: enemy.name, npcMaxHp: nHpMax, logs, isWin,
+       npcId: 'abyss', npcName: enemy.name, npcMaxHp: nHpMax, logs, isWin,
        rewardGold: finalRewardGold,
        rewardPrestige: isWin ? enemy.rewardPrestige : 0, isAbyss: true
-    };
-    set({ activeCombat: playbackData });
+    } as CombatPlaybackData & { npcId?: string };
+    set({ activeCombat: playbackData as CombatPlaybackData });
 
     get().processTurn(); get().syncProfileToCloud(); return { logs, isWin };
   }
