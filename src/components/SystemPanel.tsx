@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGameStore } from '../store/useGameStore';
 import { supabase } from '../services/supabaseClient';
+// ★ 核心修復：引入 localforage，以便能直接格式化 IndexedDB 資料庫存檔
+import localforage from 'localforage';
 
 export default function SystemPanel() {
   const { t, i18n } = useTranslation();
@@ -62,8 +64,14 @@ export default function SystemPanel() {
       action: async () => {
         await supabase.auth.signOut();
         // ★ 核心修復：阻斷 Zustand Persist 的競態條件 (Race Condition) 寫回漏洞
-        // 延遲 200ms 等待狀態更新視窗關閉後，再徹底清空 storage 並強制刷新
-        setTimeout(() => {
+        // 延遲 200ms 等待狀態更新視窗關閉後，徹底清空 storage、IndexedDB 並強制刷新
+        setTimeout(async () => {
+          try {
+            // 徹底清除 IndexedDB 內所有儲存的資料，防止舊存檔死灰復燃
+            await localforage.clear();
+          } catch (err) {
+            console.error('［清除資料庫異常］Failed to clear localforage:', err);
+          }
           localStorage.clear();
           sessionStorage.clear();
           window.location.href = '/'; 
