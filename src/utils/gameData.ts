@@ -13,13 +13,10 @@ export const QUESTS_DATA = {
   'q_enter_hub': { title: '【主線】踏入灰色地帶', description: '累積 100 點威望，並將商會遷移至中立貿易城。' },
 };
 
-// ★ V2.11.0 武器資料庫字典化
+// ★ V2.11.0 武器資料庫字典化 (已徹底淨化，僅保留預定道具)
 export const ITEMS_DATA: Record<string, { name: string, type: ItemType, effect: any, price: number, desc: string }> = {
   'potion_heal_small': { name: 'items.potion_heal_small.name', type: 'potion', effect: { stamina: 30 }, price: 500, desc: 'items.potion_heal_small.desc' },
-  'weapon_iron_sword': { name: 'items.iron_sword.name', type: 'weapon', effect: { attack: 10 }, price: 2000, desc: 'items.iron_sword.desc' },
-  'steel_spear': { name: 'items.steel_spear.name', type: 'weapon', effect: { attack: 15 }, price: 320, desc: 'items.steel_spear.desc' },
-  'obsidian_dagger': { name: 'items.obsidian_dagger.name', type: 'weapon', effect: { attack: 28 }, price: 680, desc: 'items.obsidian_dagger.desc' },
-  'abyss_reaper': { name: 'items.abyss_reaper.name', type: 'weapon', effect: { attack: 55 }, price: 1500, desc: 'items.abyss_reaper.desc' }
+  'weapon_iron_sword': { name: 'items.iron_sword.name', type: 'weapon', effect: { attack: 10 }, price: 2000, desc: 'items.iron_sword.desc' }
 };
 
 export const getSlavePortraitUrl = (slave: Slave): string => {
