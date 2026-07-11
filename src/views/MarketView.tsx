@@ -116,7 +116,12 @@ export default function MarketView() {
         <div className="flex flex-col gap-4 animate-fade-in">
           <p className="text-xs text-gray-400 italic border-l-2 border-purple-500 pl-2">{t('market.quote_shop', '「這裡流通著帝國明令禁止的特種物資與軍械。」')}</p>
           <div className="flex flex-col gap-3">
-            {Object.entries(ITEMS_DATA).map(([id, item]) => {
+            {/* ★ 核心重構：阻斷全域穿透！只渲染今天店裡有進貨 (shopStock) 的商品 */}
+            {Object.keys(shopStock).map((id) => {
+              const item = ITEMS_DATA[id];
+              // 防呆檢查：如果進貨的商品在資料庫中被刪除了，則跳過不渲染
+              if (!item) return null;
+
               const currentStock = shopStock[id] || 0;
               const isSoldOut = currentStock <= 0;
               
@@ -124,9 +129,11 @@ export default function MarketView() {
                 <div key={id} className={`bg-gray-950 border p-3 rounded flex justify-between items-center shadow-inner ${isSoldOut ? 'border-gray-800 opacity-60' : 'border-purple-900/30'}`}>
                    <div className="flex flex-col gap-1">
                       <h4 className="text-sm font-bold text-gray-200">
+                        {/* ★ 確保呼叫 t() 函數來吃多語系字典 */}
                         {t(item.name)} 
                         <span className={`text-xs font-mono ml-2 ${isSoldOut ? 'text-red-500' : 'text-purple-400'}`}>({t('ui.remaining', '剩餘')}: {currentStock})</span>
                       </h4>
+                      {/* ★ 確保呼叫 t() 函數來吃多語系字典 */}
                       <p className="text-xs text-gray-500">{t(item.desc)}</p>
                    </div>
                    <button onClick={() => {
