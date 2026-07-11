@@ -244,7 +244,7 @@
     "btn_unsecurity": "［解除守衛］",
     "btn_security": "［任用為守衛］",
     "warn_title": "［時光流逝警告］",
-    "warn_exec": "即將執行：",
+    "warn_exec": "即遇到",
     "warn_cost_pt1": "此行動將消耗 ",
     "pts_ap": " 點行動力",
     "warn_cost_pt2": "，並推進 ",
@@ -453,5 +453,15 @@
     "select_to_predict": "選擇探索者以預測存活率",
     "btn_boss": "［挑戰領主］",
     "btn_challenge": "［踏入深淵］"
+  },
+  "items": {
+    "potion_heal_small": {
+      "name": "劣質藥水",
+      "desc": "混濁的廉價藥劑，飲用後可勉強恢復 30 點體力。味道令人作嘔。"
+    },
+    "iron_sword": {
+      "name": "鐵劍",
+      "desc": "做工粗糙但沉重的制式兵器，能為持有者提升 10 點武力。刀刃上還殘留著未乾的血跡。"
+    }
   }
 }
